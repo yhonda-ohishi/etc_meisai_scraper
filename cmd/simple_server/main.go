@@ -37,6 +37,8 @@ func main() {
 	r.Get("/api/etc/accounts", etc.GetAvailableAccountsHandler)
 	r.Post("/api/etc/download", etc.DownloadETCDataHandler)
 	r.Post("/api/etc/download-single", etc.DownloadSingleAccountHandler)
+	r.Post("/api/etc/download-async", etc.StartDownloadJobHandler)
+	r.HandleFunc("/api/etc/download-status/*", etc.GetDownloadJobStatusHandler)
 	r.Post("/api/etc/parse-csv", etc.ParseCSVHandler)
 
 	// Get server port

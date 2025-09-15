@@ -286,6 +286,139 @@ paths:
         '500':
           description: サーバーエラー
 
+  /api/etc/download-async:
+    post:
+      summary: ETC明細ダウンロード（非同期・進捗確認可能）
+      description: |
+        非同期でETC明細をダウンロードし、ジョブIDを返します。
+        ジョブIDを使って進捗を確認できます。
+
+        **使用方法:**
+        1. このエンドポイントでジョブを開始
+        2. 返されたjob_idで `/api/etc/download-status/{job_id}` をポーリング
+        3. statusが"completed"になったら結果を取得
+
+        **進捗確認の例:**
+        ```javascript
+        // ジョブ開始
+        const response = await fetch('/api/etc/download-async', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            from_date: '2025-08-01',
+            to_date: '2025-09-15'
+          })
+        });
+        const {job_id} = await response.json();
+
+        // 進捗確認（1秒おきにポーリング）
+        const checkProgress = setInterval(async () => {
+          const status = await fetch(`/api/etc/download-status/${job_id}`);
+          const job = await status.json();
+          console.log(`進捗: ${job.progress}% - ${job.message}`);
+
+          if (job.status === 'completed') {
+            clearInterval(checkProgress);
+            console.log('完了:', job.result);
+          }
+        }, 1000);
+        ```
+      tags:
+        - Download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+      responses:
+        '202':
+          description: ジョブ開始成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                    description: ジョブID
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  status_url:
+                    type: string
+                    description: ステータス確認URL
+                    example: "/api/etc/download-status/550e8400-e29b-41d4-a716-446655440000"
+        '400':
+          description: リクエストエラー
+
+  /api/etc/download-status/{job_id}:
+    get:
+      summary: ダウンロードジョブの進捗確認
+      description: |
+        ジョブIDを指定してダウンロードの進捗状況を取得します。
+
+        **ステータス値:**
+        - `pending`: 処理待機中
+        - `processing`: 処理中
+        - `completed`: 完了
+        - `failed`: 失敗
+
+        **ポーリング推奨間隔:** 1-2秒
+      tags:
+        - Download
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          description: ジョブID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ジョブステータス取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: ジョブID
+                  status:
+                    type: string
+                    enum: [pending, processing, completed, failed]
+                    description: ジョブステータス
+                  progress:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                    description: 進捗率（%）
+                  message:
+                    type: string
+                    description: 現在の処理内容
+                  result:
+                    type: object
+                    description: 完了時の結果（statusがcompletedの場合）
+                  error:
+                    type: string
+                    description: エラーメッセージ（statusがfailedの場合）
+                  created_at:
+                    type: string
+                    format: date-time
+                    description: ジョブ作成日時
+                  updated_at:
+                    type: string
+                    format: date-time
+                    description: 最終更新日時
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                status: "processing"
+                progress: 45
+                message: "アカウント ohishiexp を処理中... (2/3)"
+                created_at: "2025-09-15T12:00:00Z"
+                updated_at: "2025-09-15T12:00:30Z"
+        '404':
+          description: ジョブが見つからない
+
   /api/etc/parse-csv:
     post:
       summary: CSVファイルパース

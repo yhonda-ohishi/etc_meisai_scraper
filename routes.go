@@ -23,6 +23,8 @@ func SetupRoutes(r *chi.Mux, handler *handlers.ETCHandler, importHandler *handle
 		r.HandleFunc("/accounts", GetAvailableAccountsHandler)
 		r.HandleFunc("/download", DownloadETCDataHandler)
 		r.HandleFunc("/download-single", DownloadSingleAccountHandler)
+		r.HandleFunc("/download-async", StartDownloadJobHandler)
+		r.HandleFunc("/download-status/*", GetDownloadJobStatusHandler)
 		r.HandleFunc("/parse-csv", ParseCSVHandler)
 
 		// Import endpoints
