@@ -287,12 +287,6 @@ func processDownloadJob(job *DownloadJob, req DownloadRequest, fromDate, toDate 
 	updateJob("completed", 100, "ダウンロード完了")
 }
 
-// DownloadAsyncHandler is an alias for StartDownloadJobHandler for backward compatibility
-var DownloadAsyncHandler = StartDownloadJobHandler
-
-// GetDownloadStatusHandler is an alias for GetDownloadJobStatusHandler for backward compatibility
-var GetDownloadStatusHandler = GetDownloadJobStatusHandler
-
 // RegisterProgressHandlers registers progress tracking API handlers
 func RegisterProgressHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/etc/download-async", StartDownloadJobHandler)

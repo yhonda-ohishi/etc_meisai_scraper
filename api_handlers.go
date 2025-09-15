@@ -295,6 +295,16 @@ func GetAvailableAccountsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// DownloadAsyncHandler handles async download requests (wrapper for StartDownloadJobHandler)
+func DownloadAsyncHandler(w http.ResponseWriter, r *http.Request) {
+	StartDownloadJobHandler(w, r)
+}
+
+// GetDownloadStatusHandler handles status check requests (wrapper for GetDownloadJobStatusHandler)
+func GetDownloadStatusHandler(w http.ResponseWriter, r *http.Request) {
+	GetDownloadJobStatusHandler(w, r)
+}
+
 // RegisterAPIHandlers registers all API handlers
 func RegisterAPIHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/health", HealthCheckHandler)
