@@ -213,8 +213,7 @@ func processDownloadJob(job *DownloadJob, req DownloadRequest, fromDate, toDate 
 		jobsMutex.Unlock()
 	}
 
-	updateJob("processing", 10, "処理を開始しています...")
-	time.Sleep(1 * time.Second)
+	updateJob("processing", 5, "処理を開始しています...")
 
 	// Get accounts
 	accounts := req.Accounts
@@ -228,34 +227,62 @@ func processDownloadJob(job *DownloadJob, req DownloadRequest, fromDate, toDate 
 		}
 	}
 
-	updateJob("processing", 20, fmt.Sprintf("%d件のアカウントを処理中...", len(accounts)))
+	updateJob("processing", 10, fmt.Sprintf("%d件のアカウントを処理中...", len(accounts)))
 
-	// Simulate download process
-	progressPerAccount := 70 / len(accounts)
-	currentProgress := 20
+	// Create ETC client
+	client := NewETCClient(req.Config)
 
-	results := []map[string]interface{}{}
+	// Process each account with real scraping
+	progressPerAccount := 80 / len(accounts)
+	currentProgress := 10
+	results := []DownloadResult{}
 
 	for i, account := range accounts {
+		updateJob("processing", currentProgress, fmt.Sprintf("アカウント %s にログイン中... (%d/%d)", account.UserID, i+1, len(accounts)))
+
+		// Create single account slice for processing
+		singleAccount := []config.SimpleAccount{account}
+
+		// Perform actual download
+		accountResults, err := client.DownloadETCData(singleAccount, fromDate, toDate)
+
+		if err != nil {
+			updateJob("processing", currentProgress, fmt.Sprintf("アカウント %s でエラー: %v", account.UserID, err))
+			// Add failed result
+			results = append(results, DownloadResult{
+				UserID:      account.UserID,
+				Success:     false,
+				Error:       err.Error(),
+				Records:     []ETCMeisai{},
+				RecordCount: 0,
+			})
+		} else if len(accountResults) > 0 {
+			// Add successful result
+			results = append(results, accountResults[0])
+			updateJob("processing", currentProgress + progressPerAccount/2, fmt.Sprintf("アカウント %s: %d件のデータを取得 (%d/%d)", account.UserID, accountResults[0].RecordCount, i+1, len(accounts)))
+		}
+
 		currentProgress += progressPerAccount
-		updateJob("processing", currentProgress, fmt.Sprintf("アカウント %s を処理中... (%d/%d)", account.UserID, i+1, len(accounts)))
-
-		// Simulate download time
-		time.Sleep(2 * time.Second)
-
-		// Add mock result
-		results = append(results, map[string]interface{}{
-			"user_id": account.UserID,
-			"success": true,
-			"records": 10 + i*5,
-		})
+		updateJob("processing", currentProgress, fmt.Sprintf("アカウント %s の処理完了 (%d/%d)", account.UserID, i+1, len(accounts)))
 	}
 
 	updateJob("processing", 95, "結果をまとめています...")
-	time.Sleep(500 * time.Millisecond)
+
+	// Convert results to interface{} for job storage
+	jobResults := make([]map[string]interface{}, len(results))
+	for i, result := range results {
+		jobResults[i] = map[string]interface{}{
+			"user_id":      result.UserID,
+			"success":      result.Success,
+			"csv_path":     result.CSVPath,
+			"record_count": result.RecordCount,
+			"error":        result.Error,
+			"records":      len(result.Records), // Just count, not full data
+		}
+	}
 
 	// Complete
-	job.Result = results
+	job.Result = jobResults
 	updateJob("completed", 100, "ダウンロード完了")
 }
 
