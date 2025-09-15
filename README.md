@@ -25,7 +25,7 @@ ETCメイサイ（明細）データを管理・自動取得するGoモジュー
 ## インストール
 
 ```bash
-go get github.com/yhonda-ohishi/etc_meisai@v0.0.11
+go get github.com/yhonda-ohishi/etc_meisai@v0.0.12
 ```
 
 ## 使用方法
