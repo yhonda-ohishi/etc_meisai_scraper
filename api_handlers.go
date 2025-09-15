@@ -17,8 +17,8 @@ import (
 // DownloadRequest represents a download request
 type DownloadRequest struct {
 	Accounts []config.SimpleAccount `json:"accounts,omitempty"`
-	FromDate string                  `json:"from_date" binding:"required"`
-	ToDate   string                  `json:"to_date" binding:"required"`
+	FromDate string                  `json:"from_date,omitempty"`
+	ToDate   string                  `json:"to_date,omitempty"`
 	Config   *ClientConfig           `json:"config,omitempty"`
 }
 

@@ -40,34 +40,70 @@ var (
 // @Router /api/etc/download-async [post]
 func StartDownloadJobHandler(w http.ResponseWriter, r *http.Request) {
 	var req DownloadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid request body: " + err.Error(),
-		})
-		return
+
+	// Try to decode request body, but allow empty body
+	if r.Body != nil && r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Invalid request body: " + err.Error(),
+			})
+			return
+		}
 	}
 
-	// Parse dates
-	fromDate, err := time.Parse("2006-01-02", req.FromDate)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid from_date format",
-		})
-		return
+	// Set default accounts from environment if not provided
+	if len(req.Accounts) == 0 {
+		accounts, err := config.LoadCorporateAccountsFromEnv()
+		if err != nil || len(accounts) == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "No accounts provided and none found in environment variables",
+			})
+			return
+		}
+		req.Accounts = accounts
 	}
 
-	toDate, err := time.Parse("2006-01-02", req.ToDate)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid to_date format",
-		})
-		return
+	// Set default dates if not provided
+	now := time.Now()
+	var fromDate, toDate time.Time
+	var err error
+
+	if req.FromDate == "" {
+		// Default: first day of last month
+		fromDate = time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, time.Local)
+		if now.Month() == 1 {
+			// Handle January (go to December of previous year)
+			fromDate = time.Date(now.Year()-1, 12, 1, 0, 0, 0, 0, time.Local)
+		}
+	} else {
+		fromDate, err = time.Parse("2006-01-02", req.FromDate)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Invalid from_date format",
+			})
+			return
+		}
+	}
+
+	if req.ToDate == "" {
+		// Default: today
+		toDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	} else {
+		toDate, err = time.Parse("2006-01-02", req.ToDate)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Invalid to_date format",
+			})
+			return
+		}
 	}
 
 	// Create job
@@ -88,13 +124,18 @@ func StartDownloadJobHandler(w http.ResponseWriter, r *http.Request) {
 	// Start async processing
 	go processDownloadJob(job, req, fromDate, toDate)
 
-	// Return job ID
+	// Return job ID with date info
+	response := map[string]interface{}{
+		"job_id":      jobID,
+		"status_url":  fmt.Sprintf("/api/etc/download-status/%s", jobID),
+		"from_date":   fromDate.Format("2006-01-02"),
+		"to_date":     toDate.Format("2006-01-02"),
+		"account_count": len(req.Accounts),
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{
-		"job_id": jobID,
-		"status_url": fmt.Sprintf("/api/etc/download-status/%s", jobID),
-	})
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetDownloadJobStatusHandler godoc
