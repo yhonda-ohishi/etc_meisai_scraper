@@ -41,6 +41,12 @@ func main() {
 	r.HandleFunc("/api/etc/download-status/*", etc.GetDownloadJobStatusHandler)
 	r.Post("/api/etc/parse-csv", etc.ParseCSVHandler)
 
+	// Swagger UI
+	r.Handle("/docs/*", http.StripPrefix("/docs/", http.FileServer(http.Dir("./docs/"))))
+	r.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/docs/swagger.html", http.StatusMovedPermanently)
+	})
+
 	// Get server port
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
@@ -55,6 +61,8 @@ func main() {
 	log.Printf("  GET  http://localhost%s/api/etc/accounts", addr)
 	log.Printf("  POST http://localhost%s/api/etc/download", addr)
 	log.Printf("  POST http://localhost%s/api/etc/download-single", addr)
+	log.Printf("  POST http://localhost%s/api/etc/download-async", addr)
+	log.Printf("  Swagger UI: http://localhost%s/docs", addr)
 
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
