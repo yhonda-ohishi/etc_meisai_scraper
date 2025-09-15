@@ -20,12 +20,12 @@ func NewETCService(repo *repositories.ETCRepository) *ETCService {
 
 // ImportData imports ETC meisai data for a date range
 func (s *ETCService) ImportData(req models.ETCImportRequest) (*models.ETCImportResult, error) {
-	fromDate, err := time.Parse("2006-01-02", req.FromDate)
+	_, err := time.Parse("2006-01-02", req.FromDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid from_date format: %w", err)
 	}
 
-	toDate, err := time.Parse("2006-01-02", req.ToDate)
+	_, err = time.Parse("2006-01-02", req.ToDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid to_date format: %w", err)
 	}

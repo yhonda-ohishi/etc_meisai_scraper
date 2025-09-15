@@ -1,0 +1,511 @@
+openapi: 3.0.0
+info:
+  title: ETC Meisai API
+  description: ETC利用明細の自動取得と管理API
+  version: 0.0.1
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      summary: ヘルスチェック
+      description: APIサーバーの稼働状態を確認
+      tags:
+        - System
+      responses:
+        '200':
+          description: サーバー正常稼働中
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/etc/download:
+    post:
+      summary: ETC明細ダウンロード
+      description: 指定した期間のETC明細をダウンロード
+      tags:
+        - Download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+      responses:
+        '200':
+          description: ダウンロード成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
+        '400':
+          description: リクエストエラー
+        '401':
+          description: 認証エラー
+        '500':
+          description: サーバーエラー
+
+  /api/etc/download-single:
+    post:
+      summary: 単一アカウントETC明細ダウンロード
+      description: 単一アカウントの明細をダウンロード
+      tags:
+        - Download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SingleDownloadRequest'
+      responses:
+        '200':
+          description: ダウンロード成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResult'
+
+  /api/etc/parse-csv:
+    post:
+      summary: CSVファイルパース
+      description: アップロードされたCSVファイルをパース
+      tags:
+        - Parse
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSVファイル
+      responses:
+        '200':
+          description: パース成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ETCMeisai'
+                  count:
+                    type: integer
+
+  /api/etc/import:
+    post:
+      summary: データインポート
+      description: ETC明細データをデータベースにインポート
+      tags:
+        - Import
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ETCMeisai'
+      responses:
+        '200':
+          description: インポート成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                    description: インポート件数
+                  skipped:
+                    type: integer
+                    description: スキップ件数
+
+  /api/etc/meisai:
+    get:
+      summary: 明細一覧取得
+      description: 条件を指定してETC明細を取得
+      tags:
+        - Meisai
+      parameters:
+        - name: from_date
+          in: query
+          description: 開始日 (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          description: 終了日 (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: unko_no
+          in: query
+          description: 運行番号
+          schema:
+            type: string
+        - name: card_no
+          in: query
+          description: カード番号
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: 取得件数上限
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          description: オフセット
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ETCMeisai'
+                  total:
+                    type: integer
+                    description: 総件数
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      summary: 明細作成
+      description: 新規ETC明細を作成
+      tags:
+        - Meisai
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ETCMeisai'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ETCMeisai'
+
+  /api/etc/meisai/{id}:
+    get:
+      summary: 明細詳細取得
+      description: IDを指定してETC明細を取得
+      tags:
+        - Meisai
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 明細ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ETCMeisai'
+        '404':
+          description: 明細が見つからない
+
+  /api/etc/summary:
+    get:
+      summary: サマリー取得
+      description: 指定期間のETC利用サマリーを取得
+      tags:
+        - Summary
+      parameters:
+        - name: from_date
+          in: query
+          required: true
+          description: 開始日 (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          required: true
+          description: 終了日 (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: group_by
+          in: query
+          description: グループ化項目
+          schema:
+            type: string
+            enum: [day, month, card, vehicle]
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+
+components:
+  schemas:
+    ETCMeisai:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 明細ID
+        usage_date:
+          type: string
+          description: 利用年月日
+          example: "2025-09-15"
+        usage_time:
+          type: string
+          description: 利用時刻
+          example: "14:30"
+        entrance_ic:
+          type: string
+          description: IC入口
+          example: "東京"
+        exit_ic:
+          type: string
+          description: IC出口
+          example: "横浜"
+        vehicle_number:
+          type: string
+          description: 車両番号
+          example: "品川500あ1234"
+        card_number:
+          type: string
+          description: ETCカード番号
+          example: "****1234"
+        amount:
+          type: integer
+          description: 通行料金
+          example: 1200
+        discount_amount:
+          type: integer
+          description: 割引額
+          example: 300
+        total_amount:
+          type: integer
+          description: 請求額
+          example: 900
+        distance:
+          type: number
+          format: float
+          description: 走行距離(km)
+          example: 35.2
+        unko_no:
+          type: string
+          description: 運行番号
+          example: "UN20250915001"
+        note:
+          type: string
+          description: 備考
+        created_at:
+          type: string
+          format: date-time
+          description: 作成日時
+
+    DownloadRequest:
+      type: object
+      required:
+        - from_date
+        - to_date
+      properties:
+        accounts:
+          type: array
+          description: アカウント情報（未指定の場合は環境変数から取得）
+          items:
+            type: object
+            properties:
+              user_id:
+                type: string
+              password:
+                type: string
+        from_date:
+          type: string
+          format: date
+          description: 開始日
+          example: "2025-08-01"
+        to_date:
+          type: string
+          format: date
+          description: 終了日
+          example: "2025-09-15"
+        config:
+          type: object
+          properties:
+            download_path:
+              type: string
+              default: "./downloads"
+            headless:
+              type: boolean
+              default: true
+            timeout:
+              type: integer
+              default: 30000
+            retry_count:
+              type: integer
+              default: 3
+
+    SingleDownloadRequest:
+      type: object
+      required:
+        - user_id
+        - password
+        - from_date
+        - to_date
+      properties:
+        user_id:
+          type: string
+          description: ユーザーID
+        password:
+          type: string
+          description: パスワード
+        from_date:
+          type: string
+          format: date
+        to_date:
+          type: string
+          format: date
+
+    DownloadResult:
+      type: object
+      properties:
+        account:
+          type: string
+          description: アカウント名
+        csv_path:
+          type: string
+          description: ダウンロードしたCSVファイルのパス
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ETCMeisai'
+        success:
+          type: boolean
+          description: 処理成功フラグ
+        error:
+          type: string
+          description: エラーメッセージ（失敗時）
+        record_count:
+          type: integer
+          description: レコード数
+
+    DownloadResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DownloadResult'
+        total_records:
+          type: integer
+          description: 総レコード数
+        success_count:
+          type: integer
+          description: 成功アカウント数
+        failed_count:
+          type: integer
+          description: 失敗アカウント数
+
+    SummaryResponse:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+        total_amount:
+          type: integer
+          description: 総額
+        total_discount:
+          type: integer
+          description: 総割引額
+        total_distance:
+          type: number
+          format: float
+          description: 総走行距離
+        record_count:
+          type: integer
+          description: レコード件数
+        daily_summary:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              amount:
+                type: integer
+              count:
+                type: integer
+        card_summary:
+          type: array
+          items:
+            type: object
+            properties:
+              card_number:
+                type: string
+              amount:
+                type: integer
+              count:
+                type: integer
+
+tags:
+  - name: System
+    description: システム関連エンドポイント
+  - name: Download
+    description: ETC明細ダウンロード機能
+  - name: Parse
+    description: CSVパース機能
+  - name: Import
+    description: データインポート機能
+  - name: Meisai
+    description: 明細管理機能
+  - name: Summary
+    description: サマリー機能
