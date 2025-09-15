@@ -18,6 +18,9 @@ func main() {
 		log.Println("No .env file found")
 	}
 
+	// Show configured ETC accounts
+	showConfiguredAccounts()
+
 	// Connect to database
 	dbConfig := config.NewDatabaseConfig()
 	db, err := config.ConnectDB(dbConfig)
@@ -44,9 +47,26 @@ func main() {
 	// Start server
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("Starting ETC Meisai server on %s", addr)
+	log.Printf("API Endpoint: http://localhost%s/api/etc/accounts", addr)
 	log.Printf("Module initialized: %+v", module)
 
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+}
+
+func showConfiguredAccounts() {
+	accounts, err := config.LoadCorporateAccountsFromEnv()
+	if err != nil || len(accounts) == 0 {
+		log.Println("⚠️  No ETC accounts configured in ETC_CORP_ACCOUNTS")
+		log.Println("   Set ETC_CORP_ACCOUNTS environment variable to enable account features")
+		return
+	}
+
+	fmt.Println("\n=== 📋 Configured ETC Accounts ===")
+	for i, account := range accounts {
+		fmt.Printf("  %d. %s\n", i+1, account.UserID)
+	}
+	fmt.Printf("  Total: %d accounts\n", len(accounts))
+	fmt.Println("===================================\n")
 }

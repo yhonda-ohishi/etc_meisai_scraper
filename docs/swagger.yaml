@@ -35,6 +35,58 @@ paths:
                     type: string
                     format: date-time
 
+  /api/etc/accounts:
+    get:
+      summary: 利用可能なアカウント一覧取得
+      description: |
+        環境変数 `ETC_CORP_ACCOUNTS` に設定されているアカウント名の一覧を取得します。
+        セキュリティのため、パスワードは表示されません。
+
+        このエンドポイントは、APIを使用する前に利用可能なアカウントを確認するために使用できます。
+      tags:
+        - System
+      responses:
+        '200':
+          description: アカウント一覧取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                    description: アカウントが設定されているか
+                    example: true
+                  accounts:
+                    type: array
+                    description: 利用可能なアカウントID一覧
+                    items:
+                      type: string
+                    example: ["ohishiexp", "ohishiexp1"]
+                  count:
+                    type: integer
+                    description: アカウント数
+                    example: 2
+                  message:
+                    type: string
+                    description: ステータスメッセージ
+                    example: "環境変数 ETC_CORP_ACCOUNTS から読み込み"
+              examples:
+                with_accounts:
+                  summary: アカウントが設定されている場合
+                  value:
+                    configured: true
+                    accounts: ["ohishiexp", "ohishiexp1", "ohishiexp2"]
+                    count: 3
+                    message: "環境変数 ETC_CORP_ACCOUNTS から読み込み"
+                without_accounts:
+                  summary: アカウントが未設定の場合
+                  value:
+                    configured: false
+                    accounts: []
+                    count: 0
+                    message: "環境変数 ETC_CORP_ACCOUNTS が設定されていません"
+
   /api/etc/download:
     post:
       summary: ETC明細ダウンロード（複数アカウント対応）
@@ -59,6 +111,11 @@ paths:
         accountsパラメータを省略すると、環境変数 `ETC_CORP_ACCOUNTS` から自動的に読み込まれます。
         ```
         ETC_CORP_ACCOUNTS=ohishiexp:pass1,ohishiexp1:pass2
+        ```
+
+        **利用可能なアカウントを確認するには:**
+        ```
+        GET /api/etc/accounts
         ```
 
         ### 3. カスタム設定を使用する場合

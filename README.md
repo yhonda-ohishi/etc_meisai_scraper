@@ -25,7 +25,7 @@ ETCメイサイ（明細）データを管理・自動取得するGoモジュー
 ## インストール
 
 ```bash
-go get github.com/yhonda-ohishi/etc_meisai@v0.0.3
+go get github.com/yhonda-ohishi/etc_meisai@v0.0.4
 ```
 
 ## 使用方法
@@ -109,6 +109,7 @@ go run cmd/server/main.go
 
 ### 基本エンドポイント
 - `GET /health` - ヘルスチェック
+- `GET /api/etc/accounts` - 利用可能なアカウント一覧（パスワード非表示）
 - `POST /api/etc/import` - データインポート
 - `POST /api/etc/bulk-import` - 一括インポート
 - `GET /api/etc/meisai` - 明細取得
@@ -142,6 +143,9 @@ curl -X POST http://localhost:8080/api/etc/download \
 ```bash
 # 環境変数を設定
 export ETC_CORP_ACCOUNTS="ohishiexp:pass1,ohishiexp1:pass2"
+
+# 利用可能なアカウントを確認
+curl http://localhost:8080/api/etc/accounts
 
 # APIを呼び出し
 curl -X POST http://localhost:8080/api/etc/download \

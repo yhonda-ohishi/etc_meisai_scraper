@@ -263,9 +263,42 @@ func ParseCSVHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// GetAvailableAccountsHandler godoc
+// @Summary 利用可能なアカウント一覧取得
+// @Description 環境変数に設定されているアカウント名の一覧を取得（パスワードは表示しない）
+// @Tags System
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/etc/accounts [get]
+func GetAvailableAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	accounts, err := config.LoadCorporateAccountsFromEnv()
+
+	response := map[string]interface{}{
+		"configured": err == nil && len(accounts) > 0,
+		"accounts":   []string{},
+		"count":      0,
+	}
+
+	if err == nil && len(accounts) > 0 {
+		accountNames := make([]string, len(accounts))
+		for i, account := range accounts {
+			accountNames[i] = account.UserID
+		}
+		response["accounts"] = accountNames
+		response["count"] = len(accounts)
+		response["message"] = "環境変数 ETC_CORP_ACCOUNTS から読み込み"
+	} else {
+		response["message"] = "環境変数 ETC_CORP_ACCOUNTS が設定されていません"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // RegisterAPIHandlers registers all API handlers
 func RegisterAPIHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/health", HealthCheckHandler)
+	mux.HandleFunc("/api/etc/accounts", GetAvailableAccountsHandler)
 	mux.HandleFunc("/api/etc/download", DownloadETCDataHandler)
 	mux.HandleFunc("/api/etc/download-single", DownloadSingleAccountHandler)
 	mux.HandleFunc("/api/etc/parse-csv", ParseCSVHandler)
