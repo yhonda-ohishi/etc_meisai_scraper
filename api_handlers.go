@@ -55,8 +55,8 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // DownloadETCDataHandler godoc
-// @Summary ETC明細ダウンロード
-// @Description 指定した期間のETC明細をダウンロード
+// @Summary ETC明細ダウンロード（複数アカウント対応）
+// @Description 指定した期間のETC明細を複数アカウントから一括ダウンロード
 // @Tags Download
 // @Accept json
 // @Produce json
@@ -68,27 +68,49 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func DownloadETCDataHandler(w http.ResponseWriter, r *http.Request) {
 	var req DownloadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid request body: " + err.Error(),
+		})
 		return
 	}
 
 	// Parse dates
 	fromDate, err := time.Parse("2006-01-02", req.FromDate)
 	if err != nil {
-		http.Error(w, "Invalid from_date format", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid from_date format. Expected: YYYY-MM-DD",
+		})
 		return
 	}
 
 	toDate, err := time.Parse("2006-01-02", req.ToDate)
 	if err != nil {
-		http.Error(w, "Invalid to_date format", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid to_date format. Expected: YYYY-MM-DD",
+		})
 		return
 	}
 
 	// Use environment accounts if not provided
 	accounts := req.Accounts
 	if len(accounts) == 0 {
-		accounts, _ = config.LoadCorporateAccountsFromEnv()
+		var err error
+		accounts, err = config.LoadCorporateAccountsFromEnv()
+		if err != nil || len(accounts) == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "No accounts provided in request and no accounts found in environment variable ETC_CORP_ACCOUNTS",
+				"hint":  "Either provide 'accounts' in request body or set ETC_CORP_ACCOUNTS environment variable",
+			})
+			return
+		}
 	}
 
 	// Create client
@@ -97,7 +119,11 @@ func DownloadETCDataHandler(w http.ResponseWriter, r *http.Request) {
 	// Download data
 	results, err := client.DownloadETCData(accounts, fromDate, toDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Download failed: " + err.Error(),
+		})
 		return
 	}
 
@@ -121,7 +147,7 @@ func DownloadETCDataHandler(w http.ResponseWriter, r *http.Request) {
 
 // DownloadSingleAccountHandler godoc
 // @Summary 単一アカウントETC明細ダウンロード
-// @Description 単一アカウントの明細をダウンロード
+// @Description 単一アカウントの明細をダウンロード（環境変数を使用せず、リクエストボディで直接アカウント情報を指定）
 // @Tags Download
 // @Accept json
 // @Produce json
@@ -133,20 +159,51 @@ func DownloadETCDataHandler(w http.ResponseWriter, r *http.Request) {
 func DownloadSingleAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req SingleDownloadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid request body: " + err.Error(),
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.UserID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "user_id is required",
+		})
+		return
+	}
+
+	if req.Password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "password is required",
+		})
 		return
 	}
 
 	// Parse dates
 	fromDate, err := time.Parse("2006-01-02", req.FromDate)
 	if err != nil {
-		http.Error(w, "Invalid from_date format", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid from_date format. Expected: YYYY-MM-DD",
+		})
 		return
 	}
 
 	toDate, err := time.Parse("2006-01-02", req.ToDate)
 	if err != nil {
-		http.Error(w, "Invalid to_date format", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid to_date format. Expected: YYYY-MM-DD",
+		})
 		return
 	}
 
@@ -154,7 +211,12 @@ func DownloadSingleAccountHandler(w http.ResponseWriter, r *http.Request) {
 	client := NewETCClient(nil)
 	result, err := client.DownloadETCDataSingle(req.UserID, req.Password, fromDate, toDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Download failed: " + err.Error(),
+			"hint":  "Check your credentials and ensure the account type (ohishiexp/ohishiexp1) matches the user_id",
+		})
 		return
 	}
 

@@ -37,8 +37,32 @@ paths:
 
   /api/etc/download:
     post:
-      summary: ETC明細ダウンロード
-      description: 指定した期間のETC明細をダウンロード
+      summary: ETC明細ダウンロード（複数アカウント対応）
+      description: |
+        指定した期間のETC明細を複数アカウントから一括ダウンロード。
+
+        ## アカウント設定方法
+
+        ### 1. リクエストボディで指定する場合
+        ```json
+        {
+          "accounts": [
+            {"user_id": "ohishiexp", "password": "pass1"},
+            {"user_id": "ohishiexp1", "password": "pass2"}
+          ],
+          "from_date": "2025-08-01",
+          "to_date": "2025-09-15"
+        }
+        ```
+
+        ### 2. 環境変数を使用する場合
+        accountsパラメータを省略すると、環境変数 `ETC_CORP_ACCOUNTS` から自動的に読み込まれます。
+        ```
+        ETC_CORP_ACCOUNTS=ohishiexp:pass1,ohishiexp1:pass2
+        ```
+
+        ### 3. カスタム設定を使用する場合
+        configパラメータで、ダウンロード処理の詳細な設定が可能です。
       tags:
         - Download
       requestBody:
@@ -47,6 +71,32 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DownloadRequest'
+            examples:
+              with_accounts:
+                summary: アカウント指定あり
+                value:
+                  accounts:
+                    - user_id: "ohishiexp"
+                      password: "password123"
+                    - user_id: "ohishiexp1"
+                      password: "password456"
+                  from_date: "2025-08-01"
+                  to_date: "2025-09-15"
+              without_accounts:
+                summary: 環境変数使用（accountsパラメータ省略）
+                value:
+                  from_date: "2025-08-01"
+                  to_date: "2025-09-15"
+              with_config:
+                summary: カスタム設定付き
+                value:
+                  from_date: "2025-08-01"
+                  to_date: "2025-09-15"
+                  config:
+                    download_path: "./custom_downloads"
+                    headless: false
+                    timeout: 60000
+                    retry_count: 5
       responses:
         '200':
           description: ダウンロード成功
@@ -54,8 +104,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DownloadResponse'
+              example:
+                results:
+                  - user_id: "ohishiexp"
+                    success: true
+                    csv_path: "./downloads/ETC_20250815_ohishiexp.csv"
+                    record_count: 125
+                  - user_id: "ohishiexp1"
+                    success: true
+                    csv_path: "./downloads/ETC_20250815_ohishiexp1.csv"
+                    record_count: 87
+                total_records: 212
+                success_count: 2
+                failed_count: 0
         '400':
           description: リクエストエラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: "Invalid from_date format"
         '401':
           description: 認証エラー
         '500':
@@ -64,7 +136,28 @@ paths:
   /api/etc/download-single:
     post:
       summary: 単一アカウントETC明細ダウンロード
-      description: 単一アカウントの明細をダウンロード
+      description: |
+        単一アカウントの明細をダウンロード。
+
+        ## アカウント設定方法
+
+        リクエストボディで直接アカウント情報を指定します。
+        このエンドポイントは環境変数を使用せず、必ずリクエストボディでアカウント情報を指定する必要があります。
+
+        ### 使用例
+        ```json
+        {
+          "user_id": "ohishiexp",
+          "password": "password123",
+          "from_date": "2025-08-01",
+          "to_date": "2025-09-15"
+        }
+        ```
+
+        ### 注意事項
+        - `user_id` と `password` は必須パラメータです
+        - このエンドポイントは単一アカウントのみを処理します
+        - 複数アカウントを処理する場合は `/api/etc/download` を使用してください
       tags:
         - Download
       requestBody:
@@ -73,6 +166,21 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SingleDownloadRequest'
+            examples:
+              ohishiexp_account:
+                summary: ohishiexp アカウントの例
+                value:
+                  user_id: "ohishiexp"
+                  password: "password123"
+                  from_date: "2025-08-01"
+                  to_date: "2025-09-15"
+              ohishiexp1_account:
+                summary: ohishiexp1 アカウントの例
+                value:
+                  user_id: "ohishiexp1"
+                  password: "password456"
+                  from_date: "2025-08-01"
+                  to_date: "2025-09-15"
       responses:
         '200':
           description: ダウンロード成功
@@ -80,6 +188,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DownloadResult'
+              example:
+                user_id: "ohishiexp"
+                success: true
+                csv_path: "./downloads/ETC_20250815_ohishiexp.csv"
+                record_count: 125
+                records:
+                  - usage_date: "2025-08-15"
+                    usage_time: "14:30"
+                    entrance_ic: "東京"
+                    exit_ic: "横浜"
+                    amount: 1200
+        '400':
+          description: リクエストエラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                missing_user_id:
+                  value:
+                    error: "user_id is required"
+                invalid_date:
+                  value:
+                    error: "Invalid from_date format"
+        '401':
+          description: 認証エラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: "Login failed: Invalid credentials"
+        '500':
+          description: サーバーエラー
 
   /api/etc/parse-csv:
     post:
@@ -352,39 +500,58 @@ components:
       properties:
         accounts:
           type: array
-          description: アカウント情報（未指定の場合は環境変数から取得）
+          description: |
+            アカウント情報の配列。
+            省略した場合は環境変数 `ETC_CORP_ACCOUNTS` から自動的に読み込まれます。
+
+            環境変数の形式: `ohishiexp:pass1,ohishiexp1:pass2`
           items:
             type: object
+            required:
+              - user_id
+              - password
             properties:
               user_id:
                 type: string
+                description: ETCサイトのユーザーID
+                example: "ohishiexp"
               password:
                 type: string
+                description: ETCサイトのパスワード
+                example: "password123"
         from_date:
           type: string
           format: date
-          description: 開始日
+          description: 明細取得開始日（YYYY-MM-DD形式）
           example: "2025-08-01"
         to_date:
           type: string
           format: date
-          description: 終了日
+          description: 明細取得終了日（YYYY-MM-DD形式）
           example: "2025-09-15"
         config:
           type: object
+          description: スクレイピング処理の詳細設定（省略可能）
           properties:
             download_path:
               type: string
+              description: CSVファイルのダウンロード先ディレクトリ
               default: "./downloads"
+              example: "./custom_downloads"
             headless:
               type: boolean
+              description: ブラウザを非表示モードで実行するか
               default: true
             timeout:
               type: integer
+              description: タイムアウト時間（ミリ秒）
               default: 30000
+              example: 60000
             retry_count:
               type: integer
+              description: エラー時のリトライ回数
               default: 3
+              example: 5
 
     SingleDownloadRequest:
       type: object
@@ -396,7 +563,10 @@ components:
       properties:
         user_id:
           type: string
-          description: ユーザーID
+          description: |
+            ETCサイトのユーザーID。
+            異なるアカウントタイプ（ohishiexp, ohishiexp1）で
+            ページ構造が異なるため、正しいユーザーIDを指定してください。
         password:
           type: string
           description: パスワード

@@ -25,7 +25,7 @@ ETCメイサイ（明細）データを管理・自動取得するGoモジュー
 ## インストール
 
 ```bash
-go get github.com/yhonda-ohishi/etc_meisai@v0.0.1
+go get github.com/yhonda-ohishi/etc_meisai@v0.0.3
 ```
 
 ## 使用方法
@@ -107,6 +107,7 @@ go run cmd/server/main.go
 
 ## API エンドポイント
 
+### 基本エンドポイント
 - `GET /health` - ヘルスチェック
 - `POST /api/etc/import` - データインポート
 - `POST /api/etc/bulk-import` - 一括インポート
@@ -114,6 +115,79 @@ go run cmd/server/main.go
 - `POST /api/etc/meisai` - 明細作成
 - `GET /api/etc/meisai/{id}` - ID指定で明細取得
 - `GET /api/etc/summary` - サマリー取得
+
+### ダウンロードエンドポイント
+
+#### `/api/etc/download` - 複数アカウント一括ダウンロード
+
+複数のETCアカウントから明細を一括でダウンロードします。
+
+**アカウント設定方法：**
+
+1. **リクエストボディで指定**
+```bash
+curl -X POST http://localhost:8080/api/etc/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accounts": [
+      {"user_id": "ohishiexp", "password": "pass1"},
+      {"user_id": "ohishiexp1", "password": "pass2"}
+    ],
+    "from_date": "2025-08-01",
+    "to_date": "2025-09-15"
+  }'
+```
+
+2. **環境変数を使用**（accountsパラメータを省略）
+```bash
+# 環境変数を設定
+export ETC_CORP_ACCOUNTS="ohishiexp:pass1,ohishiexp1:pass2"
+
+# APIを呼び出し
+curl -X POST http://localhost:8080/api/etc/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from_date": "2025-08-01",
+    "to_date": "2025-09-15"
+  }'
+```
+
+3. **カスタム設定付き**
+```bash
+curl -X POST http://localhost:8080/api/etc/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from_date": "2025-08-01",
+    "to_date": "2025-09-15",
+    "config": {
+      "download_path": "./custom_downloads",
+      "headless": false,
+      "timeout": 60000,
+      "retry_count": 5
+    }
+  }'
+```
+
+#### `/api/etc/download-single` - 単一アカウントダウンロード
+
+単一のETCアカウントから明細をダウンロードします。
+
+**使用例：**
+```bash
+curl -X POST http://localhost:8080/api/etc/download-single \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "ohishiexp",
+    "password": "password123",
+    "from_date": "2025-08-01",
+    "to_date": "2025-09-15"
+  }'
+```
+
+**注意事項：**
+- `user_id` と `password` は必須パラメータです
+- このエンドポイントは環境変数を使用しません
+- アカウントタイプ（ohishiexp/ohishiexp1）によってページ構造が異なるため、正しいユーザーIDを指定してください
 
 ## データ構造
 
