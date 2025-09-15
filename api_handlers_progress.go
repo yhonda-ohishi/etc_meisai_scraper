@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yhonda-ohishi/etc_meisai/config"
+	"github.com/yhonda-ohishi/etc_meisai/models"
 )
 
 // DownloadJob represents a download job status
@@ -250,16 +251,16 @@ func processDownloadJob(job *DownloadJob, req DownloadRequest, fromDate, toDate 
 			updateJob("processing", currentProgress, fmt.Sprintf("アカウント %s でエラー: %v", account.UserID, err))
 			// Add failed result
 			results = append(results, DownloadResult{
-				UserID:      account.UserID,
+				Account:     account.UserID,
 				Success:     false,
-				Error:       err.Error(),
-				Records:     []ETCMeisai{},
-				RecordCount: 0,
+				Error:       err,
+				Records:     []models.ETCMeisai{},
+				CSVPath:     "",
 			})
 		} else if len(accountResults) > 0 {
 			// Add successful result
 			results = append(results, accountResults[0])
-			updateJob("processing", currentProgress + progressPerAccount/2, fmt.Sprintf("アカウント %s: %d件のデータを取得 (%d/%d)", account.UserID, accountResults[0].RecordCount, i+1, len(accounts)))
+			updateJob("processing", currentProgress + progressPerAccount/2, fmt.Sprintf("アカウント %s: %d件のデータを取得 (%d/%d)", account.UserID, len(accountResults[0].Records), i+1, len(accounts)))
 		}
 
 		currentProgress += progressPerAccount
@@ -272,10 +273,10 @@ func processDownloadJob(job *DownloadJob, req DownloadRequest, fromDate, toDate 
 	jobResults := make([]map[string]interface{}, len(results))
 	for i, result := range results {
 		jobResults[i] = map[string]interface{}{
-			"user_id":      result.UserID,
+			"user_id":      result.Account,
 			"success":      result.Success,
 			"csv_path":     result.CSVPath,
-			"record_count": result.RecordCount,
+			"record_count": len(result.Records),
 			"error":        result.Error,
 			"records":      len(result.Records), // Just count, not full data
 		}
