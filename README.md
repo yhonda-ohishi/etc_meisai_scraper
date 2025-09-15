@@ -1,13 +1,21 @@
 # ETC Meisai Module
 
-ETCメイサイ（明細）データを管理するGoモジュール
+ETCメイサイ（明細）データを管理・自動取得するGoモジュール
 
 ## 概要
 
-このモジュールは、ETC利用明細データの管理機能を提供します。ryohi_sub_cal2からGitHub経由で呼び出されることを想定しています。
+このモジュールは、ETC利用明細データの自動取得と管理機能を提供します。ryohi_sub_cal2からGitHub経由で呼び出されることを想定しています。
 
 ## 機能
 
+### スクレイピング機能
+- ETC利用照会サービスからの自動ログイン
+- 複数アカウント対応（法人・個人）
+- 日付範囲指定でのCSVダウンロード
+- アカウントタイプに応じた適応的ページ処理
+- Shift-JISエンコーディング対応
+
+### データ管理機能
 - ETC明細データのインポート
 - 運行番号（UnkoNo）による明細検索
 - 日付範囲による明細検索
@@ -17,12 +25,57 @@ ETCメイサイ（明細）データを管理するGoモジュール
 ## インストール
 
 ```bash
-go get github.com/yhonda-ohishi/etc_meisai
+go get github.com/yhonda-ohishi/etc_meisai@v0.0.1
 ```
 
 ## 使用方法
 
-### モジュールとして使用
+### ライブラリとして使用（スクレイピング機能）
+
+```go
+import (
+    etc "github.com/yhonda-ohishi/etc_meisai"
+)
+
+// ETCクライアント作成
+client := etc.NewETCClient(&etc.ClientConfig{
+    DownloadPath: "./downloads",
+    Headless:     true,
+    Timeout:      30000,
+    RetryCount:   3,
+})
+
+// アカウント情報（環境変数から読み込みも可能）
+accounts, err := etc.LoadCorporateAccounts()
+
+// 日付範囲指定
+fromDate := time.Date(2025, 8, 1, 0, 0, 0, 0, time.Local)
+toDate := time.Now()
+
+// ETC明細をダウンロード
+results, err := client.DownloadETCData(accounts, fromDate, toDate)
+
+// 単一アカウントでのダウンロード
+result, err := client.DownloadETCDataSingle(userID, password, fromDate, toDate)
+
+// 既存のCSVファイルをパース
+records, err := etc.ParseETCCSV("path/to/file.csv")
+```
+
+### go.modでの設定（ローカル開発時）
+
+```go
+module your-module
+
+require (
+    github.com/yhonda-ohishi/etc_meisai v0.0.1
+)
+
+// ローカル開発時は以下を追加
+replace github.com/yhonda-ohishi/etc_meisai => ../etc_meisai
+```
+
+### データベース連携モジュールとして使用
 
 ```go
 import (
@@ -86,6 +139,16 @@ MySQLを使用。スキーマは`schema.sql`を参照。
 
 ## 環境変数
 
+### スクレイピング用
+- `ETC_CORP_ACCOUNTS` - 法人アカウント情報（JSON配列形式）
+  ```
+  ETC_CORP_ACCOUNTS=["user1:pass1","user2:pass2"]
+  ```
+- `ETC_PERSONAL_ACCOUNTS` - 個人アカウント情報（JSON配列形式）
+- `ETC_USER_ID` - 単一アカウントのユーザーID
+- `ETC_PASSWORD` - 単一アカウントのパスワード
+
+### データベース用
 - `DB_HOST` - データベースホスト
 - `DB_PORT` - データベースポート
 - `DB_USER` - データベースユーザー

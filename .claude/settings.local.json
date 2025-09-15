@@ -4,7 +4,8 @@
       "Bash(go mod:*)",
       "Bash(go run:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
