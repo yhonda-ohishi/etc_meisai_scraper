@@ -14,11 +14,17 @@ func SetupRoutes(r *chi.Mux, handler *handlers.ETCHandler, importHandler *handle
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
-	// Health check endpoint
-	r.Get("/health", handler.HealthCheck)
+	// Health check endpoint (use the new one from api_handlers)
+	r.Get("/health", HealthCheckHandler)
 
 	// API routes
 	r.Route("/api/etc", func(r chi.Router) {
+		// Scraping and download endpoints (no database required)
+		r.Get("/accounts", GetAvailableAccountsHandler)
+		r.Post("/download", DownloadETCDataHandler)
+		r.Post("/download-single", DownloadSingleAccountHandler)
+		r.Post("/parse-csv", ParseCSVHandler)
+
 		// Import endpoints
 		r.Post("/import", handler.ImportData)
 		r.Post("/bulk-import", handler.BulkImport)
