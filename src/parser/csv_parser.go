@@ -92,17 +92,63 @@ func (p *ETCCSVParser) ParseCSVFile(filePath string, isCorporate bool) ([]models
 		return nil, err
 	}
 
-	// Set account type for all records
-	accountType := "personal"
-	if isCorporate {
-		accountType = "corporate"
-	}
-
-	for i := range records {
-		records[i].AccountType = accountType
-	}
+	// Account type was passed as metadata but is not stored in the model
+	// (account type removed from model when migrating to gRPC-only architecture)
 
 	return records, nil
+}
+
+// Parse parses CSV content from a reader and returns a ParseResult
+func (p *ETCCSVParser) Parse(r io.Reader) (*ParseResult, error) {
+	reader := csv.NewReader(r)
+	reader.LazyQuotes = true
+	reader.TrimLeadingSpace = true
+
+	result := &ParseResult{
+		Records: []*models.ETCMeisai{},
+		Errors:  []ParseError{},
+	}
+
+	lineNum := 0
+
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			result.ErrorRows++
+			result.Errors = append(result.Errors, ParseError{
+				Row:     lineNum,
+				Message: err.Error(),
+			})
+			continue
+		}
+
+		lineNum++
+		result.TotalRows++
+
+		// Skip header row
+		if lineNum == 1 && (strings.Contains(row[0], "利用") || strings.Contains(row[0], "日付")) {
+			continue
+		}
+
+		// Parse row
+		meisai, err := p.parseRow(row)
+		if err != nil {
+			result.ErrorRows++
+			result.Errors = append(result.Errors, ParseError{
+				Row:     lineNum,
+				Message: err.Error(),
+			})
+			continue
+		}
+
+		result.Records = append(result.Records, meisai)
+		result.ValidRows++
+	}
+
+	return result, nil
 }
 
 // parseRow parses a single CSV row
@@ -122,8 +168,7 @@ func (p *ETCCSVParser) parseRow(row []string) (*models.ETCMeisai, error) {
 			dateStr = strings.TrimSpace(row[2])
 		} else {
 			// それも空なら現在日付を使用
-			meisai.Date = time.Now().Format("2006/01/02")
-			meisai.UsageDate = time.Now()
+			meisai.UseDate = time.Now()
 		}
 	}
 
@@ -132,42 +177,33 @@ func (p *ETCCSVParser) parseRow(row []string) (*models.ETCMeisai, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse date '%s': %w", dateStr, err)
 		}
-		meisai.Date = date.Format("2006/01/02")
-		meisai.UsageDate = date
+		meisai.UseDate = date
 	}
 
 	// Parse other fields based on actual CSV format
 	// 列: 利用年月日（自）,時刻（自）,利用年月日（至）,時刻（至）,利用ＩＣ（自）,利用ＩＣ（至）,
 	//     料金所名,通行料金,通行区分,車種,車両番号,ＥＴＣカード番号,備考
-	meisai.Time = strings.TrimSpace(row[1])           // 時刻（自）
-	meisai.ICEntry = strings.TrimSpace(row[4])        // 利用ＩＣ（自）
-	meisai.EntryIC = meisai.ICEntry                   // エイリアス
-	meisai.ICExit = strings.TrimSpace(row[5])         // 利用ＩＣ（至）
-	meisai.ExitIC = meisai.ICExit                     // エイリアス
-	meisai.TollGate = strings.TrimSpace(row[6])       // 料金所名
-	meisai.VehicleNo = strings.TrimSpace(row[10])     // 車両番号
-	meisai.VehicleNumber = meisai.VehicleNo           // エイリアス
-	meisai.CardNo = strings.TrimSpace(row[11])        // ＥＴＣカード番号
-	meisai.CardNumber = meisai.CardNo                 // エイリアス
-	meisai.ETCCardNumber = meisai.CardNo              // エイリアス
+	meisai.UseTime = strings.TrimSpace(row[1])        // 時刻（自）
+	meisai.EntryIC = strings.TrimSpace(row[4])        // 利用ＩＣ（自）
+	meisai.ExitIC = strings.TrimSpace(row[5])         // 利用ＩＣ（至）
+	// meisai.TollGate = strings.TrimSpace(row[6])   // 料金所名 (not in model)
+	meisai.CarNumber = strings.TrimSpace(row[10])     // 車両番号
+	meisai.ETCNumber = strings.TrimSpace(row[11])     // ＥＴＣカード番号
 
 	// Parse amounts
 	amount := p.parseAmount(row[7])                   // 通行料金
-	meisai.TotalAmount = amount
-	meisai.TollAmount = amount                        // エイリアス
-	meisai.Amount = amount                            // エイリアス
+	meisai.Amount = int32(amount)                     // Amount is int32 in model
 
-	meisai.VehicleType = strings.TrimSpace(row[9])    // 車種
-	meisai.Remarks = strings.TrimSpace(row[12])       // 備考
-
-	// 通行区分を追加
-	if len(row) > 8 {
-		meisai.UsageType = strings.TrimSpace(row[8])  // 通行区分
-	}
+	// meisai.VehicleType = strings.TrimSpace(row[9])    // 車種 (not in model)
+	// meisai.Remarks = strings.TrimSpace(row[12])       // 備考 (not in model)
+	// meisai.UsageType = strings.TrimSpace(row[8])      // 通行区分 (not in model)
 
 	// Set timestamps
-	meisai.ImportedAt = time.Now()
 	meisai.CreatedAt = time.Now()
+	meisai.UpdatedAt = time.Now()
+
+	// Generate hash
+	meisai.Hash = meisai.GenerateHash()
 
 	return meisai, nil
 }

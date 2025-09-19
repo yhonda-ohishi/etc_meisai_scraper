@@ -13,6 +13,7 @@ import (
 type Settings struct {
 	Database DatabaseSettings `json:"database"`
 	Server   ServerSettings   `json:"server"`
+	GRPC     GRPCSettings     `json:"grpc"`
 	Scraping ScrapingSettings `json:"scraping"`
 	Import   ImportSettings   `json:"import"`
 	Logging  LoggingSettings  `json:"logging"`
@@ -29,6 +30,19 @@ type DatabaseSettings struct {
 	MaxConn     int    `json:"max_connections"`
 	MaxIdleConn int    `json:"max_idle_connections"`
 	ConnTimeout int    `json:"connection_timeout"`
+	Path        string `json:"path"` // For SQLite databases
+}
+
+// GRPCSettings holds gRPC client configuration
+type GRPCSettings struct {
+	DBServiceAddress string        `json:"db_service_address"`
+	Timeout          time.Duration `json:"timeout"`
+	MaxRetries       int           `json:"max_retries"`
+	RetryDelay       time.Duration `json:"retry_delay"`
+	EnableTLS        bool          `json:"enable_tls"`
+	CertFile         string        `json:"cert_file"`
+	KeyFile          string        `json:"key_file"`
+	CAFile           string        `json:"ca_file"`
 }
 
 // ServerSettings holds server configuration
@@ -73,12 +87,13 @@ type LoggingSettings struct {
 func NewSettings() *Settings {
 	return &Settings{
 		Database: DatabaseSettings{
-			Driver:      "mysql",
+			Driver:      "gorm",
 			Host:        "localhost",
 			Port:        3306,
 			MaxConn:     25,
 			MaxIdleConn: 5,
 			ConnTimeout: 30,
+			Path:        "./data/etc_meisai.db", // Default SQLite path
 		},
 		Server: ServerSettings{
 			Host:         "0.0.0.0",
@@ -86,6 +101,13 @@ func NewSettings() *Settings {
 			ReadTimeout:  30,
 			WriteTimeout: 30,
 			MaxBodySize:  32 << 20, // 32MB
+		},
+		GRPC: GRPCSettings{
+			DBServiceAddress: "localhost:50051",
+			Timeout:          30 * time.Second,
+			MaxRetries:       3,
+			RetryDelay:       1 * time.Second,
+			EnableTLS:        false,
 		},
 		Scraping: ScrapingSettings{
 			MaxWorkers:      5,
@@ -137,6 +159,36 @@ func LoadFromEnv() *Settings {
 	}
 	if v := os.Getenv("DB_PASSWORD"); v != "" {
 		settings.Database.Password = v
+	}
+	if v := os.Getenv("DB_PATH"); v != "" {
+		settings.Database.Path = v
+	}
+
+	// gRPC settings
+	if v := os.Getenv("GRPC_DB_SERVICE_ADDRESS"); v != "" {
+		settings.GRPC.DBServiceAddress = v
+	}
+	if v := os.Getenv("GRPC_TIMEOUT"); v != "" {
+		if timeout, err := time.ParseDuration(v); err == nil {
+			settings.GRPC.Timeout = timeout
+		}
+	}
+	if v := os.Getenv("GRPC_MAX_RETRIES"); v != "" {
+		if retries, err := strconv.Atoi(v); err == nil {
+			settings.GRPC.MaxRetries = retries
+		}
+	}
+	if v := os.Getenv("GRPC_ENABLE_TLS"); v != "" {
+		settings.GRPC.EnableTLS = strings.ToLower(v) == "true"
+	}
+	if v := os.Getenv("GRPC_CERT_FILE"); v != "" {
+		settings.GRPC.CertFile = v
+	}
+	if v := os.Getenv("GRPC_KEY_FILE"); v != "" {
+		settings.GRPC.KeyFile = v
+	}
+	if v := os.Getenv("GRPC_CA_FILE"); v != "" {
+		settings.GRPC.CAFile = v
 	}
 
 	// Server settings
@@ -224,6 +276,27 @@ func (s *Settings) Validate() error {
 		s.Server.WriteTimeout = 30
 	}
 
+	// gRPC validation
+	if s.GRPC.DBServiceAddress == "" {
+		return fmt.Errorf("gRPC db_service address is required")
+	}
+	if s.GRPC.Timeout <= 0 {
+		s.GRPC.Timeout = 30 * time.Second
+	}
+	if s.GRPC.MaxRetries < 0 {
+		s.GRPC.MaxRetries = 0
+	}
+	if s.GRPC.RetryDelay <= 0 {
+		s.GRPC.RetryDelay = 1 * time.Second
+	}
+
+	// TLS validation
+	if s.GRPC.EnableTLS {
+		if s.GRPC.CertFile == "" || s.GRPC.KeyFile == "" {
+			return fmt.Errorf("TLS cert_file and key_file are required when TLS is enabled")
+		}
+	}
+
 	// Scraping validation
 	if s.Scraping.MaxWorkers <= 0 {
 		s.Scraping.MaxWorkers = 1
@@ -276,6 +349,21 @@ func (s *DatabaseSettings) GetDSN() string {
 // GetServerAddress returns the server address
 func (s *ServerSettings) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", s.Host, s.Port)
+}
+
+// GetDBServiceAddress returns the gRPC db_service address
+func (g *GRPCSettings) GetDBServiceAddress() string {
+	return g.DBServiceAddress
+}
+
+// IsSecure returns true if TLS is enabled
+func (g *GRPCSettings) IsSecure() bool {
+	return g.EnableTLS
+}
+
+// GetConnectionTimeout returns the connection timeout
+func (g *GRPCSettings) GetConnectionTimeout() time.Duration {
+	return g.Timeout
 }
 
 // GlobalSettings holds the global application settings

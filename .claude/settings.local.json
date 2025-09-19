@@ -17,7 +17,9 @@
       "Bash(curl:*)",
       "Bash(.specify/scripts/bash/setup-plan.sh:*)",
       "Bash(find:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Read(//c/go/db_service/**)",
+      "Bash(protoc:*)"
     ],
     "deny": [],
     "ask": []

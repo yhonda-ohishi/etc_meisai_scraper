@@ -1,16 +1,20 @@
 package handlers
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/yhonda-ohishi/etc_meisai/src/services"
 )
 
 // BaseHandler は全ハンドラーの基底構造体
 type BaseHandler struct {
-	DB     *sql.DB
-	Logger *log.Logger
+	ServiceRegistry *services.ServiceRegistry
+	Logger          *log.Logger
+	ErrorHandler    *GRPCErrorHandler
 }
 
 // ErrorResponse は統一エラーレスポンス
@@ -47,6 +51,18 @@ func (h *BaseHandler) RespondError(w http.ResponseWriter, status int, code, mess
 	h.RespondJSON(w, status, resp)
 }
 
+// RespondGRPCError はgRPCエラーを適切なHTTPレスポンスに変換して送信
+func (h *BaseHandler) RespondGRPCError(w http.ResponseWriter, err error, requestID string) {
+	if h.ErrorHandler == nil {
+		h.ErrorHandler = NewGRPCErrorHandler()
+	}
+
+	httpStatus, errorCode, message := h.ErrorHandler.HandleGRPCError(err)
+	errorDetail := h.ErrorHandler.CreateErrorDetail(err, requestID)
+
+	h.RespondError(w, httpStatus, errorCode, message, errorDetail)
+}
+
 // RespondSuccess は成功レスポンスを送信
 func (h *BaseHandler) RespondSuccess(w http.ResponseWriter, data interface{}, message string) {
 	resp := SuccessResponse{
@@ -55,4 +71,33 @@ func (h *BaseHandler) RespondSuccess(w http.ResponseWriter, data interface{}, me
 		Message: message,
 	}
 	h.RespondJSON(w, http.StatusOK, resp)
+}
+
+// HealthCheck performs comprehensive health check including gRPC services
+func (h *BaseHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	if h.ServiceRegistry == nil {
+		h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+			"Service registry not initialized", nil)
+		return
+	}
+
+	result := h.ServiceRegistry.HealthCheck(ctx)
+
+	if result.IsHealthy() {
+		h.RespondJSON(w, http.StatusOK, result)
+	} else {
+		h.RespondJSON(w, http.StatusServiceUnavailable, result)
+	}
+}
+
+// NewBaseHandler creates a new base handler with service registry
+func NewBaseHandler(serviceRegistry *services.ServiceRegistry, logger *log.Logger) *BaseHandler {
+	return &BaseHandler{
+		ServiceRegistry: serviceRegistry,
+		Logger:          logger,
+		ErrorHandler:    NewGRPCErrorHandler(),
+	}
 }

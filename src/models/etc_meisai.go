@@ -1,155 +1,190 @@
 package models
 
-import "time"
+import (
+	"crypto/sha256"
+	"fmt"
+	"time"
+)
 
-// ETCMeisai represents a simplified ETC transaction record
+// ETCMeisai represents the main ETC transaction record
 type ETCMeisai struct {
-	ID             int64     `db:"id" json:"id"`
-	UsageDate      time.Time `db:"usage_date" json:"usage_date"`
-	Date           string    `db:"date" json:"date"`                       // 日付文字列
-	Time           string    `db:"time" json:"time"`                       // 時刻文字列
-	EntryIC        string    `db:"entry_ic" json:"entry_ic"`
-	ICEntry        string    `db:"ic_entry" json:"ic_entry"`               // エイリアス
-	ExitIC         string    `db:"exit_ic" json:"exit_ic"`
-	ICExit         string    `db:"ic_exit" json:"ic_exit"`                 // エイリアス
-	TollGate       string    `db:"toll_gate" json:"toll_gate"`             // 料金所
-	TollAmount     int       `db:"toll_amount" json:"toll_amount"`
-	TotalAmount    int       `db:"total_amount" json:"total_amount"`       // エイリアス
-	VehicleNumber  string    `db:"vehicle_number" json:"vehicle_number"`
-	VehicleNo      string    `db:"vehicle_no" json:"vehicle_no"`           // エイリアス
-	VehicleType    string    `db:"vehicle_type" json:"vehicle_type"`       // 車種
-	ETCCardNumber  string    `db:"etc_card_number" json:"etc_card_number"`
-	CardNo         string    `db:"card_no" json:"card_no"`                 // エイリアス
-	CardNumber     string    `db:"card_number" json:"card_number"`         // エイリアス
-	ETCNum         string    `db:"etc_num" json:"etc_num"`                 // エイリアス
-	Amount         int       `db:"amount" json:"amount"`                   // エイリアス
-	DiscountAmount int       `db:"discount_amount" json:"discount_amount"` // 割引金額
-	PaymentMethod  string    `db:"payment_method" json:"payment_method"`   // 支払い方法
-	RouteCode      string    `db:"route_code" json:"route_code"`           // ルートコード
-	Distance       float64   `db:"distance" json:"distance"`               // 距離
-	Remarks        string    `db:"remarks" json:"remarks"`                 // 備考
-	UsageType      string    `db:"usage_type" json:"usage_type"`           // 通行区分
-	AccountType    string    `db:"account_type" json:"account_type"`       // corporate/personal
-	UnkoNo         string    `db:"unko_no" json:"unko_no"`                 // 運行番号
-	RowID          int64     `db:"row_id" json:"row_id"`                   // レガシー互換性
-	ImportedAt     time.Time `db:"imported_at" json:"imported_at"`
-	CreatedAt      time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time `db:"updated_at" json:"updated_at"`
+	// Primary Key
+	ID int64 `json:"id"`
+
+	// 利用情報
+	UseDate time.Time `json:"use_date"`
+	UseTime string    `json:"use_time"`
+
+	// 料金所情報
+	EntryIC string `json:"entry_ic"`
+	ExitIC  string `json:"exit_ic"`
+
+	// 金額情報
+	Amount int32 `json:"amount"`
+
+	// 車両情報
+	CarNumber string `json:"car_number"`
+
+	// ETC情報
+	ETCNumber string `json:"etc_number"`
+
+	// データ整合性
+	Hash string `json:"hash"`
+
+	// タイムスタンプ
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// リレーション
+	Mappings []ETCMeisaiMapping `json:"mappings,omitempty"`
 }
 
-// ETCRow represents a row from legacy system (for compatibility)
-type ETCRow = ETCMeisai
+// BeforeCreate prepares the record before creation
+func (e *ETCMeisai) BeforeCreate() error {
+	// Generate hash if not provided
+	if e.Hash == "" {
+		e.Hash = e.GenerateHash()
+	}
 
-// ETCSummary represents summary statistics
+	// Validate the record
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// BeforeUpdate prepares the record before updating
+func (e *ETCMeisai) BeforeUpdate() error {
+	// Re-generate hash on update
+	e.Hash = e.GenerateHash()
+
+	// Validate the record
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GenerateHash creates a unique hash for the ETC record
+func (e *ETCMeisai) GenerateHash() string {
+	data := fmt.Sprintf("%s|%s|%s|%s|%d|%s",
+		e.UseDate.Format("2006-01-02"),
+		e.UseTime,
+		e.EntryIC,
+		e.ExitIC,
+		e.Amount,
+		e.ETCNumber,
+	)
+
+	hash := sha256.Sum256([]byte(data))
+	return fmt.Sprintf("%x", hash)
+}
+
+// Validate checks the ETC record for business rule compliance
+func (e *ETCMeisai) Validate() error {
+	if e.UseDate.IsZero() {
+		return fmt.Errorf("UseDate is required")
+	}
+
+	if e.UseDate.After(time.Now()) {
+		return fmt.Errorf("UseDate cannot be in the future")
+	}
+
+	if e.Amount <= 0 {
+		return fmt.Errorf("Amount must be positive")
+	}
+
+	if len(e.ETCNumber) > 20 {
+		return fmt.Errorf("ETCNumber too long")
+	}
+
+	if e.Hash == "" {
+		return fmt.Errorf("Hash is required")
+	}
+
+	return nil
+}
+
+// ETCListParams defines parameters for querying ETC records
+type ETCListParams struct {
+	Limit     int        `json:"limit"`
+	Offset    int        `json:"offset"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
+	FromDate  *time.Time `json:"from_date,omitempty"` // Alias for StartDate
+	ToDate    *time.Time `json:"to_date,omitempty"`   // Alias for EndDate
+	ETCNumber string     `json:"etc_number,omitempty"`
+	CarNumber string     `json:"car_number,omitempty"`
+	EntryIC   string     `json:"entry_ic,omitempty"`
+	ExitIC    string     `json:"exit_ic,omitempty"`
+	SortBy    string     `json:"sort_by,omitempty"`
+	OrderBy   string     `json:"order_by,omitempty"`   // Alias for SortBy
+	SortOrder string     `json:"sort_order,omitempty"`
+}
+
+// SetDefaults sets default values for list parameters
+func (p *ETCListParams) SetDefaults() {
+	if p.Limit <= 0 || p.Limit > 1000 {
+		if p.Limit > 1000 {
+			p.Limit = 1000
+		} else {
+			p.Limit = 100
+		}
+	}
+	if p.Offset < 0 {
+		p.Offset = 0
+	}
+}
+
+// ETCSummary provides aggregated statistics for ETC records
 type ETCSummary struct {
-	Period        string           `db:"period" json:"period"`
-	StartDate     time.Time        `db:"start_date" json:"start_date"`
-	EndDate       time.Time        `db:"end_date" json:"end_date"`
-	Date          string           `db:"date" json:"date"`                 // 日付
-	VehicleNo     string           `db:"vehicle_no" json:"vehicle_no"`     // 車両番号
-	TotalRecords  int              `db:"total_records" json:"total_records"`
-	TotalAmount   int64            `db:"total_amount" json:"total_amount"`
-	TotalCount    int              `db:"total_count" json:"total_count"`     // 合計件数
-	TotalDistance float64          `db:"total_distance" json:"total_distance"` // 合計距離
-	VehicleCount  int              `db:"vehicle_count" json:"vehicle_count"`
-	RouteCount    int              `db:"route_count" json:"route_count"`
-	ByVehicle     map[string]int64 `db:"by_vehicle" json:"by_vehicle"`
-	ByRoute       map[string]int64 `db:"by_route" json:"by_route"`
+	TotalAmount int64     `json:"total_amount"`
+	TotalCount  int64     `json:"total_count"`
+	StartDate   time.Time `json:"start_date"`
+	EndDate     time.Time `json:"end_date"`
+	ByETCNumber map[string]*ETCNumberSummary  `json:"by_etc_number"`
+	ByMonth     map[string]*ETCMonthlySummary `json:"by_month"`
 }
 
-// ImportSession represents an import session record (optional)
-type ImportSession struct {
-	ID           int64     `db:"id" json:"id"`
-	AccountType  string    `db:"account_type" json:"account_type"`
-	StartDate    time.Time `db:"start_date" json:"start_date"`
-	EndDate      time.Time `db:"end_date" json:"end_date"`
-	RecordCount  int       `db:"record_count" json:"record_count"`
-	Status       string    `db:"status" json:"status"` // success/failed
-	ExecutedAt   time.Time `db:"executed_at" json:"executed_at"`
-	ErrorMessage string    `db:"error_message" json:"error_message"`
+// ETCNumberSummary provides summary statistics per ETC number
+type ETCNumberSummary struct {
+	ETCNumber   string `json:"etc_number"`
+	TotalAmount int64  `json:"total_amount"`
+	TotalCount  int64  `json:"total_count"`
 }
 
-// HashConfig represents hash configuration settings
-type HashConfig struct {
-	Algorithm string `json:"algorithm"`
-	Fields    []string `json:"fields"`
+// ETCMonthlySummary provides summary statistics per month
+type ETCMonthlySummary struct {
+	Year        int   `json:"year"`
+	Month       int   `json:"month"`
+	TotalAmount int64 `json:"total_amount"`
+	TotalCount  int64 `json:"total_count"`
 }
 
-// ETCMeisaiWithHash represents ETC meisai with hash value
-type ETCMeisaiWithHash struct {
-	ETCMeisai
-	Hash string `db:"hash" json:"hash"`
+// ETCMonthlyStats provides detailed monthly statistics
+type ETCMonthlyStats struct {
+	Year           int                          `json:"year"`
+	Month          int                          `json:"month"`
+	TotalAmount    int64                        `json:"total_amount"`
+	TotalCount     int64                        `json:"total_count"`
+	DailyBreakdown map[int]*ETCDailySummary     `json:"daily_breakdown"`
+	TopRoutes      []*ETCRouteSummary           `json:"top_routes"`
 }
 
-// HashIndex represents hash index for quick lookup
-type HashIndex struct {
-	Hash      string    `db:"hash"`
-	RecordID  int64     `db:"record_id"`
-	CreatedAt time.Time `db:"created_at"`
+// ETCDailySummary provides daily statistics within a month
+type ETCDailySummary struct {
+	Day    int   `json:"day"`
+	Amount int64 `json:"amount"`
+	Count  int64 `json:"count"`
 }
 
-// ImportDiff represents differences in import
-type ImportDiff struct {
-	Added   []ETCMeisai `json:"added"`
-	Updated []ETCMeisai `json:"updated"`
-	Deleted []ETCMeisai `json:"deleted"`
-}
-
-// ETCImportRequest represents import request parameters
-type ETCImportRequest struct {
-	FilePath    string `json:"file_path"`
-	AccountType string `json:"account_type"`
-	StartDate   string `json:"start_date"`
-	EndDate     string `json:"end_date"`
-	FromDate    string `json:"from_date"`    // エイリアス
-	ToDate      string `json:"to_date"`      // エイリアス
-}
-
-// ETCImportResult represents import operation result
-type ETCImportResult struct {
-	Success      bool      `json:"success"`
-	RecordCount  int       `json:"record_count"`
-	ImportedRows int       `json:"imported_rows"`     // エイリアス
-	Message      string    `json:"message"`
-	ErrorMessage string    `json:"error_message,omitempty"`
-	Duration     int64     `json:"duration_ms"`
-	ImportedAt   time.Time `json:"imported_at"`
-	Errors       []string  `json:"errors,omitempty"`
-}
-// ETCDtakoMapping represents mapping between ETC and Dtako records
-type ETCDtakoMapping struct {
-	ID          int64     `db:"id" json:"id"`
-	ETCMeisaiID int64     `db:"etc_meisai_id" json:"etc_meisai_id"`
-	DtakoRowID  string    `db:"dtako_row_id" json:"dtako_row_id"`
-	VehicleID   string    `db:"vehicle_id" json:"vehicle_id"`
-	MappingType string    `db:"mapping_type" json:"mapping_type"`
-	Notes       string    `db:"notes" json:"notes"`
-	CreatedAt   time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time `db:"updated_at" json:"updated_at"`
-	CreatedBy   string    `db:"created_by" json:"created_by"`
-}
-
-// DefaultHashConfigs provides default hash configurations
-var DefaultHashConfigs = map[string]HashConfig{
-	"file": {
-		Algorithm: "sha256",
-		Fields:    []string{"filename", "size"},
-	},
-	"record": {
-		Algorithm: "sha256", 
-		Fields:    []string{"date", "ic_entry", "ic_exit", "vehicle_no", "amount"},
-	},
-}
-
-// UpdatedRecord represents an updated record
-type UpdatedRecord struct {
-	ETCMeisai
-	UpdateType string `json:"update_type"`
-}
-
-// ErrorResponse represents an error response
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Code    string `json:"code,omitempty"`
-	Details string `json:"details,omitempty"`
+// ETCRouteSummary provides statistics for popular routes
+type ETCRouteSummary struct {
+	EntryIC     string `json:"entry_ic"`
+	ExitIC      string `json:"exit_ic"`
+	Count       int64  `json:"count"`
+	TotalAmount int64  `json:"total_amount"`
+	AvgAmount   int64  `json:"avg_amount"`
 }
