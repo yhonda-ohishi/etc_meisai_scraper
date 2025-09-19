@@ -15,7 +15,9 @@
       "Bash(cat:*)",
       "Bash(cmd /c:*)",
       "Bash(curl:*)",
-      "Bash(.specify/scripts/bash/setup-plan.sh:*)"
+      "Bash(.specify/scripts/bash/setup-plan.sh:*)",
+      "Bash(find:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,8 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
-	etc "github.com/yhonda-ohishi/etc_meisai"
-	"github.com/yhonda-ohishi/etc_meisai/config"
+	"github.com/yhonda-ohishi/etc_meisai/src/config"
+	"github.com/yhonda-ohishi/etc_meisai/src/handlers"
 )
 
 func main() {
@@ -32,14 +32,25 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(corsMiddleware)
 
-	// Register scraping API endpoints (no database required)
-	r.Get("/health", etc.HealthCheckHandler)
-	r.Get("/api/etc/accounts", etc.GetAvailableAccountsHandler)
-	r.Post("/api/etc/download", etc.DownloadETCDataHandler)
-	r.Post("/api/etc/download-single", etc.DownloadSingleAccountHandler)
-	r.Post("/api/etc/download-async", etc.StartDownloadJobHandler)
-	r.HandleFunc("/api/etc/download-status/*", etc.GetDownloadJobStatusHandler)
-	r.Post("/api/etc/parse-csv", etc.ParseCSVHandler)
+	// Initialize handlers with new structure
+	baseHandler := handlers.BaseHandler{}
+	parseHandler := handlers.NewParseHandler(baseHandler)
+	downloadHandler := handlers.NewDownloadHandler(baseHandler, nil)
+	accountHandler := handlers.NewAccountsHandler(baseHandler)
+
+	// Register API endpoints
+	r.Route("/api", func(r chi.Router) {
+		// Parse endpoints
+		r.Post("/parse/csv", parseHandler.ParseCSV)
+
+		// Download endpoints
+		r.Post("/download/sync", downloadHandler.DownloadSync)
+		r.Post("/download/async", downloadHandler.DownloadAsync)
+		r.Get("/download/status", downloadHandler.GetDownloadStatus)
+
+		// Account endpoints
+		r.Get("/accounts", accountHandler.GetAccounts)
+	})
 
 	// Swagger UI
 	r.Handle("/docs/*", http.StripPrefix("/docs/", http.FileServer(http.Dir("./docs/"))))
@@ -57,11 +68,11 @@ func main() {
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("Starting ETC Meisai API server on %s", addr)
 	log.Printf("Endpoints:")
-	log.Printf("  GET  http://localhost%s/health", addr)
-	log.Printf("  GET  http://localhost%s/api/etc/accounts", addr)
-	log.Printf("  POST http://localhost%s/api/etc/download", addr)
-	log.Printf("  POST http://localhost%s/api/etc/download-single", addr)
-	log.Printf("  POST http://localhost%s/api/etc/download-async", addr)
+	log.Printf("  GET  http://localhost%s/api/accounts", addr)
+	log.Printf("  POST http://localhost%s/api/parse/csv", addr)
+	log.Printf("  POST http://localhost%s/api/download/sync", addr)
+	log.Printf("  POST http://localhost%s/api/download/async", addr)
+	log.Printf("  GET  http://localhost%s/api/download/status", addr)
 	log.Printf("  Swagger UI: http://localhost%s/docs", addr)
 
 	if err := http.ListenAndServe(addr, r); err != nil {
