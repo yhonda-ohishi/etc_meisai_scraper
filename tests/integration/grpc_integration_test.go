@@ -70,7 +70,7 @@ func testETCService(t *testing.T, registry *services.ServiceRegistry) {
 	}
 
 	// Test Create
-	createdID, err := etcService.Create(ctx, testRecord)
+	created, err := etcService.Create(ctx, testRecord)
 	if err != nil {
 		// If gRPC is not implemented, check for expected error
 		if strings.Contains(err.Error(), "not yet implemented") {
@@ -79,8 +79,9 @@ func testETCService(t *testing.T, registry *services.ServiceRegistry) {
 		t.Fatalf("Failed to create ETC record: %v", err)
 	}
 
-	assert.NotZero(t, createdID, "ID should be returned after creation")
-	testRecord.ID = createdID
+	assert.NotNil(t, created, "Created record should not be nil")
+	assert.NotZero(t, created.ID, "ID should be returned after creation")
+	testRecord.ID = created.ID
 
 	// Test GetByID
 	retrieved, err := etcService.GetByID(ctx, testRecord.ID)
