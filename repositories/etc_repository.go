@@ -18,6 +18,143 @@ func NewETCRepository(db *sql.DB) *ETCRepository {
 	return &ETCRepository{db: db}
 }
 
+// GetByID retrieves an ETC record by row ID
+func (r *ETCRepository) GetByID(rowID string) (*models.ETCRow, error) {
+	query := `
+		SELECT row_id, date, time, entry_ic, exit_ic,
+		       card_number, amount, created_at
+		FROM etc_rows
+		WHERE row_id = ?
+	`
+
+	var row models.ETCRow
+	err := r.db.QueryRow(query, rowID).Scan(
+		&row.RowID,
+		&row.Date,
+		&row.Time,
+		&row.EntryIC,
+		&row.ExitIC,
+		&row.CardNumber,
+		&row.Amount,
+		&row.CreatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get ETC row by ID: %w", err)
+	}
+
+	return &row, nil
+}
+
+// CountByDateRange counts ETC records in a date range
+func (r *ETCRepository) CountByDateRange(startDate, endDate time.Time) (int, error) {
+	query := `
+		SELECT COUNT(*) FROM etc_rows
+		WHERE date >= ? AND date <= ?
+	`
+
+	var count int
+	err := r.db.QueryRow(query, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count ETC records: %w", err)
+	}
+
+	return count, nil
+}
+
+// GetByDateRangeBatch retrieves ETC records in batches
+func (r *ETCRepository) GetByDateRangeBatch(startDate, endDate time.Time, limit, offset int) ([]models.ETCRow, error) {
+	query := `
+		SELECT row_id, date, time, entry_ic, exit_ic,
+		       card_number, amount, created_at
+		FROM etc_rows
+		WHERE date >= ? AND date <= ?
+		ORDER BY date, time
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := r.db.Query(query,
+		startDate.Format("2006-01-02"),
+		endDate.Format("2006-01-02"),
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query ETC rows: %w", err)
+	}
+	defer rows.Close()
+
+	var etcRows []models.ETCRow
+	for rows.Next() {
+		var row models.ETCRow
+		err := rows.Scan(
+			&row.RowID,
+			&row.Date,
+			&row.Time,
+			&row.EntryIC,
+			&row.ExitIC,
+			&row.CardNumber,
+			&row.Amount,
+			&row.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan ETC row: %w", err)
+		}
+		etcRows = append(etcRows, row)
+	}
+
+	return etcRows, nil
+}
+
+// GetUnmappedRecords retrieves ETC records without mappings
+func (r *ETCRepository) GetUnmappedETCRecords(startDate, endDate time.Time, limit, offset int) ([]*models.ETCRow, error) {
+	query := `
+		SELECT e.row_id, e.date, e.time, e.entry_ic, e.exit_ic,
+		       e.card_number, e.amount, e.created_at
+		FROM etc_rows e
+		LEFT JOIN etc_dtako_mapping m ON e.row_id = m.etc_row_id
+		WHERE m.id IS NULL
+		  AND e.date >= ? AND e.date <= ?
+		ORDER BY e.date, e.time
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := r.db.Query(query,
+		startDate.Format("2006-01-02"),
+		endDate.Format("2006-01-02"),
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query unmapped ETC rows: %w", err)
+	}
+	defer rows.Close()
+
+	var etcRows []*models.ETCRow
+	for rows.Next() {
+		var row models.ETCRow
+		err := rows.Scan(
+			&row.RowID,
+			&row.Date,
+			&row.Time,
+			&row.EntryIC,
+			&row.ExitIC,
+			&row.CardNumber,
+			&row.Amount,
+			&row.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan unmapped ETC row: %w", err)
+		}
+		etcRows = append(etcRows, &row)
+	}
+
+	return etcRows, nil
+}
+
 // GetByDateRange retrieves ETC meisai records within a date range
 func (r *ETCRepository) GetByDateRange(fromDate, toDate time.Time) ([]models.ETCMeisai, error) {
 	query := `
@@ -111,7 +248,7 @@ func (r *ETCRepository) Insert(m *models.ETCMeisai) error {
 	if err != nil {
 		return fmt.Errorf("failed to get last insert ID: %w", err)
 	}
-	m.ID = int(id)
+	m.ID = id
 
 	return nil
 }

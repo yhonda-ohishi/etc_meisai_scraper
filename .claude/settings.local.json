@@ -5,7 +5,17 @@
       "Bash(go run:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(python:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebSearch",
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(go get:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(cat:*)",
+      "Bash(cmd /c:*)",
+      "Bash(curl:*)",
+      "Bash(.specify/scripts/bash/setup-plan.sh:*)"
     ],
     "deny": [],
     "ask": []

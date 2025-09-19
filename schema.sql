@@ -22,3 +22,24 @@ CREATE TABLE IF NOT EXISTS etc_meisai (
     INDEX idx_vehicle_no (vehicle_no),
     INDEX idx_card_no (card_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ETC Dtako Mapping table
+CREATE TABLE IF NOT EXISTS etc_dtako_mapping (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    etc_meisai_id INT NOT NULL,
+    dtako_row_id VARCHAR(100) NOT NULL,
+    vehicle_id VARCHAR(50),
+    mapping_type VARCHAR(20) NOT NULL DEFAULT 'manual',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    CONSTRAINT fk_etc_meisai
+        FOREIGN KEY (etc_meisai_id)
+        REFERENCES etc_meisai(id)
+        ON DELETE CASCADE,
+    INDEX idx_etc_meisai_id (etc_meisai_id),
+    INDEX idx_dtako_row_id (dtako_row_id),
+    INDEX idx_vehicle_id (vehicle_id),
+    UNIQUE KEY unique_meisai_dtako (etc_meisai_id, dtako_row_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -14,7 +14,7 @@ type ETCModule struct{}
 
 // GetHandlers は利用可能な全ハンドラーを返す
 func (m *ETCModule) GetHandlers() map[string]func(http.ResponseWriter, *http.Request) {
-	return GlobalRegistry.GetAll()
+	return make(map[string]func(http.ResponseWriter, *http.Request))
 }
 
 // GetVersion はモジュールバージョンを返す

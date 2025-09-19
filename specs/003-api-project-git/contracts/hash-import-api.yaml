@@ -1,0 +1,494 @@
+openapi: 3.0.3
+info:
+  title: ハッシュベースインポートAPI
+  description: |
+    ETC明細CSVファイルのハッシュベースインポート機能を提供するAPI
+
+    ## 主な機能
+    - **重複検出**: xxHash128を使用した高速重複検出
+    - **変更追跡**: SHA256を使用した詳細な変更追跡
+    - **セッション管理**: インポートセッションごとの処理状況管理
+    - **差分管理**: 追加・更新・重複レコードの詳細な差分情報
+
+    ## ハッシュアルゴリズム
+    - **レコードハッシュ**: xxHash128（重複検出用）
+    - **コンテンツハッシュ**: SHA256（変更検出用）
+
+  version: 1.0.0
+
+paths:
+  /api/etc/import/hash:
+    post:
+      summary: ハッシュベースインポート
+      description: |
+        CSVファイルをハッシュベースでインポートし、重複検出と変更追跡を行います。
+
+        ## 処理フロー
+        1. CSVファイルの解析
+        2. 各レコードのハッシュ値計算
+        3. 既存データとの重複・変更検出
+        4. 差分情報の生成
+        5. データの追加・更新（オプション）
+
+      tags:
+        - Hash Import
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HashImportRequest'
+            examples:
+              basic_import:
+                summary: 基本的なインポート
+                value:
+                  csv_path: "/path/to/etc_data.csv"
+                  options:
+                    skip_duplicates: true
+                    update_existing: false
+                    validate_only: false
+              validate_only:
+                summary: バリデーションのみ
+                value:
+                  csv_path: "/path/to/etc_data.csv"
+                  session_id: "550e8400-e29b-41d4-a716-446655440000"
+                  options:
+                    validate_only: true
+      responses:
+        '200':
+          description: インポート成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+              examples:
+                successful_import:
+                  summary: 成功時のレスポンス
+                  value:
+                    success: true
+                    processed_count: 150
+                    added_count: 120
+                    updated_count: 25
+                    duplicate_count: 5
+                    error_count: 0
+                    session:
+                      id: "550e8400-e29b-41d4-a716-446655440000"
+                      status: "completed"
+                      started_at: "2025-01-13T15:04:05Z"
+                      completed_at: "2025-01-13T15:05:30Z"
+                validation_only:
+                  summary: バリデーションのみの場合
+                  value:
+                    success: true
+                    processed_count: 150
+                    added_count: 120
+                    updated_count: 25
+                    duplicate_count: 5
+                    session:
+                      status: "completed"
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+              example:
+                success: false
+                errors:
+                  - record_index: 0
+                    error: "CSV parse failed: invalid format"
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+              example:
+                success: false
+                errors:
+                  - record_index: -1
+                    error: "Database connection failed"
+
+  /api/etc/diff/{session_id}:
+    get:
+      summary: 差分情報取得
+      description: 指定されたセッションIDの差分情報を取得します
+      tags:
+        - Hash Import
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: インポートセッションID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: 差分情報
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportDiff'
+        '404':
+          description: セッションが見つからない
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Session not found"
+
+  /api/etc/duplicates:
+    get:
+      summary: 重複レコード検出
+      description: 現在のハッシュインデックス内の重複レコードを検出・取得します
+      tags:
+        - Hash Import
+      responses:
+        '200':
+          description: 重複検出結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_records:
+                    type: integer
+                    description: 総レコード数
+                    example: 1500
+                  duplicate_groups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DuplicateGroup'
+                  message:
+                    type: string
+                    example: "Duplicate detection completed"
+
+  /api/etc/hash/stats:
+    get:
+      summary: ハッシュインデックス統計
+      description: メモリ内ハッシュインデックスの統計情報を取得します
+      tags:
+        - Hash Import
+      responses:
+        '200':
+          description: ハッシュインデックス統計情報
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HashIndexStats'
+              example:
+                total_records: 1500
+                memory_usage_estimate: "0.76 MB"
+                index_type: "in-memory"
+                hash_algorithms:
+                  record: "xxHash128"
+                  content: "SHA256"
+                last_updated: "2025-01-13T15:04:05Z"
+                performance_metrics:
+                  avg_lookup_time_ms: 0.05
+                  collision_rate: 0.001
+
+  /api/etc/hash/clear:
+    post:
+      summary: ハッシュインデックスクリア
+      description: メモリ内ハッシュインデックスをクリアします
+      tags:
+        - Hash Import
+      responses:
+        '200':
+          description: クリア成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Hash index cleared"
+                  previous_size:
+                    type: integer
+                    description: クリア前のレコード数
+                    example: 1500
+                  current_size:
+                    type: integer
+                    description: クリア後のレコード数
+                    example: 0
+        '405':
+          description: メソッドが許可されていない
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Method not allowed"
+
+components:
+  schemas:
+    # ハッシュインポートリクエスト
+    HashImportRequest:
+      type: object
+      required:
+        - csv_path
+      properties:
+        csv_path:
+          type: string
+          description: インポート対象のCSVファイルパス
+          example: "/path/to/etc_data.csv"
+        session_id:
+          type: string
+          format: uuid
+          description: セッションID（未指定の場合は自動生成）
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        options:
+          $ref: '#/components/schemas/HashImportOptions'
+
+    # ハッシュインポートオプション
+    HashImportOptions:
+      type: object
+      properties:
+        skip_duplicates:
+          type: boolean
+          default: true
+          description: 重複レコードをスキップするか
+        update_existing:
+          type: boolean
+          default: false
+          description: 既存レコードを更新するか
+        validate_only:
+          type: boolean
+          default: false
+          description: バリデーションのみ実行（実際の更新は行わない）
+
+    # インポート結果
+    ImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: インポート成功フラグ
+        processed_count:
+          type: integer
+          description: 処理されたレコード数
+        added_count:
+          type: integer
+          description: 新規追加されたレコード数
+        updated_count:
+          type: integer
+          description: 更新されたレコード数
+        duplicate_count:
+          type: integer
+          description: 重複スキップされたレコード数
+        error_count:
+          type: integer
+          description: エラーレコード数
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportError'
+          description: エラー詳細
+        session:
+          $ref: '#/components/schemas/ImportSession'
+        diff:
+          $ref: '#/components/schemas/ImportDiff'
+
+    # インポートセッション
+    ImportSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: セッションID
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+          description: セッションステータス
+        started_at:
+          type: string
+          format: date-time
+          description: 開始時刻
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 完了時刻
+        total_records:
+          type: integer
+          description: 総レコード数
+        processed_count:
+          type: integer
+          description: 処理済みレコード数
+        added_count:
+          type: integer
+          description: 追加レコード数
+        updated_count:
+          type: integer
+          description: 更新レコード数
+        duplicate_count:
+          type: integer
+          description: 重複レコード数
+        error_count:
+          type: integer
+          description: エラーレコード数
+        errors:
+          type: array
+          items:
+            type: string
+          description: エラーメッセージ一覧
+
+    # インポート差分
+    ImportDiff:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          description: セッションID
+        added:
+          type: array
+          items:
+            $ref: '#/components/schemas/ETCMeisaiWithHash'
+          description: 新規追加レコード
+        updated:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdatedRecord'
+          description: 更新レコード
+        duplicates:
+          type: array
+          items:
+            $ref: '#/components/schemas/ETCMeisaiWithHash'
+          description: 重複レコード
+        deleted:
+          type: array
+          items:
+            $ref: '#/components/schemas/ETCMeisaiWithHash'
+          description: 削除対象レコード（オプション）
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: 差分作成時刻
+
+    # ハッシュ付きETC明細
+    ETCMeisaiWithHash:
+      allOf:
+        - $ref: '../openapi.yaml#/components/schemas/ETCMeisai'
+        - type: object
+          properties:
+            record_hash:
+              type: string
+              description: レコードハッシュ（xxHash128）
+              example: "a1b2c3d4e5f6789012345678"
+            content_hash:
+              type: string
+              description: コンテンツハッシュ（SHA256）
+              example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            import_session_id:
+              type: string
+              format: uuid
+              description: インポートセッションID
+              nullable: true
+
+    # 更新レコード
+    UpdatedRecord:
+      type: object
+      properties:
+        old:
+          $ref: '#/components/schemas/ETCMeisaiWithHash'
+        new:
+          $ref: '#/components/schemas/ETCMeisaiWithHash'
+        changed_fields:
+          type: array
+          items:
+            type: string
+          description: 変更されたフィールド一覧
+          example: ["price", "total_amount", "remarks"]
+
+    # 重複グループ
+    DuplicateGroup:
+      type: object
+      properties:
+        record_hash:
+          type: string
+          description: 共通のレコードハッシュ
+        count:
+          type: integer
+          description: 重複レコード数
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ETCMeisaiWithHash'
+          description: 重複レコード一覧
+
+    # ハッシュインデックス統計
+    HashIndexStats:
+      type: object
+      properties:
+        total_records:
+          type: integer
+          description: 総レコード数
+        memory_usage_estimate:
+          type: string
+          description: 推定メモリ使用量
+          example: "0.76 MB"
+        index_type:
+          type: string
+          description: インデックスタイプ
+          example: "in-memory"
+        hash_algorithms:
+          type: object
+          properties:
+            record:
+              type: string
+              description: レコードハッシュアルゴリズム
+              example: "xxHash128"
+            content:
+              type: string
+              description: コンテンツハッシュアルゴリズム
+              example: "SHA256"
+        last_updated:
+          type: string
+          format: date-time
+          description: 最終更新時刻
+        performance_metrics:
+          type: object
+          properties:
+            avg_lookup_time_ms:
+              type: number
+              format: double
+              description: 平均検索時間（ミリ秒）
+            collision_rate:
+              type: number
+              format: double
+              description: ハッシュ衝突率
+          nullable: true
+
+    # インポートエラー
+    ImportError:
+      type: object
+      properties:
+        record_index:
+          type: integer
+          description: エラーが発生したレコードのインデックス
+        error:
+          type: string
+          description: エラーメッセージ
+        record:
+          $ref: '../openapi.yaml#/components/schemas/ETCMeisai'
+          nullable: true
+          description: エラーが発生したレコード
+
+tags:
+  - name: Hash Import
+    description: ハッシュベースインポート機能

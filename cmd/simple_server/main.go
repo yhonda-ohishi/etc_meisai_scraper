@@ -97,5 +97,5 @@ func showConfiguredAccounts() {
 		fmt.Printf("  %d. %s\n", i+1, account.UserID)
 	}
 	fmt.Printf("  Total: %d accounts\n", len(accounts))
-	fmt.Println("===================================\n")
+	fmt.Println("===================================")
 }
