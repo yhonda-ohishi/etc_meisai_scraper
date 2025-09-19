@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -147,8 +148,8 @@ func (h *ETCHandler) respondJSON(w http.ResponseWriter, status int, data interfa
 
 func (h *ETCHandler) respondError(w http.ResponseWriter, status int, message string) {
 	h.respondJSON(w, status, models.ErrorResponse{
-		Code:    status,
-		Message: message,
+		Code:  fmt.Sprintf("%d", status),
+		Error: message,
 	})
 }
 

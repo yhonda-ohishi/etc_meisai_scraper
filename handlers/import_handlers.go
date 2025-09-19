@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -126,7 +127,7 @@ func (h *ImportHandler) respondJSON(w http.ResponseWriter, status int, data inte
 
 func (h *ImportHandler) respondError(w http.ResponseWriter, status int, message string) {
 	h.respondJSON(w, status, models.ErrorResponse{
-		Code:    status,
-		Message: message,
+		Code:  fmt.Sprintf("%d", status),
+		Error: message,
 	})
 }

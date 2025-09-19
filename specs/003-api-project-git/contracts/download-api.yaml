@@ -1,0 +1,615 @@
+openapi: 3.0.3
+info:
+  title: ダウンロード・非同期処理API
+  description: |
+    ETC明細ダウンロードと非同期処理機能を提供するAPI
+
+    ## 主な機能
+    - **同期ダウンロード**: 即座にレスポンスを返すダウンロード機能
+    - **非同期ダウンロード**: バックグラウンドでの大量データ処理
+    - **ジョブ管理**: 非同期処理の進捗監視とステータス確認
+    - **リアルタイム通信**: Server-Sent Eventsによるリアルタイム進捗通知
+    - **アカウント管理**: 複数ETCアカウントの一括処理
+
+    ## 処理パターン
+    - **単一アカウント**: 1つのETCアカウントを対象とした処理
+    - **複数アカウント**: 環境変数またはリクエストで指定された複数アカウント処理
+    - **デフォルト設定**: パラメータ未指定時の自動設定（前月1日から今日まで）
+
+  version: 1.0.0
+
+paths:
+  /api/etc/download:
+    post:
+      summary: ETC明細ダウンロード（複数アカウント対応）
+      description: |
+        指定した期間のETC明細を複数アカウントから一括ダウンロードします。
+        アカウント情報が未指定の場合は環境変数から自動取得します。
+      tags:
+        - Download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+            examples:
+              with_accounts:
+                summary: アカウント指定ダウンロード
+                value:
+                  accounts:
+                    - user_id: "user001"
+                      password: "password123"
+                  from_date: "2025-01-01"
+                  to_date: "2025-01-31"
+                  config:
+                    timeout: 60
+                    retry_count: 3
+              env_accounts:
+                summary: 環境変数アカウント使用
+                value:
+                  from_date: "2025-01-01"
+                  to_date: "2025-01-31"
+              minimal:
+                summary: 最小パラメータ（前月分）
+                value: {}
+      responses:
+        '200':
+          description: ダウンロード成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
+              example:
+                results:
+                  - account: "user001"
+                    success: true
+                    csv_path: "/downloads/user001_20250101_20250131.csv"
+                    records:
+                      - id: 1
+                        date_to: "2025-01-15T10:30:00Z"
+                        etc_num: "1234567890123456"
+                        price: 1000
+                  - account: "user002"
+                    success: false
+                    error: "Login failed"
+                    records: []
+                total_records: 150
+                success_count: 1
+                failed_count: 1
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid from_date format. Expected: YYYY-MM-DD"
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Download failed: network timeout"
+
+  /api/etc/download-single:
+    post:
+      summary: 単一アカウントETC明細ダウンロード
+      description: |
+        単一アカウントの明細をダウンロードします。
+        環境変数を使用せず、リクエストボディで直接アカウント情報を指定します。
+      tags:
+        - Download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SingleDownloadRequest'
+            example:
+              user_id: "user001"
+              password: "password123"
+              from_date: "2025-01-01"
+              to_date: "2025-01-31"
+      responses:
+        '200':
+          description: ダウンロード成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResult'
+              example:
+                account: "user001"
+                success: true
+                csv_path: "/downloads/user001_20250101_20250131.csv"
+                total_records: 75
+                records:
+                  - id: 1
+                    date_to: "2025-01-15T10:30:00Z"
+                    etc_num: "1234567890123456"
+                    price: 1000
+                    ic_entry: "東京IC"
+                    ic_exit: "横浜IC"
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  hint:
+                    type: string
+                example:
+                  error: "user_id is required"
+        '500':
+          description: ダウンロード失敗
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  hint:
+                    type: string
+                example:
+                  error: "Download failed: invalid credentials"
+                  hint: "Check your credentials and ensure the account type (ohishiexp/ohishiexp1) matches the user_id"
+
+  /api/etc/download-async:
+    post:
+      summary: ETC明細ダウンロード（非同期）
+      description: |
+        ダウンロードジョブを開始し、ジョブIDを返します。
+        パラメータが未指定の場合は自動的にデフォルト値が設定されます。
+
+        ## デフォルト設定
+        - **from_date**: 前月の1日
+        - **to_date**: 今日
+        - **accounts**: 環境変数から自動取得
+      tags:
+        - Download
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+            examples:
+              full_request:
+                summary: 完全なリクエスト
+                value:
+                  accounts:
+                    - user_id: "user001"
+                      password: "password123"
+                    - user_id: "user002"
+                      password: "password456"
+                  from_date: "2025-01-01"
+                  to_date: "2025-01-31"
+                  config:
+                    timeout: 120
+                    retry_count: 5
+              partial_request:
+                summary: 一部パラメータ指定
+                value:
+                  from_date: "2025-01-01"
+                  to_date: "2025-01-31"
+              empty_request:
+                summary: 空リクエスト（デフォルト使用）
+                value: {}
+      responses:
+        '202':
+          description: ジョブ開始成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                    format: uuid
+                    description: ジョブID
+                  status_url:
+                    type: string
+                    description: ステータス確認URL
+                  from_date:
+                    type: string
+                    format: date
+                    description: 実際の開始日
+                  to_date:
+                    type: string
+                    format: date
+                    description: 実際の終了日
+                  account_count:
+                    type: integer
+                    description: 処理対象アカウント数
+              example:
+                job_id: "550e8400-e29b-41d4-a716-446655440000"
+                status_url: "/api/etc/download-status/550e8400-e29b-41d4-a716-446655440000"
+                from_date: "2024-12-01"
+                to_date: "2025-01-13"
+                account_count: 3
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "No accounts provided and none found in environment variables"
+
+  /api/etc/download-status/{job_id}:
+    get:
+      summary: ダウンロードジョブステータス取得
+      description: |
+        ジョブIDを指定してダウンロード進捗を取得します。
+        定期的にポーリングすることで進捗を監視できます。
+      tags:
+        - Download
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ジョブID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: ジョブステータス
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadJob'
+              examples:
+                processing:
+                  summary: 処理中
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "processing"
+                    progress: 65
+                    message: "アカウント user002 の処理完了 (2/3)"
+                    created_at: "2025-01-13T15:04:05Z"
+                    updated_at: "2025-01-13T15:06:30Z"
+                completed:
+                  summary: 完了
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "completed"
+                    progress: 100
+                    message: "ダウンロード完了"
+                    result:
+                      - user_id: "user001"
+                        success: true
+                        csv_path: "/downloads/user001_20250101_20250131.csv"
+                        record_count: 50
+                      - user_id: "user002"
+                        success: true
+                        csv_path: "/downloads/user002_20250101_20250131.csv"
+                        record_count: 75
+                    created_at: "2025-01-13T15:04:05Z"
+                    updated_at: "2025-01-13T15:08:15Z"
+                failed:
+                  summary: 失敗
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "failed"
+                    progress: 30
+                    message: "アカウント接続に失敗しました"
+                    error: "Authentication failed for multiple accounts"
+                    created_at: "2025-01-13T15:04:05Z"
+                    updated_at: "2025-01-13T15:05:45Z"
+        '404':
+          description: ジョブが見つからない
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Job not found"
+
+  /api/etc/download-sse:
+    post:
+      summary: ETC明細ダウンロード（Server-Sent Events）
+      description: |
+        リアルタイムで進捗を送信しながらダウンロードを実行します。
+        WebブラウザやSSEクライアントでリアルタイム進捗確認が可能です。
+      tags:
+        - Download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+      responses:
+        '200':
+          description: SSEストリーム開始
+          headers:
+            Content-Type:
+              description: text/event-stream
+              schema:
+                type: string
+                example: "text/event-stream"
+            Cache-Control:
+              description: no-cache
+              schema:
+                type: string
+                example: "no-cache"
+            Connection:
+              description: keep-alive
+              schema:
+                type: string
+                example: "keep-alive"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Server-Sent Eventsフォーマット:
+
+                  ```
+                  data: {"progress": 10, "message": "初期化中..."}
+
+                  data: {"progress": 30, "message": "アカウント user001 にログイン中..."}
+
+                  data: {"progress": 60, "message": "アカウント user001 のデータをダウンロード中..."}
+
+                  data: {"progress": 100, "message": "完了しました！"}
+
+                  event: complete
+                  data: {"message": "All downloads completed"}
+                  ```
+              examples:
+                progress_event:
+                  summary: 進捗イベント
+                  value: 'data: {"progress": 45, "message": "アカウント user001 の処理完了 (1/2)"}'
+                completion_event:
+                  summary: 完了イベント
+                  value: |
+                    data: {"progress": 100, "message": "完了しました！"}
+
+                    event: complete
+                    data: {"message": "All downloads completed"}
+        '400':
+          description: 不正なリクエスト
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: 'event: error\ndata: {"error": "Invalid request"}'
+        '500':
+          description: ストリーミング未対応
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Streaming unsupported"
+
+components:
+  schemas:
+    # ダウンロードリクエスト
+    DownloadRequest:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleAccount'
+          description: ダウンロード対象アカウント（未指定時は環境変数から取得）
+        from_date:
+          type: string
+          format: date
+          description: 開始日（YYYY-MM-DD形式、未指定時は前月1日）
+          example: "2025-01-01"
+        to_date:
+          type: string
+          format: date
+          description: 終了日（YYYY-MM-DD形式、未指定時は今日）
+          example: "2025-01-31"
+        config:
+          $ref: '#/components/schemas/ClientConfig'
+
+    # 単一アカウントダウンロードリクエスト
+    SingleDownloadRequest:
+      type: object
+      required:
+        - user_id
+        - password
+        - from_date
+        - to_date
+      properties:
+        user_id:
+          type: string
+          description: ユーザーID
+          example: "user001"
+        password:
+          type: string
+          format: password
+          description: パスワード
+          example: "password123"
+        from_date:
+          type: string
+          format: date
+          description: 開始日（YYYY-MM-DD形式）
+          example: "2025-01-01"
+        to_date:
+          type: string
+          format: date
+          description: 終了日（YYYY-MM-DD形式）
+          example: "2025-01-31"
+
+    # アカウント情報
+    SimpleAccount:
+      type: object
+      required:
+        - user_id
+        - password
+      properties:
+        user_id:
+          type: string
+          description: ユーザーID
+          example: "user001"
+        password:
+          type: string
+          format: password
+          description: パスワード
+          example: "password123"
+
+    # クライアント設定
+    ClientConfig:
+      type: object
+      properties:
+        timeout:
+          type: integer
+          description: タイムアウト秒数
+          default: 60
+          minimum: 10
+          maximum: 300
+          example: 120
+        retry_count:
+          type: integer
+          description: リトライ回数
+          default: 3
+          minimum: 0
+          maximum: 10
+          example: 5
+        headless:
+          type: boolean
+          description: ヘッドレスモード
+          default: true
+        user_agent:
+          type: string
+          description: ユーザーエージェント
+          nullable: true
+
+    # ダウンロードレスポンス
+    DownloadResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DownloadResult'
+          description: アカウント別ダウンロード結果
+        total_records:
+          type: integer
+          description: 総レコード数
+        success_count:
+          type: integer
+          description: 成功アカウント数
+        failed_count:
+          type: integer
+          description: 失敗アカウント数
+
+    # ダウンロード結果
+    DownloadResult:
+      type: object
+      properties:
+        account:
+          type: string
+          description: アカウントID
+        success:
+          type: boolean
+          description: ダウンロード成功フラグ
+        csv_path:
+          type: string
+          description: 保存されたCSVファイルパス
+          nullable: true
+        total_records:
+          type: integer
+          description: 取得レコード数
+        records:
+          type: array
+          items:
+            $ref: '../openapi.yaml#/components/schemas/ETCMeisai'
+          description: 取得したETC明細レコード
+        error:
+          type: string
+          description: エラーメッセージ
+          nullable: true
+        processing_time:
+          type: number
+          format: double
+          description: 処理時間（秒）
+          nullable: true
+
+    # ダウンロードジョブ
+    DownloadJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ジョブID
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+          description: ジョブステータス
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 進捗パーセンテージ
+        message:
+          type: string
+          description: 現在の処理状況メッセージ
+        result:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id:
+                type: string
+                description: ユーザーID
+              success:
+                type: boolean
+                description: 処理成功フラグ
+              csv_path:
+                type: string
+                description: CSVファイルパス
+                nullable: true
+              record_count:
+                type: integer
+                description: レコード数
+              error:
+                type: string
+                description: エラーメッセージ
+                nullable: true
+          description: ジョブ結果（完了時のみ）
+          nullable: true
+        error:
+          type: string
+          description: エラーメッセージ（失敗時のみ）
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: ジョブ作成日時
+        updated_at:
+          type: string
+          format: date-time
+          description: 最終更新日時
+
+tags:
+  - name: Download
+    description: ETC明細ダウンロード機能
