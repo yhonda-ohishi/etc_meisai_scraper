@@ -67,6 +67,12 @@ func (s *MappingService) GetMappingByDTakoRowID(ctx context.Context, dtakoRowID 
 // ListMappings lists mappings with pagination and filters
 func (s *MappingService) ListMappings(ctx context.Context, params *models.MappingListParams) ([]*models.ETCMeisaiMapping, int64, error) {
 	// Set defaults
+	if params == nil {
+		params = &models.MappingListParams{
+			Limit:  100,
+			Offset: 0,
+		}
+	}
 	if params.Limit <= 0 {
 		params.Limit = 100
 	}
@@ -74,7 +80,17 @@ func (s *MappingService) ListMappings(ctx context.Context, params *models.Mappin
 		params.Limit = 1000
 	}
 
-	return s.mappingRepo.List(params)
+	mappings, total, err := s.mappingRepo.List(params)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Ensure non-nil slice
+	if mappings == nil {
+		mappings = []*models.ETCMeisaiMapping{}
+	}
+
+	return mappings, total, nil
 }
 
 // UpdateMapping updates an existing mapping
@@ -119,7 +135,7 @@ func (s *MappingService) AutoMatch(ctx context.Context, startDate, endDate time.
 		return nil, fmt.Errorf("failed to get unmapped records: %w", err)
 	}
 
-	var results []*models.AutoMatchResult
+	results := make([]*models.AutoMatchResult, 0)
 
 	for _, etcRecord := range unmapped {
 		// Check if already mapped

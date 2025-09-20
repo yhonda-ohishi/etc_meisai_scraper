@@ -37,3 +37,8 @@ Thumbs.db
 # Build directories
 /bin/
 /dist/
+# Test artifacts
+coverage.html
+coverage.txt
+*.coverprofile
+tests/helpers/mocks/*.go

@@ -1,3 +1,5 @@
+//go:generate mockgen -source=$GOFILE -destination=../../tests/mocks/mock_db_service_client.go -package=mocks
+
 package clients
 
 import (

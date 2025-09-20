@@ -3,6 +3,30 @@
 # Variables
 APP_NAME := etc_meisai
 DOCKER_IMAGE := $(APP_NAME):latest
+
+# Test targets
+.PHONY: test test-coverage test-coverage-html test-coverage-check
+
+test:
+	go test -v ./...
+
+test-coverage:
+	go test -coverprofile=coverage.out -coverpkg=./... ./...
+	go tool cover -func=coverage.out
+
+test-coverage-html: test-coverage
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+test-coverage-check: test-coverage
+	@echo "Checking coverage threshold (100%)..."
+	@coverage=$$(go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
+	if [ "$$(echo "$$coverage < 100" | bc)" -eq 1 ]; then \
+		echo "❌ Coverage is below 100%: $$coverage%"; \
+		exit 1; \
+	else \
+		echo "✅ Coverage meets threshold: $$coverage%"; \
+	fi
 GO := go
 GOFLAGS := -v
 CGO_ENABLED := 1

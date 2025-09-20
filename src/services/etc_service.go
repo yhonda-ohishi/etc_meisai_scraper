@@ -33,6 +33,11 @@ func (s *ETCService) Create(ctx context.Context, etc *models.ETCMeisai) (*models
 		return nil, fmt.Errorf("ETC record cannot be nil")
 	}
 
+	// Generate hash if not present
+	if etc.Hash == "" {
+		etc.Hash = etc.GenerateHash()
+	}
+
 	// Validate the record
 	if err := etc.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
