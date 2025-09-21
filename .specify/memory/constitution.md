@@ -1,75 +1,50 @@
-# ETC明細システム Constitution
+# [PROJECT_NAME] Constitution
+<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
 
 ## Core Principles
 
-### I. ドキュメント言語
-すべての仕様書、計画書、設計書は日本語で記述する
-- 機能仕様書（spec.md）：日本語必須
-- 実装計画書（plan.md）：日本語必須
-- リサーチドキュメント：日本語推奨
-- データモデル定義：日本語必須
-- タスクリスト：日本語必須
+### [PRINCIPLE_1_NAME]
+<!-- Example: I. Library-First -->
+[PRINCIPLE_1_DESCRIPTION]
+<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
 
-### II. セキュリティ原則（譲れない）
-**ハードコードされた認証情報の禁止**
-- パスワード、APIキー、秘密鍵をソースコードに直接記載することは厳禁
-- すべての認証情報は環境変数または設定ファイルから読み込む
-- テストコードであってもハードコードは禁止
-- デフォルト値として実際の認証情報を使用しない
+### [PRINCIPLE_2_NAME]
+<!-- Example: II. CLI Interface -->
+[PRINCIPLE_2_DESCRIPTION]
+<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
 
-### III. Test-First（譲れない）
-TDD必須: テスト作成 → ユーザー承認 → テスト失敗確認 → 実装
-- Red-Green-Refactorサイクルの厳格な適用
-- テストなしの実装は禁止
+### [PRINCIPLE_3_NAME]
+<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
+[PRINCIPLE_3_DESCRIPTION]
+<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
 
-### IV. 統合テスト
-統合テストが必要な重点領域:
-- 新規ライブラリの契約テスト
-- 契約変更
-- サービス間通信
-- 共有スキーマ
+### [PRINCIPLE_4_NAME]
+<!-- Example: IV. Integration Testing -->
+[PRINCIPLE_4_DESCRIPTION]
+<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
 
-### V. 可観測性
-- テキストI/Oによるデバッグ性の確保
-- 構造化ログ記録必須
-- エラーメッセージは明確で実行可能に
+### [PRINCIPLE_5_NAME]
+<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
+[PRINCIPLE_5_DESCRIPTION]
+<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
 
-## セキュリティ要件
+## [SECTION_2_NAME]
+<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
 
-### 認証情報管理
-1. **環境変数の使用**
-   - 本番環境: 必ず環境変数から読み込む
-   - 開発環境: `.env`ファイルを使用（.gitignoreに追加必須）
-   - テスト環境: モックまたはテスト用の環境変数
+[SECTION_2_CONTENT]
+<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
 
-2. **禁止事項**
-   - `password := "kikuraku"` のようなハードコード
-   - `defaultPassword = "actual_password"` のようなデフォルト値
-   - URLに認証情報を含める（`http://user:pass@host`）
+## [SECTION_3_NAME]
+<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
 
-3. **推奨事項**
-   - getEnv関数でデフォルト値は空文字または"CHANGE_ME"を使用
-   - 認証情報が未設定の場合は明確なエラーメッセージ
-   - サンプルファイル（.env.example）での説明
-
-## 開発ワークフロー
-
-### コードレビュー要件
-- すべてのPRでハードコードされた認証情報のチェック必須
-- セキュリティ原則違反は即座に修正が必要
-- テストコードも同じ基準で審査
-
-### デプロイ前チェック
-1. ハードコードされた認証情報の検索
-2. 環境変数の設定確認
-3. `.env`ファイルがコミットされていないことの確認
+[SECTION_3_CONTENT]
+<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
 
 ## Governance
+<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-憲法はすべての他の慣行に優先する
-- 修正には文書化、承認、移行計画が必要
-- すべてのPR/レビューは準拠を検証しなければならない
-- 複雑さは正当化されなければならない
-- セキュリティ違反は例外なく修正が必要
+[GOVERNANCE_RULES]
+<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
 
-**Version**: 3.0.0 | **Ratified**: 2025-09-19 | **Last Amended**: 2025-09-19
+**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
+<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->

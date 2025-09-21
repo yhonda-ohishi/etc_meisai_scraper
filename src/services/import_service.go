@@ -2,234 +2,571 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/csv"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io"
+	"log"
+	"strconv"
 	"strings"
+	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/clients"
+	"gorm.io/gorm"
+
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
-	"github.com/yhonda-ohishi/etc_meisai/src/parser"
-	"github.com/yhonda-ohishi/etc_meisai/src/pb"
-	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
 )
 
-// ImportService handles CSV import operations
+// ImportService handles CSV import operations for ETC records
 type ImportService struct {
-	dbClient    *clients.DBServiceClient
-	etcRepo     repositories.ETCRepository
-	mappingRepo repositories.MappingRepository
-	parser      *parser.ETCCSVParser
+	db     *gorm.DB
+	logger *log.Logger
 }
 
 // NewImportService creates a new import service
-func NewImportService(dbClient *clients.DBServiceClient, etcRepo repositories.ETCRepository, mappingRepo repositories.MappingRepository) *ImportService {
+func NewImportService(db *gorm.DB, logger *log.Logger) *ImportService {
+	if logger == nil {
+		logger = log.New(log.Writer(), "[ImportService] ", log.LstdFlags|log.Lshortfile)
+	}
+
 	return &ImportService{
-		dbClient:    dbClient,
-		etcRepo:     etcRepo,
-		mappingRepo: mappingRepo,
-		parser:      parser.NewETCCSVParser(),
+		db:     db,
+		logger: logger,
 	}
 }
 
-// ProcessCSVFile processes a CSV file and imports the data
-func (s *ImportService) ProcessCSVFile(ctx context.Context, filePath string, accountID string, importType string) (*models.ETCImportBatch, error) {
-	// Read the CSV file
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV file: %w", err)
-	}
-
-	// Create import batch via gRPC
-	batchReq := &pb.CreateImportBatchRequest{
-		FileName:    filepath.Base(filePath),
-		FileSize:    int64(len(data)),
-		AccountId:   accountID,
-		ImportType:  importType,
-		Status:      "processing",
-		TotalRows:   0,
-		ProcessedRows: 0,
-	}
-
-	batchResp, err := s.dbClient.CreateImportBatch(ctx, batchReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create import batch: %w", err)
-	}
-
-	// Process CSV data via gRPC
-	processReq := &pb.ProcessCSVDataRequest{
-		BatchId:    batchResp.Id,
-		CsvContent: string(data),
-		AccountId:  accountID,
-	}
-
-	processResp, err := s.dbClient.ProcessCSVData(ctx, processReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process CSV data: %w", err)
-	}
-
-	// Convert response to model
-	batch := &models.ETCImportBatch{
-		ID:            batchResp.Id,
-		FileName:      batchResp.FileName,
-		FileSize:      batchResp.FileSize,
-		AccountID:     batchResp.AccountId,
-		ImportType:    batchResp.ImportType,
-		Status:        processResp.Status,
-		TotalRows:     processResp.TotalRows,
-		ProcessedRows: processResp.ProcessedRows,
-		SuccessCount:  processResp.SuccessCount,
-		ErrorCount:    processResp.ErrorCount,
-		CreatedAt:     batchResp.CreatedAt.AsTime(),
-		UpdatedAt:     processResp.UpdatedAt.AsTime(),
-	}
-
-	if batchResp.CompletedAt != nil {
-		completedAt := batchResp.CompletedAt.AsTime()
-		batch.CompletedAt = &completedAt
-	}
-
-	return batch, nil
+// ImportCSVParams contains parameters for CSV import
+type ImportCSVParams struct {
+	AccountType string `json:"account_type" validate:"required"`
+	AccountID   string `json:"account_id" validate:"required"`
+	FileName    string `json:"file_name" validate:"required"`
+	FileSize    int64  `json:"file_size" validate:"required,min=1"`
+	CreatedBy   string `json:"created_by,omitempty"`
 }
 
-// ParseAndValidateCSV parses and validates CSV content without importing
-func (s *ImportService) ParseAndValidateCSV(ctx context.Context, content string, accountID string) (*parser.ParseResult, error) {
-	// Parse CSV content
-	result, err := s.parser.Parse(strings.NewReader(content))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CSV: %w", err)
+// ImportCSVStreamParams contains parameters for streaming CSV import
+type ImportCSVStreamParams struct {
+	SessionID string   `json:"session_id" validate:"required"`
+	Chunks    []string `json:"chunks" validate:"required"`
+}
+
+// ImportCSVResult contains the result of CSV import
+type ImportCSVResult struct {
+	Session       *models.ImportSession     `json:"session"`
+	Records       []*models.ETCMeisaiRecord `json:"records"`
+	SuccessCount  int                       `json:"success_count"`
+	ErrorCount    int                       `json:"error_count"`
+	DuplicateCount int                      `json:"duplicate_count"`
+	Errors        []models.ImportError      `json:"errors"`
+}
+
+// ListImportSessionsParams contains parameters for listing import sessions
+type ListImportSessionsParams struct {
+	Page        int     `json:"page" validate:"min=1"`
+	PageSize    int     `json:"page_size" validate:"min=1,max=1000"`
+	AccountType *string `json:"account_type,omitempty"`
+	AccountID   *string `json:"account_id,omitempty"`
+	Status      *string `json:"status,omitempty"`
+	CreatedBy   *string `json:"created_by,omitempty"`
+	SortBy      string  `json:"sort_by"`     // created_at, started_at, file_name
+	SortOrder   string  `json:"sort_order"`  // asc, desc
+}
+
+// ListImportSessionsResponse contains the response for listing import sessions
+type ListImportSessionsResponse struct {
+	Sessions   []*models.ImportSession `json:"sessions"`
+	TotalCount int64                   `json:"total_count"`
+	Page       int                     `json:"page"`
+	PageSize   int                     `json:"page_size"`
+	TotalPages int                     `json:"total_pages"`
+}
+
+// CSVRow represents a single row from the CSV file
+type CSVRow struct {
+	Date          string `json:"date"`
+	Time          string `json:"time"`
+	EntranceIC    string `json:"entrance_ic"`
+	ExitIC        string `json:"exit_ic"`
+	TollAmount    string `json:"toll_amount"`
+	CarNumber     string `json:"car_number"`
+	ETCCardNumber string `json:"etc_card_number"`
+	ETCNum        string `json:"etc_num,omitempty"`
+}
+
+// DuplicateResult contains information about duplicate records
+type DuplicateResult struct {
+	Hash           string                 `json:"hash"`
+	ExistingRecord *models.ETCMeisaiRecord `json:"existing_record"`
+	NewRecord      *models.ETCMeisaiRecord `json:"new_record"`
+	Action         string                  `json:"action"` // skip, update, create_new
+}
+
+// ImportCSV processes CSV import and creates records
+func (s *ImportService) ImportCSV(ctx context.Context, params *ImportCSVParams, data io.Reader) (*ImportCSVResult, error) {
+	s.logger.Printf("Starting CSV import for account: %s (%s), file: %s", params.AccountID, params.AccountType, params.FileName)
+
+	// Start transaction
+	tx := s.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", tx.Error)
 	}
-
-	// Validate each record
-	for _, record := range result.Records {
-		// Generate hash for duplicate detection
-		hash := s.generateRecordHash(record)
-		record.Hash = hash
-
-		// Check for duplicates via repository
-		existing, err := s.etcRepo.GetByHash(hash)
-		if err == nil && existing != nil {
-			result.DuplicateCount++
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
 		}
+	}()
+
+	// Create import session
+	session := &models.ImportSession{
+		AccountType: params.AccountType,
+		AccountID:   params.AccountID,
+		FileName:    params.FileName,
+		FileSize:    params.FileSize,
+		Status:      string(models.ImportStatusPending),
+		CreatedBy:   params.CreatedBy,
 	}
+
+	if err := tx.Create(session).Error; err != nil {
+		tx.Rollback()
+		s.logger.Printf("Failed to create import session: %v", err)
+		return nil, fmt.Errorf("failed to create import session: %w", err)
+	}
+
+	// Start processing
+	if err := session.StartProcessing(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to start processing: %w", err)
+	}
+
+	// Parse CSV data
+	records, errors, err := s.parseCSVData(data)
+	if err != nil {
+		tx.Rollback()
+		s.logger.Printf("Failed to parse CSV data: %v", err)
+		return nil, fmt.Errorf("failed to parse CSV data: %w", err)
+	}
+
+	session.TotalRows = len(records) + len(errors)
+
+	// Process each record
+	var successRecords []*models.ETCMeisaiRecord
+	var duplicateCount int
+
+	for i, record := range records {
+		// Check for duplicates
+		var existingRecord models.ETCMeisaiRecord
+		err := tx.Where("hash = ?", record.Hash).First(&existingRecord).Error
+		if err == nil {
+			// Duplicate found
+			duplicateCount++
+			s.logger.Printf("Duplicate record found with hash: %s", record.Hash)
+			continue
+		} else if err != gorm.ErrRecordNotFound {
+			// Database error
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to check for duplicates: %w", err)
+		}
+
+		// Create the record
+		if err := tx.Create(record).Error; err != nil {
+			s.logger.Printf("Failed to create record %d: %v", i+1, err)
+
+			// Add error to session
+			session.AddError(i+1, "creation_error", err.Error(), "")
+			session.ErrorRows++
+		} else {
+			successRecords = append(successRecords, record)
+			session.SuccessRows++
+		}
+		session.ProcessedRows++
+	}
+
+	// Add parsing errors to session
+	for _, importErr := range errors {
+		session.AddError(importErr.RowNumber, importErr.ErrorType, importErr.ErrorMessage, importErr.RawData)
+		session.ErrorRows++
+	}
+
+	session.DuplicateRows = duplicateCount
+
+	// Complete the session
+	if session.ErrorRows == 0 {
+		if err := session.Complete(); err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to complete session: %w", err)
+		}
+	} else {
+		// Set as completed with errors
+		session.Status = string(models.ImportStatusCompleted)
+		now := time.Now()
+		session.CompletedAt = &now
+	}
+
+	// Save session updates
+	if err := tx.Save(session).Error; err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to save session: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	result := &ImportCSVResult{
+		Session:        session,
+		Records:        successRecords,
+		SuccessCount:   session.SuccessRows,
+		ErrorCount:     session.ErrorRows,
+		DuplicateCount: session.DuplicateRows,
+		Errors:         errors,
+	}
+
+	s.logger.Printf("CSV import completed - Success: %d, Errors: %d, Duplicates: %d",
+		session.SuccessRows, session.ErrorRows, session.DuplicateRows)
 
 	return result, nil
 }
 
-// ImportParsedRecords imports pre-parsed records
-func (s *ImportService) ImportParsedRecords(ctx context.Context, records []*models.ETCMeisai, batchID int64) error {
-	// Bulk create via repository
-	if err := s.etcRepo.BulkInsert(records); err != nil {
-		return fmt.Errorf("failed to bulk create records: %w", err)
+// ImportCSVStream handles streaming import of CSV data in chunks
+func (s *ImportService) ImportCSVStream(ctx context.Context, params *ImportCSVStreamParams) (*ImportCSVResult, error) {
+	s.logger.Printf("Starting streaming CSV import for session: %s", params.SessionID)
+
+	// Get existing session
+	session, err := s.GetImportSession(ctx, params.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get import session: %w", err)
 	}
 
+	if !session.IsPending() {
+		return nil, fmt.Errorf("session is not in pending status: %s", session.Status)
+	}
+
+	// Combine chunks into single data stream
+	csvData := strings.Join(params.Chunks, "")
+	dataReader := strings.NewReader(csvData)
+
+	// Update file size
+	session.FileSize = int64(len(csvData))
+
+	// Process the CSV data
+	importParams := &ImportCSVParams{
+		AccountType: session.AccountType,
+		AccountID:   session.AccountID,
+		FileName:    session.FileName,
+		FileSize:    session.FileSize,
+		CreatedBy:   session.CreatedBy,
+	}
+
+	// Delete the temporary session since ImportCSV will create a new one
+	if err := s.db.WithContext(ctx).Delete(session).Error; err != nil {
+		s.logger.Printf("Failed to delete temporary session: %v", err)
+	}
+
+	return s.ImportCSV(ctx, importParams, dataReader)
+}
+
+// GetImportSession retrieves an import session by ID
+func (s *ImportService) GetImportSession(ctx context.Context, sessionID string) (*models.ImportSession, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session ID cannot be empty")
+	}
+
+	s.logger.Printf("Retrieving import session: %s", sessionID)
+
+	var session models.ImportSession
+	err := s.db.WithContext(ctx).First(&session, "id = ?", sessionID).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, fmt.Errorf("import session not found: %s", sessionID)
+	} else if err != nil {
+		s.logger.Printf("Failed to retrieve import session: %v", err)
+		return nil, fmt.Errorf("failed to retrieve import session: %w", err)
+	}
+
+	return &session, nil
+}
+
+// ListImportSessions lists import sessions with filtering and pagination
+func (s *ImportService) ListImportSessions(ctx context.Context, params *ListImportSessionsParams) (*ListImportSessionsResponse, error) {
+	// Set defaults
+	if params.Page <= 0 {
+		params.Page = 1
+	}
+	if params.PageSize <= 0 {
+		params.PageSize = 50
+	}
+	if params.PageSize > 1000 {
+		params.PageSize = 1000
+	}
+	if params.SortBy == "" {
+		params.SortBy = "created_at"
+	}
+	if params.SortOrder == "" {
+		params.SortOrder = "desc"
+	}
+
+	s.logger.Printf("Listing import sessions - page: %d, size: %d", params.Page, params.PageSize)
+
+	// Build query
+	query := s.db.WithContext(ctx).Model(&models.ImportSession{})
+
+	// Apply filters
+	if params.AccountType != nil && *params.AccountType != "" {
+		query = query.Where("account_type = ?", *params.AccountType)
+	}
+	if params.AccountID != nil && *params.AccountID != "" {
+		query = query.Where("account_id LIKE ?", "%"+*params.AccountID+"%")
+	}
+	if params.Status != nil && *params.Status != "" {
+		query = query.Where("status = ?", *params.Status)
+	}
+	if params.CreatedBy != nil && *params.CreatedBy != "" {
+		query = query.Where("created_by LIKE ?", "%"+*params.CreatedBy+"%")
+	}
+
+	// Get total count
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		s.logger.Printf("Failed to count import sessions: %v", err)
+		return nil, fmt.Errorf("failed to count import sessions: %w", err)
+	}
+
+	// Apply sorting and pagination
+	orderClause := fmt.Sprintf("%s %s", params.SortBy, params.SortOrder)
+	offset := (params.Page - 1) * params.PageSize
+
+	var sessions []*models.ImportSession
+	err := query.Order(orderClause).Offset(offset).Limit(params.PageSize).Find(&sessions).Error
+	if err != nil {
+		s.logger.Printf("Failed to retrieve import sessions: %v", err)
+		return nil, fmt.Errorf("failed to retrieve import sessions: %w", err)
+	}
+
+	totalPages := int((totalCount + int64(params.PageSize) - 1) / int64(params.PageSize))
+
+	response := &ListImportSessionsResponse{
+		Sessions:   sessions,
+		TotalCount: totalCount,
+		Page:       params.Page,
+		PageSize:   params.PageSize,
+		TotalPages: totalPages,
+	}
+
+	s.logger.Printf("Successfully retrieved %d import sessions (page %d of %d)", len(sessions), params.Page, totalPages)
+	return response, nil
+}
+
+// ProcessCSVRow processes a single CSV row
+func (s *ImportService) ProcessCSVRow(ctx context.Context, row *CSVRow) (*models.ETCMeisaiRecord, error) {
+	// Parse date
+	date, err := time.Parse("2006-01-02", row.Date)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date format: %s", row.Date)
+	}
+
+	// Parse toll amount
+	tollAmount, err := strconv.Atoi(row.TollAmount)
+	if err != nil {
+		return nil, fmt.Errorf("invalid toll amount: %s", row.TollAmount)
+	}
+
+	// Create record
+	record := &models.ETCMeisaiRecord{
+		Date:          date,
+		Time:          row.Time,
+		EntranceIC:    row.EntranceIC,
+		ExitIC:        row.ExitIC,
+		TollAmount:    tollAmount,
+		CarNumber:     row.CarNumber,
+		ETCCardNumber: row.ETCCardNumber,
+	}
+
+	// Set ETC number if provided
+	if row.ETCNum != "" {
+		record.ETCNum = &row.ETCNum
+	}
+
+	// Validate and generate hash
+	if err := record.BeforeCreate(s.db); err != nil {
+		return nil, fmt.Errorf("record validation failed: %w", err)
+	}
+
+	return record, nil
+}
+
+// HandleDuplicates detects and handles duplicate records
+func (s *ImportService) HandleDuplicates(ctx context.Context, records []*models.ETCMeisaiRecord) ([]*DuplicateResult, error) {
+	s.logger.Printf("Checking for duplicates in %d records", len(records))
+
+	var results []*DuplicateResult
+
+	// Extract hashes from records
+	hashes := make([]string, len(records))
+	for i, record := range records {
+		hashes[i] = record.Hash
+	}
+
+	// Check for existing records with these hashes
+	var existingRecords []*models.ETCMeisaiRecord
+	err := s.db.WithContext(ctx).Where("hash IN ?", hashes).Find(&existingRecords).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for duplicates: %w", err)
+	}
+
+	// Create a map of existing records by hash
+	existingMap := make(map[string]*models.ETCMeisaiRecord)
+	for _, existing := range existingRecords {
+		existingMap[existing.Hash] = existing
+	}
+
+	// Check each record for duplicates
+	for _, record := range records {
+		if existing, found := existingMap[record.Hash]; found {
+			result := &DuplicateResult{
+				Hash:           record.Hash,
+				ExistingRecord: existing,
+				NewRecord:      record,
+				Action:         "skip", // Default action for duplicates
+			}
+			results = append(results, result)
+		}
+	}
+
+	s.logger.Printf("Found %d duplicate records", len(results))
+	return results, nil
+}
+
+// parseCSVData parses CSV data and returns records and errors
+func (s *ImportService) parseCSVData(data io.Reader) ([]*models.ETCMeisaiRecord, []models.ImportError, error) {
+	reader := csv.NewReader(data)
+	reader.FieldsPerRecord = -1 // Allow variable number of fields
+
+	var records []*models.ETCMeisaiRecord
+	var errors []models.ImportError
+	rowNumber := 0
+
+	for {
+		rowNumber++
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			errors = append(errors, models.ImportError{
+				RowNumber:    rowNumber,
+				ErrorType:    "parse_error",
+				ErrorMessage: fmt.Sprintf("Failed to parse CSV row: %v", err),
+				RawData:      strings.Join(row, ","),
+			})
+			continue
+		}
+
+		// Skip header row
+		if rowNumber == 1 {
+			continue
+		}
+
+		// Ensure minimum number of fields
+		if len(row) < 7 {
+			errors = append(errors, models.ImportError{
+				RowNumber:    rowNumber,
+				ErrorType:    "insufficient_fields",
+				ErrorMessage: fmt.Sprintf("Row has %d fields, expected at least 7", len(row)),
+				RawData:      strings.Join(row, ","),
+			})
+			continue
+		}
+
+		// Create CSV row structure
+		csvRow := &CSVRow{
+			Date:          strings.TrimSpace(row[0]),
+			Time:          strings.TrimSpace(row[1]),
+			EntranceIC:    strings.TrimSpace(row[2]),
+			ExitIC:        strings.TrimSpace(row[3]),
+			TollAmount:    strings.TrimSpace(row[4]),
+			CarNumber:     strings.TrimSpace(row[5]),
+			ETCCardNumber: strings.TrimSpace(row[6]),
+		}
+
+		// Optional ETC number field
+		if len(row) > 7 {
+			csvRow.ETCNum = strings.TrimSpace(row[7])
+		}
+
+		// Process the row
+		record, err := s.ProcessCSVRow(context.Background(), csvRow)
+		if err != nil {
+			errors = append(errors, models.ImportError{
+				RowNumber:    rowNumber,
+				ErrorType:    "validation_error",
+				ErrorMessage: err.Error(),
+				RawData:      strings.Join(row, ","),
+			})
+			continue
+		}
+
+		records = append(records, record)
+	}
+
+	s.logger.Printf("Parsed %d records with %d errors from CSV", len(records), len(errors))
+	return records, errors, nil
+}
+
+// CancelImportSession cancels an ongoing import session
+func (s *ImportService) CancelImportSession(ctx context.Context, sessionID string) error {
+	s.logger.Printf("Cancelling import session: %s", sessionID)
+
+	// Start transaction
+	tx := s.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to start transaction: %w", tx.Error)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Get session
+	var session models.ImportSession
+	err := tx.First(&session, "id = ?", sessionID).Error
+	if err == gorm.ErrRecordNotFound {
+		tx.Rollback()
+		return fmt.Errorf("import session not found: %s", sessionID)
+	} else if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to retrieve import session: %w", err)
+	}
+
+	// Cancel the session
+	if err := session.Cancel(); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to cancel session: %w", err)
+	}
+
+	// Save session
+	if err := tx.Save(&session).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to save cancelled session: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	s.logger.Printf("Successfully cancelled import session: %s", sessionID)
 	return nil
 }
 
-// GetImportProgress gets the progress of an import batch
-func (s *ImportService) GetImportProgress(ctx context.Context, batchID int64) (*models.ImportProgress, error) {
-	req := &pb.GetImportProgressRequest{
-		BatchId: batchID,
-	}
-
-	resp, err := s.dbClient.GetImportProgress(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get import progress: %w", err)
-	}
-
-	return &models.ImportProgress{
-		BatchID:       resp.BatchId,
-		Status:        resp.Status,
-		TotalRows:     resp.TotalRows,
-		ProcessedRows: resp.ProcessedRows,
-		SuccessCount:  resp.SuccessCount,
-		ErrorCount:    resp.ErrorCount,
-		Percentage:    resp.Percentage,
-		Message:       resp.Message,
-		UpdatedAt:     resp.UpdatedAt.AsTime(),
-	}, nil
-}
-
-// generateRecordHash generates a SHA256 hash for duplicate detection
-func (s *ImportService) generateRecordHash(record *models.ETCMeisai) string {
-	// Create a unique string from key fields
-	hashInput := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d",
-		record.ETCNumber,
-		record.UseDate.Format("2006-01-02"),
-		record.UseTime,
-		record.EntryIC,
-		record.ExitIC,
-		record.CarNumber,
-		record.Amount,
-	)
-
-	hash := sha256.Sum256([]byte(hashInput))
-	return hex.EncodeToString(hash[:])
-}
-
-// ValidateImportFile validates an import file before processing
-func (s *ImportService) ValidateImportFile(filePath string) error {
-	// Check file exists
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return fmt.Errorf("file not found: %w", err)
-	}
-
-	// Check file size (max 100MB)
-	if info.Size() > 100*1024*1024 {
-		return fmt.Errorf("file too large: %d bytes (max 100MB)", info.Size())
-	}
-
-	// Check file extension
-	ext := strings.ToLower(filepath.Ext(filePath))
-	if ext != ".csv" {
-		return fmt.Errorf("invalid file type: %s (expected .csv)", ext)
-	}
-
-	return nil
-}
-
-// CancelImport cancels an ongoing import
-func (s *ImportService) CancelImport(ctx context.Context, batchID int64) error {
-	// Update batch status via gRPC
-	// This would require adding a CancelImport RPC to the proto definition
-	// For now, we'll return an error indicating it's not implemented
-	return fmt.Errorf("cancel import not yet implemented in gRPC service")
-}
-
-// GetImportHistory retrieves import history for an account
-func (s *ImportService) GetImportHistory(ctx context.Context, accountID string, limit int) ([]*models.ETCImportBatch, error) {
-	// This would require adding a GetImportHistory RPC to the proto definition
-	// For now, return empty list
-	return []*models.ETCImportBatch{}, nil
-}
-
-// RetryImport retries a failed import batch
-func (s *ImportService) RetryImport(ctx context.Context, batchID int64) (*models.ETCImportBatch, error) {
-	// Get the original batch details
-	_, err := s.GetImportProgress(ctx, batchID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get batch details: %w", err)
-	}
-
-	// Create a new batch for retry
-	// This would require storing the original CSV content or file path
-	return nil, fmt.Errorf("retry import requires stored CSV content: not yet implemented")
-}
-
-// HealthCheck performs a health check on the import service
+// HealthCheck performs health check for the service
 func (s *ImportService) HealthCheck(ctx context.Context) error {
-	// Check gRPC client connectivity
-	if s.dbClient == nil {
-		return fmt.Errorf("db client not initialized")
+	// Check database connectivity
+	sqlDB, err := s.db.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get database connection: %w", err)
 	}
 
-	// Try to get progress for a non-existent batch to test connectivity
-	_, err := s.GetImportProgress(ctx, -1)
-	if err != nil && !strings.Contains(err.Error(), "not found") {
-		return fmt.Errorf("import service health check failed: %w", err)
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("database ping failed: %w", err)
 	}
 
 	return nil

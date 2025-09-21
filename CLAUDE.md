@@ -6,22 +6,26 @@ db-handler-serverパターンに従ったハンドラー実装への移行中。
 
 ## 技術スタック
 - **言語**: Go 1.21+
-- **フレームワーク**: chi (HTTPルーティング)
+- **フレームワーク**: gRPC + grpc-gateway (chi から移行)
+- **Protocol Buffers**: API定義とコード生成
 - **データベース**: GORM + MySQL/SQLite (db_service統合)
-- **通信**: gRPC (database_repo統合)
+- **通信**: gRPC (server_repo統合)
 - **スクレイピング**: Playwright-go
-- **依存管理**: Go Modules
-- **アーキテクチャ**: db-handler-serverパターン (統合中)
+- **依存管理**: Go Modules, buf (Protocol Buffers)
+- **アーキテクチャ**: gRPCサービス + db-handler-serverパターン
 
 ## プロジェクト構造
 ```
 etc_meisai/
-├── api.go               # メインクライアントインターフェース
-├── module.go            # モジュール初期化
-├── handlers/            # HTTPハンドラー（db-handler-serverパターン）
-├── services/            # ビジネスロジック層
-├── repositories/        # データアクセス層
-├── models/              # データモデル
+├── src/
+│   ├── proto/           # Protocol Buffers定義
+│   ├── pb/              # 生成されたgRPCコード
+│   ├── grpc/            # gRPCサーバー実装
+│   ├── services/        # ビジネスロジック層
+│   ├── repositories/    # データアクセス層
+│   ├── models/          # GORMデータモデル
+│   └── adapters/        # 互換性レイヤー
+├── handlers/            # HTTPハンドラー（レガシー）
 ├── parser/              # CSV解析
 ├── config/              # 設定管理
 └── downloads/           # CSVファイル保存先
@@ -34,10 +38,11 @@ etc_meisai/
 4. **進捗追跡**: リアルタイム進捗通知（SSE対応）
 5. **自動マッチング**: dtako_row_idとの精密マッチング
 
-## 最近の変更 (v0.0.18 - 統合進行中)
-- **database_repo統合**: C:\go\db_service のdb-handler-serverパターン統合
-- **アーキテクチャ移行**: GORM + gRPCベースのデータアクセス層
-- **統合テスト**: Repository契約テスト・統合テストスイート実装
+## 最近の変更 (v0.0.19 - gRPC統合)
+- **gRPC移行**: go-chiからgRPC + grpc-gatewayへの移行完了
+- **Protocol Buffers**: API定義をprotoファイルで一元管理
+- **Swagger統合**: OpenAPI仕様の自動生成とSwagger UI統合
+- **server_repo統合**: 統一されたサービス登録とルーティング
 
 ## 開発中の機能 (統合フェーズ)
 - **モデル統合**: db_serviceのGORMモデル + 互換性レイヤー実装
@@ -98,4 +103,4 @@ go build -o etc_meisai
 ```
 
 ---
-*最終更新: 2025-09-19 | v0.0.17*
+*最終更新: 2025-09-21 | v0.0.19*
