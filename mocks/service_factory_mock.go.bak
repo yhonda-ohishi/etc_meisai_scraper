@@ -1,0 +1,367 @@
+package mocks
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/yhonda-ohishi/etc_meisai/src/models"
+	"github.com/yhonda-ohishi/etc_meisai/src/pb"
+	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
+	"github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// MockServiceFactory provides dependency injection for service testing
+type MockServiceFactory struct {
+	mock.Mock
+	dbClient       pb.ETCMeisaiServiceClient
+	etcRepo        repositories.ETCRepository
+	mappingRepo    repositories.MappingRepository
+	logger         *log.Logger
+	serviceCache   map[string]interface{}
+}
+
+// NewMockServiceFactory creates a new mock service factory with all dependencies
+func NewMockServiceFactory() *MockServiceFactory {
+	factory := &MockServiceFactory{
+		dbClient:     new(MockDBServiceClient),
+		etcRepo:      new(MockETCRepository),
+		mappingRepo:  new(MockMappingRepository),
+		logger:       log.New(log.Writer(), "[TEST] ", log.LstdFlags),
+		serviceCache: make(map[string]interface{}),
+	}
+
+	// Setup default mock behaviors
+	SetupMockDBServiceForSuccess(factory.dbClient.(*MockDBServiceClient))
+	SetupMockETCRepositoryForSuccess(factory.etcRepo.(*MockETCRepository))
+	SetupMockMappingRepositoryForSuccess(factory.mappingRepo.(*MockMappingRepository))
+
+	return factory
+}
+
+// WithDBClient sets a custom DB client
+func (f *MockServiceFactory) WithDBClient(client pb.ETCMeisaiServiceClient) *MockServiceFactory {
+	f.dbClient = client
+	return f
+}
+
+// WithETCRepository sets a custom ETC repository
+func (f *MockServiceFactory) WithETCRepository(repo repositories.ETCRepository) *MockServiceFactory {
+	f.etcRepo = repo
+	return f
+}
+
+// WithMappingRepository sets a custom mapping repository
+func (f *MockServiceFactory) WithMappingRepository(repo repositories.MappingRepository) *MockServiceFactory {
+	f.mappingRepo = repo
+	return f
+}
+
+// WithLogger sets a custom logger
+func (f *MockServiceFactory) WithLogger(logger *log.Logger) *MockServiceFactory {
+	f.logger = logger
+	return f
+}
+
+// GetDBClient returns the mock DB service client
+func (f *MockServiceFactory) GetDBClient() pb.ETCMeisaiServiceClient {
+	return f.dbClient
+}
+
+// GetETCRepository returns the mock ETC repository
+func (f *MockServiceFactory) GetETCRepository() repositories.ETCRepository {
+	return f.etcRepo
+}
+
+// GetMappingRepository returns the mock mapping repository
+func (f *MockServiceFactory) GetMappingRepository() repositories.MappingRepository {
+	return f.mappingRepo
+}
+
+// GetLogger returns the logger
+func (f *MockServiceFactory) GetLogger() *log.Logger {
+	return f.logger
+}
+
+// CreateETCService creates a new ETC service with mocked dependencies
+func (f *MockServiceFactory) CreateETCService() *services.ETCService {
+	if cached, ok := f.serviceCache["etcService"]; ok {
+		return cached.(*services.ETCService)
+	}
+
+	// ETCService needs to be created properly with NewETCService
+	service := services.NewETCService(f.etcRepo, f.dbClient)
+	f.serviceCache["etcService"] = service
+	return service
+}
+
+// CreateMappingService creates a new mapping service with mocked dependencies
+func (f *MockServiceFactory) CreateMappingService() *services.MappingService {
+	if cached, ok := f.serviceCache["mappingService"]; ok {
+		return cached.(*services.MappingService)
+	}
+
+	// MappingService needs to be created properly with NewMappingService
+	service := services.NewMappingService(f.mappingRepo, f.etcRepo)
+	f.serviceCache["mappingService"] = service
+	return service
+}
+
+// CreateBaseService creates a new base service with mocked dependencies
+func (f *MockServiceFactory) CreateBaseService() *services.BaseService {
+	if cached, ok := f.serviceCache["baseService"]; ok {
+		return cached.(*services.BaseService)
+	}
+
+	service := services.NewBaseServiceWithDependencies(f.dbClient, f.etcRepo, f.mappingRepo, f.logger)
+	f.serviceCache["baseService"] = service
+	return service
+}
+
+// CreateImportService creates a new import service with mocked dependencies
+func (f *MockServiceFactory) CreateImportService() *services.ImportServiceLegacy {
+	if cached, ok := f.serviceCache["importService"]; ok {
+		return cached.(*services.ImportServiceLegacy)
+	}
+
+	// ImportServiceLegacy needs to be created properly
+	service := services.NewImportServiceLegacy(f.dbClient, f.etcRepo, f.mappingRepo)
+	f.serviceCache["importService"] = service
+	return service
+}
+
+// CreateDownloadService creates a new download service with mocked dependencies
+func (f *MockServiceFactory) CreateDownloadService() services.DownloadServiceInterface {
+	if cached, ok := f.serviceCache["downloadService"]; ok {
+		return cached.(services.DownloadServiceInterface)
+	}
+
+	service := NewMockDownloadService()
+	f.serviceCache["downloadService"] = service
+	return service
+}
+
+// CreateServiceRegistry creates a complete service registry with all mocked services
+func (f *MockServiceFactory) CreateServiceRegistry() services.ServiceRegistryInterface {
+	return &MockServiceRegistryWithFactory{
+		factory: f,
+	}
+}
+
+// MockServiceRegistryWithFactory implements ServiceRegistryInterface using the factory
+type MockServiceRegistryWithFactory struct {
+	factory *MockServiceFactory
+}
+
+// GetETCService returns the mocked ETC service
+func (r *MockServiceRegistryWithFactory) GetETCService() *services.ETCService {
+	return r.factory.CreateETCService()
+}
+
+// GetMappingService returns the mocked mapping service
+func (r *MockServiceRegistryWithFactory) GetMappingService() *services.MappingService {
+	return r.factory.CreateMappingService()
+}
+
+// GetBaseService returns the mocked base service
+func (r *MockServiceRegistryWithFactory) GetBaseService() *services.BaseService {
+	return r.factory.CreateBaseService()
+}
+
+// GetImportService returns the mocked import service
+func (r *MockServiceRegistryWithFactory) GetImportService() *services.ImportServiceLegacy {
+	return r.factory.CreateImportService()
+}
+
+// GetDownloadService returns the mocked download service
+func (r *MockServiceRegistryWithFactory) GetDownloadService() services.DownloadServiceInterface {
+	return r.factory.CreateDownloadService()
+}
+
+// HealthCheck performs a health check
+func (r *MockServiceRegistryWithFactory) HealthCheck(ctx context.Context) *services.HealthCheckResult {
+	return &services.HealthCheckResult{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Services: map[string]*services.ServiceHealth{
+			"etcService":      {Name: "etcService", Status: "healthy"},
+			"mappingService":  {Name: "mappingService", Status: "healthy"},
+			"baseService":     {Name: "baseService", Status: "healthy"},
+			"importService":   {Name: "importService", Status: "healthy"},
+			"downloadService": {Name: "downloadService", Status: "healthy"},
+		},
+	}
+}
+
+// MockDownloadService implements DownloadServiceInterface for testing
+type MockDownloadService struct {
+	mock.Mock
+}
+
+// NewMockDownloadService creates a new mock download service
+func NewMockDownloadService() *MockDownloadService {
+	m := &MockDownloadService{}
+	// Setup default successful responses
+	m.On("DownloadETCMeisai", mock.Anything, mock.Anything).Return(&models.DownloadResult{
+		Status:      "success",
+		TotalFiles:  1,
+		Downloaded:  1,
+		Failed:      0,
+		FilePaths:   []string{"/tmp/test.csv"},
+	}, nil).Maybe()
+
+	m.On("ProcessDownloadedFiles", mock.Anything).Return(&models.ProcessResult{
+		TotalRecords: 100,
+		Imported:     95,
+		Duplicates:   5,
+		Errors:       0,
+	}, nil).Maybe()
+
+	m.On("GetDownloadStatus", mock.Anything).Return(&models.DownloadStatus{
+		SessionID:  "test-session",
+		Status:     "completed",
+		Progress:   100,
+		TotalFiles: 1,
+		Processed:  1,
+	}, nil).Maybe()
+
+	return m
+}
+
+// DownloadETCMeisai downloads ETC data
+func (m *MockDownloadService) DownloadETCMeisai(ctx context.Context, params *models.DownloadParams) (*models.DownloadResult, error) {
+	args := m.Called(ctx, params)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.DownloadResult), args.Error(1)
+}
+
+// ProcessDownloadedFiles processes downloaded CSV files
+func (m *MockDownloadService) ProcessDownloadedFiles(files []string) (*models.ProcessResult, error) {
+	args := m.Called(files)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.ProcessResult), args.Error(1)
+}
+
+// GetDownloadStatus retrieves download status
+func (m *MockDownloadService) GetDownloadStatus(sessionID string) (*models.DownloadStatus, error) {
+	args := m.Called(sessionID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.DownloadStatus), args.Error(1)
+}
+
+// GetAllAccountIDs retrieves all account IDs (implementing interface)
+func (m *MockDownloadService) GetAllAccountIDs() []string {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return []string{}
+	}
+	return args.Get(0).([]string)
+}
+
+// GetJobStatus retrieves job status (implementing interface)
+func (m *MockDownloadService) GetJobStatus(jobID string) (*services.DownloadJob, bool) {
+	args := m.Called(jobID)
+	if args.Get(0) == nil {
+		return nil, args.Bool(1)
+	}
+	return args.Get(0).(*services.DownloadJob), args.Bool(1)
+}
+
+// ProcessAsync processes download asynchronously
+func (m *MockDownloadService) ProcessAsync(jobID string, accounts []string, fromDate, toDate string) {
+	m.Called(jobID, accounts, fromDate, toDate)
+}
+
+// TestDataBuilder provides utility functions for creating test data
+type TestDataBuilder struct {
+	factory *MockServiceFactory
+}
+
+// NewTestDataBuilder creates a new test data builder
+func NewTestDataBuilder(factory *MockServiceFactory) *TestDataBuilder {
+	return &TestDataBuilder{factory: factory}
+}
+
+// CreateTestETCMeisai creates a test ETC meisai record
+func (b *TestDataBuilder) CreateTestETCMeisai(id int64) *models.ETCMeisai {
+	return &models.ETCMeisai{
+		ID:        id,
+		Hash:      "test_hash_" + string(rune(id)),
+		UseDate:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		UseTime:   "12:00:00",
+		EntryIC:   "東京IC",
+		ExitIC:    "横浜IC",
+		Amount:    1000,
+		CarNumber: "品川500あ1234",
+		ETCNumber: "ETC123456",
+	}
+}
+
+// CreateTestMapping creates a test mapping record
+func (b *TestDataBuilder) CreateTestMapping(id int64, etcID int64) *models.ETCMeisaiMapping {
+	return &models.ETCMeisaiMapping{
+		ID:          id,
+		ETCMeisaiID: etcID,
+		DTakoRowID:  "DTAKO001",
+		MappingType: "auto",
+		Confidence:  0.95,
+	}
+}
+
+// CreateTestImportRequest creates a test import request
+func (b *TestDataBuilder) CreateTestImportRequest() models.ETCImportRequest {
+	return models.ETCImportRequest{
+		FromDate: "2024-01-01",
+		ToDate:   "2024-01-31",
+		Source:   "test",
+		BatchID:  "test-batch-001",
+	}
+}
+
+// IntegrationTestSetup provides a complete test environment
+type IntegrationTestSetup struct {
+	Factory      *MockServiceFactory
+	Registry     services.ServiceRegistryInterface
+	DataBuilder  *TestDataBuilder
+	DBClient     *MockDBServiceClient
+	ETCRepo      *MockETCRepository
+	MappingRepo  *MockMappingRepository
+}
+
+// NewIntegrationTestSetup creates a new integration test setup
+func NewIntegrationTestSetup() *IntegrationTestSetup {
+	factory := NewMockServiceFactory()
+
+	setup := &IntegrationTestSetup{
+		Factory:     factory,
+		Registry:    factory.CreateServiceRegistry(),
+		DataBuilder: NewTestDataBuilder(factory),
+		DBClient:    factory.GetDBClient().(*MockDBServiceClient),
+		ETCRepo:     factory.GetETCRepository().(*MockETCRepository),
+		MappingRepo: factory.GetMappingRepository().(*MockMappingRepository),
+	}
+
+	return setup
+}
+
+// Cleanup performs any necessary cleanup
+func (s *IntegrationTestSetup) Cleanup() {
+	// Reset mocks if needed
+	s.DBClient.ExpectedCalls = nil
+	s.ETCRepo.ExpectedCalls = nil
+	s.MappingRepo.ExpectedCalls = nil
+}
+
+// AssertExpectations verifies all mock expectations
+func (s *IntegrationTestSetup) AssertExpectations(t mock.TestingT) {
+	s.DBClient.AssertExpectations(t)
+	s.ETCRepo.AssertExpectations(t)
+	s.MappingRepo.AssertExpectations(t)
+}

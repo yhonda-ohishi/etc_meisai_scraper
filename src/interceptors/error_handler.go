@@ -2,10 +2,10 @@ package interceptors
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"strings"
 
@@ -308,18 +308,20 @@ func sanitizeGRPCError(st *status.Status) error {
 
 // sanitizeErrorMessage sanitizes error messages for production
 func sanitizeErrorMessage(message string) string {
-	// Remove sensitive information patterns
+	// Remove sensitive information patterns using regex
+	// Order matters: more specific patterns first
 	sensitivePatterns := []string{
-		`password=\w+`,
-		`token=[\w\-]+`,
-		`key=[\w\-]+`,
-		`secret=[\w\-]+`,
 		`api_key=[\w\-]+`,
+		`password=[\w\-]+`,
+		`token=[\w\-]+`,
+		`secret=[\w\-]+`,
+		`key=[\w\-]+`,
 	}
 
 	sanitized := message
 	for _, pattern := range sensitivePatterns {
-		sanitized = strings.ReplaceAll(sanitized, pattern, "[REDACTED]")
+		re := regexp.MustCompile(pattern)
+		sanitized = re.ReplaceAllString(sanitized, "[REDACTED]")
 	}
 
 	// Generic sanitization for internal errors

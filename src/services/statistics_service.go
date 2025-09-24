@@ -6,30 +6,10 @@ import (
 	"log"
 	"time"
 
-	"gorm.io/gorm"
-
-	"github.com/yhonda-ohishi/etc_meisai/src/models"
+	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
 )
 
-// StatisticsService handles analytics and statistics for ETC data
-type StatisticsService struct {
-	db     *gorm.DB
-	logger *log.Logger
-}
-
-// NewStatisticsService creates a new statistics service
-func NewStatisticsService(db *gorm.DB, logger *log.Logger) *StatisticsService {
-	if logger == nil {
-		logger = log.New(log.Writer(), "[StatisticsService] ", log.LstdFlags|log.Lshortfile)
-	}
-
-	return &StatisticsService{
-		db:     db,
-		logger: logger,
-	}
-}
-
-// StatisticsFilter contains filters for statistics queries
+// StatisticsFilter re-exported from original service
 type StatisticsFilter struct {
 	DateFrom      *time.Time `json:"date_from,omitempty"`
 	DateTo        *time.Time `json:"date_to,omitempty"`
@@ -58,510 +38,417 @@ type GeneralStatistics struct {
 	HourlyDistribution []HourlyStatistic  `json:"hourly_distribution"`
 }
 
-// DailyStatistics contains daily aggregated statistics
-type DailyStatistics struct {
-	Date           time.Time `json:"date"`
-	TotalRecords   int64     `json:"total_records"`
-	TotalAmount    int64     `json:"total_amount"`
-	AverageAmount  float64   `json:"average_amount"`
-	UniqueVehicles int64     `json:"unique_vehicles"`
-	UniqueCards    int64     `json:"unique_cards"`
-	PeakHour       int       `json:"peak_hour"`
-	PeakHourCount  int64     `json:"peak_hour_count"`
-}
-
-// ICStatistics contains IC (Interchange) usage statistics
-type ICStatistics struct {
-	ICName        string  `json:"ic_name"`
-	Type          string  `json:"type"` // entrance, exit, both
-	UsageCount    int64   `json:"usage_count"`
-	TotalAmount   int64   `json:"total_amount"`
-	AverageAmount float64 `json:"average_amount"`
-	UniqueCards   int64   `json:"unique_cards"`
-}
-
 // RouteStatistic contains route usage statistics
 type RouteStatistic struct {
-	EntranceIC    string  `json:"entrance_ic"`
-	ExitIC        string  `json:"exit_ic"`
-	UsageCount    int64   `json:"usage_count"`
-	TotalAmount   int64   `json:"total_amount"`
-	AverageAmount float64 `json:"average_amount"`
+	EntranceIC  string  `json:"entrance_ic"`
+	ExitIC      string  `json:"exit_ic"`
+	Count       int64   `json:"count"`
+	TotalAmount int64   `json:"total_amount"`
+	AvgAmount   float64 `json:"avg_amount"`
 }
 
 // VehicleStatistic contains vehicle usage statistics
 type VehicleStatistic struct {
-	CarNumber     string  `json:"car_number"`
-	UsageCount    int64   `json:"usage_count"`
-	TotalAmount   int64   `json:"total_amount"`
-	AverageAmount float64 `json:"average_amount"`
-	LastUsed      time.Time `json:"last_used"`
+	CarNumber   string  `json:"car_number"`
+	Count       int64   `json:"count"`
+	TotalAmount int64   `json:"total_amount"`
+	AvgAmount   float64 `json:"avg_amount"`
 }
 
 // CardStatistic contains ETC card usage statistics
 type CardStatistic struct {
 	ETCCardNumber string  `json:"etc_card_number"`
-	MaskedNumber  string  `json:"masked_number"`
-	UsageCount    int64   `json:"usage_count"`
+	Count         int64   `json:"count"`
 	TotalAmount   int64   `json:"total_amount"`
-	AverageAmount float64 `json:"average_amount"`
-	LastUsed      time.Time `json:"last_used"`
+	AvgAmount     float64 `json:"avg_amount"`
 }
 
 // HourlyStatistic contains hourly usage statistics
 type HourlyStatistic struct {
-	Hour          int     `json:"hour"`
-	UsageCount    int64   `json:"usage_count"`
-	TotalAmount   int64   `json:"total_amount"`
-	AverageAmount float64 `json:"average_amount"`
+	Hour        int     `json:"hour"`
+	HourLabel   string  `json:"hour_label"`
+	Count       int64   `json:"count"`
+	TotalAmount int64   `json:"total_amount"`
+	AvgAmount   float64 `json:"avg_amount"`
 }
 
-// GetStatistics retrieves aggregated statistics with filters
-func (s *StatisticsService) GetStatistics(ctx context.Context, filter *StatisticsFilter) (*GeneralStatistics, error) {
-	s.logger.Printf("Generating statistics with filter: %+v", filter)
+// DailyStatistic for service layer
+type DailyStatistic struct {
+	Date        string  `json:"date"`
+	Count       int64   `json:"count"`
+	TotalAmount int64   `json:"total_amount"`
+	AvgAmount   float64 `json:"avg_amount"`
+}
 
-	// Build base query
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
+// MonthlyStatistic for service layer
+type MonthlyStatistic struct {
+	Year        int     `json:"year"`
+	Month       int     `json:"month"`
+	MonthName   string  `json:"month_name"`
+	Count       int64   `json:"count"`
+	TotalAmount int64   `json:"total_amount"`
+	AvgAmount   float64 `json:"avg_amount"`
+}
 
-	// Get basic counts and totals
-	var result struct {
-		TotalRecords int64 `json:"total_records"`
-		TotalAmount  int64 `json:"total_amount"`
+// Response types
+type DailyStatisticsResponse struct {
+	DateRange  string           `json:"date_range"`
+	Statistics []DailyStatistic `json:"statistics"`
+}
+
+type MonthlyStatisticsResponse struct {
+	DateRange  string             `json:"date_range"`
+	Statistics []MonthlyStatistic `json:"statistics"`
+}
+
+type VehicleStatisticsResponse struct {
+	DateRange string             `json:"date_range"`
+	Vehicles  []VehicleStatistic `json:"vehicles"`
+}
+
+type MappingStatisticsResponse struct {
+	DateRange             string  `json:"date_range"`
+	TotalRecords          int64   `json:"total_records"`
+	MappedRecords         int64   `json:"mapped_records"`
+	UnmappedRecords       int64   `json:"unmapped_records"`
+	MappingRate           float64 `json:"mapping_rate"`
+	MappingRatePercentage string  `json:"mapping_rate_percentage"`
+}
+
+// StatisticsService handles analytics and statistics using repository pattern
+type StatisticsService struct {
+	statsRepo repositories.StatisticsRepository
+	logger    *log.Logger
+}
+
+// NewStatisticsService creates a new statistics service with repository pattern
+func NewStatisticsService(statsRepo repositories.StatisticsRepository, logger *log.Logger) *StatisticsService {
+	if logger == nil {
+		logger = log.New(log.Writer(), "[StatisticsService] ", log.LstdFlags|log.Lshortfile)
 	}
 
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("COUNT(*) as total_records, COALESCE(SUM(toll_amount), 0) as total_amount").
-		Scan(&result).Error
+	return &StatisticsService{
+		statsRepo: statsRepo,
+		logger:    logger,
+	}
+}
+
+// GetGeneralStatistics retrieves general statistics based on filter
+func (s *StatisticsService) GetGeneralStatistics(ctx context.Context, filter *StatisticsFilter) (*GeneralStatistics, error) {
+	s.logger.Printf("Generating general statistics")
+
+	// Convert service filter to repository filter
+	repoFilter := s.toRepoFilter(filter)
+
+	// Get basic counts
+	totalRecords, err := s.statsRepo.CountRecords(ctx, repoFilter)
 	if err != nil {
-		s.logger.Printf("Failed to get basic statistics: %v", err)
-		return nil, fmt.Errorf("failed to get basic statistics: %w", err)
+		s.logger.Printf("Failed to count records: %v", err)
+		return nil, fmt.Errorf("failed to count records: %w", err)
 	}
 
-	// Calculate average
-	var averageAmount float64
-	if result.TotalRecords > 0 {
-		averageAmount = float64(result.TotalAmount) / float64(result.TotalRecords)
-	}
-
-	// Get unique counts
-	uniqueVehicles, err := s.CountUniqueVehicles(ctx, filter)
+	totalAmount, err := s.statsRepo.SumTollAmount(ctx, repoFilter)
 	if err != nil {
+		s.logger.Printf("Failed to sum toll amount: %v", err)
+		return nil, fmt.Errorf("failed to sum toll amount: %w", err)
+	}
+
+	avgAmount, err := s.statsRepo.AverageTollAmount(ctx, repoFilter)
+	if err != nil {
+		s.logger.Printf("Failed to calculate average toll amount: %v", err)
+		return nil, fmt.Errorf("failed to calculate average toll amount: %w", err)
+	}
+
+	uniqueVehicles, err := s.statsRepo.CountUniqueVehicles(ctx, repoFilter)
+	if err != nil {
+		s.logger.Printf("Failed to count unique vehicles: %v", err)
 		return nil, fmt.Errorf("failed to count unique vehicles: %w", err)
 	}
 
-	uniqueCards, err := s.CountUniqueCards(ctx, filter)
+	uniqueCards, err := s.statsRepo.CountUniqueCards(ctx, repoFilter)
 	if err != nil {
+		s.logger.Printf("Failed to count unique cards: %v", err)
 		return nil, fmt.Errorf("failed to count unique cards: %w", err)
 	}
 
-	// Get unique ICs
-	var uniqueEntranceICs, uniqueExitICs int64
-	err = query.Model(&models.ETCMeisaiRecord{}).
-		Select("COUNT(DISTINCT entrance_ic)").
-		Scan(&uniqueEntranceICs).Error
+	uniqueEntranceICs, err := s.statsRepo.CountUniqueEntranceICs(ctx, repoFilter)
 	if err != nil {
+		s.logger.Printf("Failed to count unique entrance ICs: %v", err)
 		return nil, fmt.Errorf("failed to count unique entrance ICs: %w", err)
 	}
 
-	err = query.Model(&models.ETCMeisaiRecord{}).
-		Select("COUNT(DISTINCT exit_ic)").
-		Scan(&uniqueExitICs).Error
+	uniqueExitICs, err := s.statsRepo.CountUniqueExitICs(ctx, repoFilter)
 	if err != nil {
+		s.logger.Printf("Failed to count unique exit ICs: %v", err)
 		return nil, fmt.Errorf("failed to count unique exit ICs: %w", err)
 	}
 
-	// Get top routes
-	topRoutes, err := s.getTopRoutes(ctx, filter, 10)
+	// Get top statistics
+	topRoutes, err := s.statsRepo.GetTopRoutes(ctx, repoFilter, 10)
 	if err != nil {
+		s.logger.Printf("Failed to get top routes: %v", err)
 		return nil, fmt.Errorf("failed to get top routes: %w", err)
 	}
 
-	// Get top vehicles
-	topVehicles, err := s.getTopVehicles(ctx, filter, 10)
+	topVehicles, err := s.statsRepo.GetTopVehicles(ctx, repoFilter, 10)
 	if err != nil {
+		s.logger.Printf("Failed to get top vehicles: %v", err)
 		return nil, fmt.Errorf("failed to get top vehicles: %w", err)
 	}
 
-	// Get top cards
-	topCards, err := s.getTopCards(ctx, filter, 10)
+	topCards, err := s.statsRepo.GetTopCards(ctx, repoFilter, 10)
 	if err != nil {
+		s.logger.Printf("Failed to get top cards: %v", err)
 		return nil, fmt.Errorf("failed to get top cards: %w", err)
 	}
 
-	// Get hourly distribution
-	hourlyDistribution, err := s.getHourlyDistribution(ctx, filter)
+	hourlyDist, err := s.statsRepo.GetHourlyDistribution(ctx, repoFilter)
 	if err != nil {
+		s.logger.Printf("Failed to get hourly distribution: %v", err)
 		return nil, fmt.Errorf("failed to get hourly distribution: %w", err)
 	}
 
-	// Build date range string
-	dateRange := "All time"
-	if filter.DateFrom != nil || filter.DateTo != nil {
-		if filter.DateFrom != nil && filter.DateTo != nil {
-			dateRange = fmt.Sprintf("%s to %s", filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02"))
-		} else if filter.DateFrom != nil {
-			dateRange = fmt.Sprintf("From %s", filter.DateFrom.Format("2006-01-02"))
-		} else {
-			dateRange = fmt.Sprintf("Until %s", filter.DateTo.Format("2006-01-02"))
-		}
+	// Format date range
+	dateRange := s.formatDateRange(filter)
+
+	// Convert repository types to service types
+	stats := &GeneralStatistics{
+		DateRange:          dateRange,
+		TotalRecords:       totalRecords,
+		TotalAmount:        totalAmount,
+		AverageAmount:      avgAmount,
+		UniqueVehicles:     uniqueVehicles,
+		UniqueCards:        uniqueCards,
+		UniqueEntranceICs:  uniqueEntranceICs,
+		UniqueExitICs:      uniqueExitICs,
+		TopRoutes:          s.convertRouteStats(topRoutes),
+		TopVehicles:        s.convertVehicleStats(topVehicles),
+		TopCards:           s.convertCardStats(topCards),
+		HourlyDistribution: s.convertHourlyStats(hourlyDist),
 	}
 
-	statistics := &GeneralStatistics{
-		DateRange:         dateRange,
-		TotalRecords:      result.TotalRecords,
-		TotalAmount:       result.TotalAmount,
-		AverageAmount:     averageAmount,
-		UniqueVehicles:    uniqueVehicles,
-		UniqueCards:       uniqueCards,
-		UniqueEntranceICs: uniqueEntranceICs,
-		UniqueExitICs:     uniqueExitICs,
-		TopRoutes:         topRoutes,
-		TopVehicles:       topVehicles,
-		TopCards:          topCards,
-		HourlyDistribution: hourlyDistribution,
-	}
-
-	s.logger.Printf("Generated statistics - Records: %d, Amount: %d, Vehicles: %d",
-		result.TotalRecords, result.TotalAmount, uniqueVehicles)
-
-	return statistics, nil
+	s.logger.Printf("Successfully generated general statistics")
+	return stats, nil
 }
 
-// GetDailyStatistics retrieves daily statistics for a specific date
-func (s *StatisticsService) GetDailyStatistics(ctx context.Context, date time.Time) (*DailyStatistics, error) {
-	s.logger.Printf("Generating daily statistics for date: %s", date.Format("2006-01-02"))
+// GetDailyStatistics retrieves daily statistics
+func (s *StatisticsService) GetDailyStatistics(ctx context.Context, filter *StatisticsFilter) (*DailyStatisticsResponse, error) {
+	s.logger.Printf("Generating daily statistics")
 
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	endOfDay := startOfDay.Add(24 * time.Hour).Add(-time.Nanosecond)
-
-	query := s.db.WithContext(ctx).Model(&models.ETCMeisaiRecord{}).
-		Where("date >= ? AND date <= ?", startOfDay, endOfDay)
-
-	// Get basic statistics
-	var result struct {
-		TotalRecords int64 `json:"total_records"`
-		TotalAmount  int64 `json:"total_amount"`
-	}
-
-	err := query.Select("COUNT(*) as total_records, COALESCE(SUM(toll_amount), 0) as total_amount").
-		Scan(&result).Error
+	repoFilter := s.toRepoFilter(filter)
+	dailyDist, err := s.statsRepo.GetDailyDistribution(ctx, repoFilter)
 	if err != nil {
-		s.logger.Printf("Failed to get daily statistics: %v", err)
-		return nil, fmt.Errorf("failed to get daily statistics: %w", err)
+		s.logger.Printf("Failed to get daily distribution: %v", err)
+		return nil, fmt.Errorf("failed to get daily distribution: %w", err)
 	}
 
-	var averageAmount float64
-	if result.TotalRecords > 0 {
-		averageAmount = float64(result.TotalAmount) / float64(result.TotalRecords)
+	// Convert to service response type
+	var stats []DailyStatistic
+	for _, d := range dailyDist {
+		stats = append(stats, DailyStatistic{
+			Date:        d.Date.Format("2006-01-02"),
+			Count:       d.Count,
+			TotalAmount: d.TotalAmount,
+			AvgAmount:   d.AvgAmount,
+		})
 	}
 
-	// Get unique counts
-	var uniqueVehicles, uniqueCards int64
-	query.Select("COUNT(DISTINCT car_number)").Scan(&uniqueVehicles)
-	query.Select("COUNT(DISTINCT etc_card_number)").Scan(&uniqueCards)
-
-	// Get peak hour
-	var peakResult struct {
-		Hour  int   `json:"hour"`
-		Count int64 `json:"count"`
+	response := &DailyStatisticsResponse{
+		DateRange:  s.formatDateRange(filter),
+		Statistics: stats,
 	}
 
-	err = s.db.WithContext(ctx).Model(&models.ETCMeisaiRecord{}).
-		Select("EXTRACT(HOUR FROM time::time) as hour, COUNT(*) as count").
-		Where("date >= ? AND date <= ?", startOfDay, endOfDay).
-		Group("EXTRACT(HOUR FROM time::time)").
-		Order("count DESC").
-		Limit(1).
-		Scan(&peakResult).Error
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, fmt.Errorf("failed to get peak hour: %w", err)
-	}
-
-	dailyStats := &DailyStatistics{
-		Date:           date,
-		TotalRecords:   result.TotalRecords,
-		TotalAmount:    result.TotalAmount,
-		AverageAmount:  averageAmount,
-		UniqueVehicles: uniqueVehicles,
-		UniqueCards:    uniqueCards,
-		PeakHour:       peakResult.Hour,
-		PeakHourCount:  peakResult.Count,
-	}
-
-	s.logger.Printf("Generated daily statistics for %s - Records: %d, Amount: %d",
-		date.Format("2006-01-02"), result.TotalRecords, result.TotalAmount)
-
-	return dailyStats, nil
+	s.logger.Printf("Successfully generated daily statistics")
+	return response, nil
 }
 
-// GetICStatistics retrieves IC usage statistics for a date range
-func (s *StatisticsService) GetICStatistics(ctx context.Context, dateFrom, dateTo time.Time) ([]*ICStatistics, error) {
-	s.logger.Printf("Generating IC statistics from %s to %s", dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02"))
+// GetMonthlyStatistics retrieves monthly statistics
+func (s *StatisticsService) GetMonthlyStatistics(ctx context.Context, filter *StatisticsFilter) (*MonthlyStatisticsResponse, error) {
+	s.logger.Printf("Generating monthly statistics")
 
-	var entranceStats []ICStatistics
-	var exitStats []ICStatistics
-
-	// Get entrance IC statistics
-	err := s.db.WithContext(ctx).Model(&models.ETCMeisaiRecord{}).
-		Select("entrance_ic as ic_name, COUNT(*) as usage_count, SUM(toll_amount) as total_amount, AVG(toll_amount) as average_amount, COUNT(DISTINCT etc_card_number) as unique_cards").
-		Where("date >= ? AND date <= ?", dateFrom, dateTo).
-		Group("entrance_ic").
-		Order("usage_count DESC").
-		Scan(&entranceStats).Error
+	repoFilter := s.toRepoFilter(filter)
+	monthlyDist, err := s.statsRepo.GetMonthlyDistribution(ctx, repoFilter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get entrance IC statistics: %w", err)
+		s.logger.Printf("Failed to get monthly distribution: %v", err)
+		return nil, fmt.Errorf("failed to get monthly distribution: %w", err)
 	}
 
-	// Get exit IC statistics
-	err = s.db.WithContext(ctx).Model(&models.ETCMeisaiRecord{}).
-		Select("exit_ic as ic_name, COUNT(*) as usage_count, SUM(toll_amount) as total_amount, AVG(toll_amount) as average_amount, COUNT(DISTINCT etc_card_number) as unique_cards").
-		Where("date >= ? AND date <= ?", dateFrom, dateTo).
-		Group("exit_ic").
-		Order("usage_count DESC").
-		Scan(&exitStats).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get exit IC statistics: %w", err)
+	// Convert to service response type
+	var stats []MonthlyStatistic
+	for _, m := range monthlyDist {
+		stats = append(stats, MonthlyStatistic{
+			Year:        m.Year,
+			Month:       m.Month,
+			MonthName:   time.Month(m.Month).String(),
+			Count:       m.Count,
+			TotalAmount: m.TotalAmount,
+			AvgAmount:   m.AvgAmount,
+		})
 	}
 
-	// Combine and deduplicate IC statistics
-	icMap := make(map[string]*ICStatistics)
-
-	// Process entrance statistics
-	for _, stat := range entranceStats {
-		if existing, exists := icMap[stat.ICName]; exists {
-			existing.Type = "both"
-			existing.UsageCount += stat.UsageCount
-			existing.TotalAmount += stat.TotalAmount
-			existing.AverageAmount = float64(existing.TotalAmount) / float64(existing.UsageCount)
-			if stat.UniqueCards > existing.UniqueCards {
-				existing.UniqueCards = stat.UniqueCards
-			}
-		} else {
-			icMap[stat.ICName] = &ICStatistics{
-				ICName:        stat.ICName,
-				Type:          "entrance",
-				UsageCount:    stat.UsageCount,
-				TotalAmount:   stat.TotalAmount,
-				AverageAmount: stat.AverageAmount,
-				UniqueCards:   stat.UniqueCards,
-			}
-		}
+	response := &MonthlyStatisticsResponse{
+		DateRange:  s.formatDateRange(filter),
+		Statistics: stats,
 	}
 
-	// Process exit statistics
-	for _, stat := range exitStats {
-		if existing, exists := icMap[stat.ICName]; exists {
-			if existing.Type == "entrance" {
-				existing.Type = "both"
-			}
-			existing.UsageCount += stat.UsageCount
-			existing.TotalAmount += stat.TotalAmount
-			existing.AverageAmount = float64(existing.TotalAmount) / float64(existing.UsageCount)
-			if stat.UniqueCards > existing.UniqueCards {
-				existing.UniqueCards = stat.UniqueCards
-			}
-		} else {
-			icMap[stat.ICName] = &ICStatistics{
-				ICName:        stat.ICName,
-				Type:          "exit",
-				UsageCount:    stat.UsageCount,
-				TotalAmount:   stat.TotalAmount,
-				AverageAmount: stat.AverageAmount,
-				UniqueCards:   stat.UniqueCards,
-			}
-		}
-	}
-
-	// Convert map to slice
-	var result []*ICStatistics
-	for _, stat := range icMap {
-		result = append(result, stat)
-	}
-
-	s.logger.Printf("Generated IC statistics for %d unique ICs", len(result))
-	return result, nil
+	s.logger.Printf("Successfully generated monthly statistics")
+	return response, nil
 }
 
-// CalculateTotalAmount calculates total toll amount from records
-func (s *StatisticsService) CalculateTotalAmount(ctx context.Context, filter *StatisticsFilter) (int64, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
+// GetVehicleStatistics retrieves statistics for specific vehicles
+func (s *StatisticsService) GetVehicleStatistics(ctx context.Context, carNumbers []string, filter *StatisticsFilter) (*VehicleStatisticsResponse, error) {
+	s.logger.Printf("Generating vehicle statistics for %d vehicles", len(carNumbers))
 
-	var totalAmount int64
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("COALESCE(SUM(toll_amount), 0)").
-		Scan(&totalAmount).Error
-	if err != nil {
-		s.logger.Printf("Failed to calculate total amount: %v", err)
-		return 0, fmt.Errorf("failed to calculate total amount: %w", err)
-	}
-
-	return totalAmount, nil
-}
-
-// CountUniqueVehicles counts unique vehicles from records
-func (s *StatisticsService) CountUniqueVehicles(ctx context.Context, filter *StatisticsFilter) (int64, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
-
-	var count int64
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("COUNT(DISTINCT car_number)").
-		Scan(&count).Error
-	if err != nil {
-		s.logger.Printf("Failed to count unique vehicles: %v", err)
-		return 0, fmt.Errorf("failed to count unique vehicles: %w", err)
-	}
-
-	return count, nil
-}
-
-// CountUniqueCards counts unique ETC cards from records
-func (s *StatisticsService) CountUniqueCards(ctx context.Context, filter *StatisticsFilter) (int64, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
-
-	var count int64
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("COUNT(DISTINCT etc_card_number)").
-		Scan(&count).Error
-	if err != nil {
-		s.logger.Printf("Failed to count unique cards: %v", err)
-		return 0, fmt.Errorf("failed to count unique cards: %w", err)
-	}
-
-	return count, nil
-}
-
-// buildFilterQuery builds a GORM query with the given filters
-func (s *StatisticsService) buildFilterQuery(query *gorm.DB, filter *StatisticsFilter) *gorm.DB {
+	// Add car numbers to filter
 	if filter == nil {
-		return query
+		filter = &StatisticsFilter{}
 	}
+	filter.CarNumbers = carNumbers
 
-	if filter.DateFrom != nil {
-		query = query.Where("date >= ?", *filter.DateFrom)
-	}
-	if filter.DateTo != nil {
-		query = query.Where("date <= ?", *filter.DateTo)
-	}
-	if len(filter.CarNumbers) > 0 {
-		query = query.Where("car_number IN ?", filter.CarNumbers)
-	}
-	if len(filter.ETCNumbers) > 0 {
-		query = query.Where("etc_card_number IN ?", filter.ETCNumbers)
-	}
-	if len(filter.ETCNums) > 0 {
-		query = query.Where("etc_num IN ?", filter.ETCNums)
-	}
-	if len(filter.EntranceICs) > 0 {
-		query = query.Where("entrance_ic IN ?", filter.EntranceICs)
-	}
-	if len(filter.ExitICs) > 0 {
-		query = query.Where("exit_ic IN ?", filter.ExitICs)
-	}
-	if filter.MinTollAmount != nil {
-		query = query.Where("toll_amount >= ?", *filter.MinTollAmount)
-	}
-	if filter.MaxTollAmount != nil {
-		query = query.Where("toll_amount <= ?", *filter.MaxTollAmount)
-	}
-
-	return query
-}
-
-// getTopRoutes gets the top routes by usage
-func (s *StatisticsService) getTopRoutes(ctx context.Context, filter *StatisticsFilter, limit int) ([]RouteStatistic, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
-
-	var routes []RouteStatistic
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("entrance_ic, exit_ic, COUNT(*) as usage_count, SUM(toll_amount) as total_amount, AVG(toll_amount) as average_amount").
-		Group("entrance_ic, exit_ic").
-		Order("usage_count DESC").
-		Limit(limit).
-		Scan(&routes).Error
+	repoFilter := s.toRepoFilter(filter)
+	vehicleStats, err := s.statsRepo.GetTopVehicles(ctx, repoFilter, len(carNumbers))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get top routes: %w", err)
+		s.logger.Printf("Failed to get vehicle statistics: %v", err)
+		return nil, fmt.Errorf("failed to get vehicle statistics: %w", err)
 	}
 
-	return routes, nil
+	response := &VehicleStatisticsResponse{
+		DateRange: s.formatDateRange(filter),
+		Vehicles:  s.convertVehicleStats(vehicleStats),
+	}
+
+	s.logger.Printf("Successfully generated vehicle statistics")
+	return response, nil
 }
 
-// getTopVehicles gets the top vehicles by usage
-func (s *StatisticsService) getTopVehicles(ctx context.Context, filter *StatisticsFilter, limit int) ([]VehicleStatistic, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
+// GetMappingStatistics retrieves mapping statistics
+func (s *StatisticsService) GetMappingStatistics(ctx context.Context, filter *StatisticsFilter) (*MappingStatisticsResponse, error) {
+	s.logger.Printf("Generating mapping statistics")
 
-	var vehicles []VehicleStatistic
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("car_number, COUNT(*) as usage_count, SUM(toll_amount) as total_amount, AVG(toll_amount) as average_amount, MAX(date) as last_used").
-		Group("car_number").
-		Order("usage_count DESC").
-		Limit(limit).
-		Scan(&vehicles).Error
+	repoFilter := s.toRepoFilter(filter)
+	mappingStats, err := s.statsRepo.GetMappingStatistics(ctx, repoFilter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get top vehicles: %w", err)
+		s.logger.Printf("Failed to get mapping statistics: %v", err)
+		return nil, fmt.Errorf("failed to get mapping statistics: %w", err)
 	}
 
-	return vehicles, nil
-}
-
-// getTopCards gets the top ETC cards by usage
-func (s *StatisticsService) getTopCards(ctx context.Context, filter *StatisticsFilter, limit int) ([]CardStatistic, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
-
-	var cards []CardStatistic
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("etc_card_number, COUNT(*) as usage_count, SUM(toll_amount) as total_amount, AVG(toll_amount) as average_amount, MAX(date) as last_used").
-		Group("etc_card_number").
-		Order("usage_count DESC").
-		Limit(limit).
-		Scan(&cards).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get top cards: %w", err)
+	response := &MappingStatisticsResponse{
+		DateRange:       s.formatDateRange(filter),
+		TotalRecords:    mappingStats.TotalRecords,
+		MappedRecords:   mappingStats.MappedRecords,
+		UnmappedRecords: mappingStats.UnmappedRecords,
+		MappingRate:     mappingStats.MappingRate,
+		MappingRatePercentage: fmt.Sprintf("%.2f%%", mappingStats.MappingRate*100),
 	}
 
-	// Add masked numbers
-	for i := range cards {
-		cards[i].MaskedNumber = s.maskCardNumber(cards[i].ETCCardNumber)
-	}
-
-	return cards, nil
-}
-
-// getHourlyDistribution gets the hourly usage distribution
-func (s *StatisticsService) getHourlyDistribution(ctx context.Context, filter *StatisticsFilter) ([]HourlyStatistic, error) {
-	query := s.buildFilterQuery(s.db.WithContext(ctx), filter)
-
-	var hourlyStats []HourlyStatistic
-	err := query.Model(&models.ETCMeisaiRecord{}).
-		Select("EXTRACT(HOUR FROM time::time) as hour, COUNT(*) as usage_count, SUM(toll_amount) as total_amount, AVG(toll_amount) as average_amount").
-		Group("EXTRACT(HOUR FROM time::time)").
-		Order("hour").
-		Scan(&hourlyStats).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get hourly distribution: %w", err)
-	}
-
-	return hourlyStats, nil
-}
-
-// maskCardNumber creates a masked version of the ETC card number
-func (s *StatisticsService) maskCardNumber(cardNumber string) string {
-	if len(cardNumber) <= 4 {
-		return "****"
-	}
-	return "****-****-****-" + cardNumber[len(cardNumber)-4:]
+	s.logger.Printf("Successfully generated mapping statistics")
+	return response, nil
 }
 
 // HealthCheck performs health check for the service
 func (s *StatisticsService) HealthCheck(ctx context.Context) error {
-	// Check database connectivity
-	sqlDB, err := s.db.DB()
-	if err != nil {
-		return fmt.Errorf("failed to get database connection: %w", err)
+	if s.statsRepo == nil {
+		return fmt.Errorf("statistics repository not initialized")
 	}
 
-	if err := sqlDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("database ping failed: %w", err)
+	if err := s.statsRepo.Ping(ctx); err != nil {
+		return fmt.Errorf("statistics repository ping failed: %w", err)
 	}
 
 	return nil
+}
+
+// Helper methods
+
+func (s *StatisticsService) toRepoFilter(filter *StatisticsFilter) repositories.StatisticsFilter {
+	if filter == nil {
+		return repositories.StatisticsFilter{}
+	}
+
+	return repositories.StatisticsFilter{
+		DateFrom:      filter.DateFrom,
+		DateTo:        filter.DateTo,
+		CarNumbers:    filter.CarNumbers,
+		ETCNumbers:    filter.ETCNumbers,
+		ETCNums:       filter.ETCNums,
+		EntranceICs:   filter.EntranceICs,
+		ExitICs:       filter.ExitICs,
+		MinTollAmount: filter.MinTollAmount,
+		MaxTollAmount: filter.MaxTollAmount,
+	}
+}
+
+func (s *StatisticsService) formatDateRange(filter *StatisticsFilter) string {
+	if filter == nil || (filter.DateFrom == nil && filter.DateTo == nil) {
+		return "All Time"
+	}
+
+	var from, to string
+	if filter.DateFrom != nil {
+		from = filter.DateFrom.Format("2006-01-02")
+	} else {
+		from = "Beginning"
+	}
+
+	if filter.DateTo != nil {
+		to = filter.DateTo.Format("2006-01-02")
+	} else {
+		to = "Present"
+	}
+
+	return fmt.Sprintf("%s to %s", from, to)
+}
+
+func (s *StatisticsService) convertRouteStats(routes []repositories.RouteStatistic) []RouteStatistic {
+	var result []RouteStatistic
+	for _, r := range routes {
+		result = append(result, RouteStatistic{
+			EntranceIC:  r.EntranceIC,
+			ExitIC:      r.ExitIC,
+			Count:       r.Count,
+			TotalAmount: r.TotalAmount,
+			AvgAmount:   r.AvgAmount,
+		})
+	}
+	return result
+}
+
+func (s *StatisticsService) convertVehicleStats(vehicles []repositories.VehicleStatistic) []VehicleStatistic {
+	var result []VehicleStatistic
+	for _, v := range vehicles {
+		result = append(result, VehicleStatistic{
+			CarNumber:   v.CarNumber,
+			Count:       v.Count,
+			TotalAmount: v.TotalAmount,
+			AvgAmount:   v.AvgAmount,
+		})
+	}
+	return result
+}
+
+func (s *StatisticsService) convertCardStats(cards []repositories.CardStatistic) []CardStatistic {
+	var result []CardStatistic
+	for _, c := range cards {
+		result = append(result, CardStatistic{
+			ETCCardNumber: c.ETCCardNumber,
+			Count:         c.Count,
+			TotalAmount:   c.TotalAmount,
+			AvgAmount:     c.AvgAmount,
+		})
+	}
+	return result
+}
+
+func (s *StatisticsService) convertHourlyStats(hourly []repositories.HourlyStatistic) []HourlyStatistic {
+	var result []HourlyStatistic
+	for _, h := range hourly {
+		result = append(result, HourlyStatistic{
+			Hour:        h.Hour,
+			HourLabel:   fmt.Sprintf("%02d:00", h.Hour),
+			Count:       h.Count,
+			TotalAmount: h.TotalAmount,
+			AvgAmount:   h.AvgAmount,
+		})
+	}
+	return result
 }

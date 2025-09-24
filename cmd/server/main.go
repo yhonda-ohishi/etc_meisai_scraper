@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/yhonda-ohishi/etc_meisai/src/clients"
 	"github.com/yhonda-ohishi/etc_meisai/src/config"
 	"github.com/yhonda-ohishi/etc_meisai/src/handlers"
 	// custommw "github.com/yhonda-ohishi/etc_meisai/src/middleware"
@@ -45,18 +44,22 @@ func main() {
 			},
 		}
 	}
+	_ = cfg // TODO: Use cfg when clients package is restored
 
 	// Initialize gRPC client
-	dbClient, err := initGRPCClient(cfg)
-	if err != nil {
-		logger.Fatalf("[ERROR] Failed to initialize gRPC client: %v", err)
-	}
+	// TODO: Fix after clients package is reimplemented
+	// dbClient, err := initGRPCClient(cfg)
+	// if err != nil {
+	// 	logger.Fatalf("[ERROR] Failed to initialize gRPC client: %v", err)
+	// }
+	var dbClient interface{} = nil // temporary placeholder
 
 	// Initialize shutdown manager
 	shutdownManager := server.NewShutdownManager(logger)
 
 	// Register db_service client for cleanup
-	shutdownManager.Register(server.NewDBServiceComponent(dbClient))
+	// TODO: Uncomment when dbClient has proper type with Close() method
+	// shutdownManager.Register(server.NewDBServiceComponent(dbClient))
 
 	// Initialize service registry
 	serviceRegistry := services.NewServiceRegistryGRPCOnly(dbClient, logger)
@@ -151,26 +154,27 @@ func loadConfig(configPath string) (*config.Settings, error) {
 	}, nil
 }
 
-func initGRPCClient(cfg *config.Settings) (*clients.DBServiceClient, error) {
-	address := cfg.GRPC.GetDBServiceAddress()
-	timeout := cfg.GRPC.GetConnectionTimeout()
-
-	client, err := clients.NewDBServiceClient(address, timeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
-	}
-
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := client.HealthCheck(ctx); err != nil {
-		log.Printf("[WARNING] db_service health check failed: %v", err)
-		// Continue anyway - the service might become available later
-	}
-
-	return client, nil
-}
+// TODO: Fix after clients package is reimplemented
+// func initGRPCClient(cfg *config.Settings) (*clients.DBServiceClient, error) {
+// 	address := cfg.GRPC.GetDBServiceAddress()
+// 	timeout := cfg.GRPC.GetConnectionTimeout()
+//
+// 	client, err := clients.NewDBServiceClient(address, timeout)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
+// 	}
+//
+// 	// Test connection
+// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// 	defer cancel()
+//
+// 	if err := client.HealthCheck(ctx); err != nil {
+// 		log.Printf("[WARNING] db_service health check failed: %v", err)
+// 		// Continue anyway - the service might become available later
+// 	}
+//
+// 	return client, nil
+// }
 
 func initRouterWithMiddleware(serviceRegistry *services.ServiceRegistry, logger *log.Logger) chi.Router {
 	r := chi.NewRouter()

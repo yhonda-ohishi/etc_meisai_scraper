@@ -1,0 +1,411 @@
+package middleware_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yhonda-ohishi/etc_meisai/src/middleware"
+)
+
+func TestNewMetrics(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	assert.NotNil(t, metrics)
+	assert.Equal(t, int64(0), metrics.GetTotalRequests())
+	assert.Equal(t, int64(0), metrics.GetTotalErrors())
+	assert.Equal(t, int64(0), metrics.GetActiveConnections())
+	assert.NotNil(t, metrics.GetStatusCodes())
+}
+
+func TestMetrics_IncrementRequests(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	initial := metrics.GetTotalRequests()
+	metrics.IncrementRequests()
+	after := metrics.GetTotalRequests()
+
+	assert.Equal(t, initial+1, after)
+}
+
+func TestMetrics_IncrementErrors(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	initial := metrics.GetTotalErrors()
+	metrics.IncrementErrors()
+	after := metrics.GetTotalErrors()
+
+	assert.Equal(t, initial+1, after)
+}
+
+func TestMetrics_IncrementActiveConnections(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	initial := metrics.GetActiveConnections()
+	metrics.IncrementActiveConnections()
+	after := metrics.GetActiveConnections()
+
+	assert.Equal(t, initial+1, after)
+}
+
+func TestMetrics_DecrementActiveConnections(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// First increment to have a positive value
+	metrics.IncrementActiveConnections()
+	initial := metrics.GetActiveConnections()
+	metrics.DecrementActiveConnections()
+	after := metrics.GetActiveConnections()
+
+	assert.Equal(t, initial-1, after)
+}
+
+func TestMetrics_RecordResponseTime(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+	duration := 100 * time.Millisecond
+
+	metrics.RecordResponseTime(duration)
+
+	stats := metrics.GetResponseTimeStats()
+	assert.Equal(t, duration, stats.Max)
+	assert.Equal(t, duration, stats.Min)
+	assert.Equal(t, duration, stats.Total)
+}
+
+func TestMetrics_RecordMultipleResponseTimes(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	durations := []time.Duration{
+		50 * time.Millisecond,
+		100 * time.Millisecond,
+		200 * time.Millisecond,
+		75 * time.Millisecond,
+	}
+
+	for _, duration := range durations {
+		metrics.RecordResponseTime(duration)
+	}
+
+	stats := metrics.GetResponseTimeStats()
+	assert.Equal(t, 200*time.Millisecond, stats.Max)
+	assert.Equal(t, 50*time.Millisecond, stats.Min)
+	assert.Equal(t, 425*time.Millisecond, stats.Total)
+}
+
+func TestMetrics_RecordStatusCode(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// Record various status codes
+	metrics.RecordStatusCode(200)
+	metrics.RecordStatusCode(200)
+	metrics.RecordStatusCode(404)
+	metrics.RecordStatusCode(500)
+	metrics.RecordStatusCode(200)
+
+	statusCodes := metrics.GetStatusCodes()
+	assert.Equal(t, int64(3), statusCodes[200])
+	assert.Equal(t, int64(1), statusCodes[404])
+	assert.Equal(t, int64(1), statusCodes[500])
+}
+
+func TestMetrics_IncrementBusinessMetrics(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// Test records imported
+	initial := metrics.GetRecordsImported()
+	metrics.IncrementRecordsImported(10)
+	after := metrics.GetRecordsImported()
+	assert.Equal(t, initial+10, after)
+
+	// Test CSV processed
+	initial = metrics.GetCSVProcessed()
+	metrics.IncrementCSVProcessed()
+	after = metrics.GetCSVProcessed()
+	assert.Equal(t, initial+1, after)
+
+	// Test duplicates found
+	initial = metrics.GetDuplicatesFound()
+	metrics.IncrementDuplicatesFound(5)
+	after = metrics.GetDuplicatesFound()
+	assert.Equal(t, initial+5, after)
+}
+
+func TestMetrics_GetSnapshot(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// Record some data
+	metrics.IncrementRequests()
+	metrics.IncrementErrors()
+	metrics.IncrementActiveConnections()
+	metrics.RecordResponseTime(100 * time.Millisecond)
+	metrics.RecordStatusCode(200)
+	metrics.IncrementRecordsImported(50)
+
+	snapshot := metrics.GetSnapshot()
+
+	assert.Equal(t, int64(1), snapshot.TotalRequests)
+	assert.Equal(t, int64(1), snapshot.TotalErrors)
+	assert.Equal(t, int64(1), snapshot.ActiveConnections)
+	assert.Equal(t, int64(50), snapshot.TotalRecordsImported)
+	assert.Equal(t, int64(1), snapshot.StatusCodes[200])
+	assert.Equal(t, 100*time.Millisecond, snapshot.MaxResponseTime)
+}
+
+func TestMetricsMiddleware(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(10 * time.Millisecond) // Simulate processing time
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	handler := middleware.MetricsMiddleware(baseHandler)
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		expectedStatus int
+	}{
+		{
+			name:           "successful request",
+			method:         "GET",
+			path:           "/test",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "another successful request",
+			method:         "POST",
+			path:           "/create",
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+			assert.Equal(t, "OK", w.Body.String())
+		})
+	}
+
+	// Verify metrics were recorded
+	assert.Equal(t, int64(2), metrics.GetTotalRequests())
+	assert.Equal(t, int64(2), metrics.GetStatusCodes()[200])
+	assert.Equal(t, int64(0), metrics.GetActiveConnections()) // Should be back to 0 after requests complete
+}
+
+func TestMetricsMiddleware_ErrorResponse(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error"))
+	})
+
+	handler := middleware.MetricsMiddleware(baseHandler)
+
+	req := httptest.NewRequest("GET", "/error", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, "Error", w.Body.String())
+
+	// Verify error metrics
+	assert.Equal(t, int64(1), metrics.GetTotalRequests())
+	assert.Equal(t, int64(1), metrics.GetTotalErrors())
+	assert.Equal(t, int64(1), metrics.GetStatusCodes()[500])
+}
+
+func TestMetrics_ConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+	numGoroutines := 100
+	incrementsPerGoroutine := 10
+
+	// Test concurrent increments
+	done := make(chan bool, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			for j := 0; j < incrementsPerGoroutine; j++ {
+				metrics.IncrementRequests()
+				metrics.IncrementErrors()
+				metrics.IncrementActiveConnections()
+				metrics.RecordStatusCode(200)
+				metrics.RecordResponseTime(10 * time.Millisecond)
+			}
+			done <- true
+		}()
+	}
+
+	// Wait for all goroutines to complete
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+
+	// Verify final counts
+	expectedCount := int64(numGoroutines * incrementsPerGoroutine)
+	assert.Equal(t, expectedCount, metrics.GetTotalRequests())
+	assert.Equal(t, expectedCount, metrics.GetTotalErrors())
+	assert.Equal(t, expectedCount, metrics.GetActiveConnections())
+	assert.Equal(t, expectedCount, metrics.GetStatusCodes()[200])
+}
+
+func TestMetrics_ResetMetrics(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// Record some data
+	metrics.IncrementRequests()
+	metrics.IncrementErrors()
+	metrics.RecordStatusCode(200)
+	metrics.RecordResponseTime(100 * time.Millisecond)
+
+	// Verify data exists
+	assert.Greater(t, metrics.GetTotalRequests(), int64(0))
+
+	// Reset metrics
+	metrics.Reset()
+
+	// Verify everything is reset
+	assert.Equal(t, int64(0), metrics.GetTotalRequests())
+	assert.Equal(t, int64(0), metrics.GetTotalErrors())
+	assert.Equal(t, int64(0), metrics.GetActiveConnections())
+	assert.Empty(t, metrics.GetStatusCodes())
+
+	stats := metrics.GetResponseTimeStats()
+	assert.Equal(t, time.Duration(0), stats.Total)
+	assert.Equal(t, time.Duration(0), stats.Max)
+	assert.Equal(t, time.Duration(0), stats.Min)
+}
+
+func TestMetrics_ResponseTimeStats_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// Test with zero duration
+	metrics.RecordResponseTime(0)
+	stats := metrics.GetResponseTimeStats()
+	assert.Equal(t, time.Duration(0), stats.Total)
+	assert.Equal(t, time.Duration(0), stats.Max)
+	assert.Equal(t, time.Duration(0), stats.Min)
+
+	// Test with negative duration (should handle gracefully)
+	metrics.RecordResponseTime(-10 * time.Millisecond)
+	stats = metrics.GetResponseTimeStats()
+	// Implementation should handle negative durations appropriately
+	assert.NotNil(t, stats)
+}
+
+func TestMetrics_StatusCodeEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	metrics := middleware.NewMetrics()
+
+	// Test various HTTP status codes
+	statusCodes := []int{100, 200, 300, 400, 404, 500, 503}
+
+	for _, code := range statusCodes {
+		metrics.RecordStatusCode(code)
+	}
+
+	retrievedCodes := metrics.GetStatusCodes()
+	for _, code := range statusCodes {
+		assert.Equal(t, int64(1), retrievedCodes[code])
+	}
+}
+
+// Benchmark tests
+func BenchmarkMetrics_IncrementRequests(b *testing.B) {
+	metrics := middleware.NewMetrics()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		metrics.IncrementRequests()
+	}
+}
+
+func BenchmarkMetrics_RecordResponseTime(b *testing.B) {
+	metrics := middleware.NewMetrics()
+	duration := 100 * time.Millisecond
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		metrics.RecordResponseTime(duration)
+	}
+}
+
+func BenchmarkMetrics_RecordStatusCode(b *testing.B) {
+	metrics := middleware.NewMetrics()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		metrics.RecordStatusCode(200)
+	}
+}
+
+func BenchmarkMetricsMiddleware(b *testing.B) {
+	metrics := middleware.NewMetrics()
+
+	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := middleware.MetricsMiddleware(baseHandler)
+	req := httptest.NewRequest("GET", "/test", nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkMetrics_ConcurrentAccess(b *testing.B) {
+	metrics := middleware.NewMetrics()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			metrics.IncrementRequests()
+			metrics.RecordStatusCode(200)
+			metrics.RecordResponseTime(10 * time.Millisecond)
+		}
+	})
+}

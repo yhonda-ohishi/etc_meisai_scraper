@@ -1,0 +1,121 @@
+{
+  "profile": {
+    "total_duration": 0,
+    "package_count": 43,
+    "test_count": 10,
+    "packages": {
+      "github.com/yhonda-ohishi/etc_meisai/src/repositories": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/src/repositories",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/src/services": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/src/services",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/contract": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/contract",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/fixtures": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/fixtures",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/integration": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/integration",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/performance": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/performance",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/security": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/security",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/unit/grpc": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/unit/grpc",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/unit/handlers": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/unit/handlers",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      },
+      "github.com/yhonda-ohishi/etc_meisai/tests/unit/middleware": {
+        "name": "github.com/yhonda-ohishi/etc_meisai/tests/unit/middleware",
+        "duration": 0,
+        "test_count": 1,
+        "tests": [],
+        "can_parallel": true,
+        "has_db_access": false,
+        "has_file_io": false
+      }
+    },
+    "slow_tests": null,
+    "optimizations": null
+  },
+  "summary": {
+    "current_duration": 0,
+    "target_duration": 30000000000,
+    "meets_target": true,
+    "potential_savings": 0,
+    "top_slow_packages": [
+      "github.com/yhonda-ohishi/etc_meisai/src/repositories (0s)",
+      "github.com/yhonda-ohishi/etc_meisai/tests/fixtures (0s)",
+      "github.com/yhonda-ohishi/etc_meisai/tests/integration (0s)",
+      "github.com/yhonda-ohishi/etc_meisai/tests/performance (0s)",
+      "github.com/yhonda-ohishi/etc_meisai/tests/unit/handlers (0s)"
+    ]
+  },
+  "recommendations": [
+    "Enable parallel execution for 10 packages",
+    "Optimize 0 slow tests (\u003e1s each)",
+    "Use test data factories to reduce setup time",
+    "Implement test result caching for expensive operations",
+    "Consider using build tags to separate unit and integration tests"
+  ]
+}

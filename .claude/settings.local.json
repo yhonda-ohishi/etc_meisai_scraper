@@ -29,7 +29,18 @@
       "Bash(protoc-gen-go-grpc:*)",
       "Bash(protoc-gen-grpc-gateway:*)",
       "Bash(protoc-gen-openapiv2:*)",
-      "Bash(go doc:*)"
+      "Bash(go doc:*)",
+      "Bash(awk:*)",
+      "Bash(while read pkg)",
+      "Bash(do echo -n \"$pkg: \")",
+      "Bash(grep:*)",
+      "Bash(powershell:*)",
+      "Bash(sort:*)",
+      "Bash(time go test ./src/... -count=1)",
+      "Bash(.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks)",
+      "Bash(go clean:*)",
+      "Bash(go vet:*)",
+      "Bash(gofmt:*)"
     ],
     "deny": [],
     "ask": []

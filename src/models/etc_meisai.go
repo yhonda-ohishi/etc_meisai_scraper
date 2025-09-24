@@ -41,14 +41,18 @@ type ETCMeisai struct {
 
 // BeforeCreate prepares the record before creation
 func (e *ETCMeisai) BeforeCreate() error {
+	// Set timestamps
+	now := time.Now()
+	if e.CreatedAt.IsZero() {
+		e.CreatedAt = now
+	}
+	if e.UpdatedAt.IsZero() {
+		e.UpdatedAt = now
+	}
+
 	// Generate hash if not provided
 	if e.Hash == "" {
 		e.Hash = e.GenerateHash()
-	}
-
-	// Validate the record
-	if err := e.Validate(); err != nil {
-		return err
 	}
 
 	return nil
@@ -56,25 +60,24 @@ func (e *ETCMeisai) BeforeCreate() error {
 
 // BeforeUpdate prepares the record before updating
 func (e *ETCMeisai) BeforeUpdate() error {
+	// Update timestamp
+	e.UpdatedAt = time.Now()
+
 	// Re-generate hash on update
 	e.Hash = e.GenerateHash()
-
-	// Validate the record
-	if err := e.Validate(); err != nil {
-		return err
-	}
 
 	return nil
 }
 
 // GenerateHash creates a unique hash for the ETC record
 func (e *ETCMeisai) GenerateHash() string {
-	data := fmt.Sprintf("%s|%s|%s|%s|%d|%s",
+	data := fmt.Sprintf("%s|%s|%s|%s|%d|%s|%s",
 		e.UseDate.Format("2006-01-02"),
 		e.UseTime,
 		e.EntryIC,
 		e.ExitIC,
 		e.Amount,
+		e.CarNumber,
 		e.ETCNumber,
 	)
 
@@ -88,20 +91,32 @@ func (e *ETCMeisai) Validate() error {
 		return fmt.Errorf("UseDate is required")
 	}
 
-	if e.UseDate.After(time.Now()) {
-		return fmt.Errorf("UseDate cannot be in the future")
+	if e.UseTime == "" {
+		return fmt.Errorf("UseTime is required")
+	}
+
+	if e.EntryIC == "" {
+		return fmt.Errorf("EntryIC is required")
+	}
+
+	if e.ExitIC == "" {
+		return fmt.Errorf("ExitIC is required")
 	}
 
 	if e.Amount <= 0 {
 		return fmt.Errorf("Amount must be positive")
 	}
 
-	if len(e.ETCNumber) > 20 {
-		return fmt.Errorf("ETCNumber too long")
+	if e.CarNumber == "" {
+		return fmt.Errorf("CarNumber is required")
 	}
 
-	if e.Hash == "" {
-		return fmt.Errorf("Hash is required")
+	if e.ETCNumber == "" {
+		return fmt.Errorf("ETCNumber is required")
+	}
+
+	if len(e.ETCNumber) > 20 {
+		return fmt.Errorf("ETCNumber too long")
 	}
 
 	return nil
@@ -161,6 +176,17 @@ type ETCMonthlySummary struct {
 	Month       int   `json:"month"`
 	TotalAmount int64 `json:"total_amount"`
 	TotalCount  int64 `json:"total_count"`
+}
+
+// GetTableName returns the table name
+func (e *ETCMeisai) GetTableName() string {
+	return "etc_meisai"
+}
+
+// String returns a string representation of the ETC record
+func (e *ETCMeisai) String() string {
+	return fmt.Sprintf("ETCMeisai{ID:%d, Date:%s, ETCNumber:%s, EntryIC:%s, ExitIC:%s, Amount:%d}",
+		e.ID, e.UseDate.Format("2006-01-02"), e.ETCNumber, e.EntryIC, e.ExitIC, e.Amount)
 }
 
 // ETCMonthlyStats provides detailed monthly statistics

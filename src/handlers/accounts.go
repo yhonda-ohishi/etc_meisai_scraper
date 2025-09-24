@@ -44,7 +44,9 @@ func (h *AccountsHandler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 					IsActive: true,
 				}
 				if len(parts) >= 3 {
-					account.ETCNum = parts[2]
+					// If there are more than 3 parts, take the last one as ETC number
+					// to handle cases like "id:password:extra:colons:etc_num"
+					account.ETCNum = parts[len(parts)-1]
 				}
 				accounts = append(accounts, account)
 			}
@@ -65,7 +67,9 @@ func (h *AccountsHandler) GetAccounts(w http.ResponseWriter, r *http.Request) {
 					IsActive: true,
 				}
 				if len(parts) >= 3 {
-					account.ETCNum = parts[2]
+					// If there are more than 3 parts, take the last one as ETC number
+					// to handle cases like "id:password:extra:colons:etc_num"
+					account.ETCNum = parts[len(parts)-1]
 				}
 				accounts = append(accounts, account)
 			}

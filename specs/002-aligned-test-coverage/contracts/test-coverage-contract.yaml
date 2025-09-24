@@ -1,0 +1,136 @@
+openapi: 3.0.0
+info:
+  title: Test Coverage Contract
+  version: 1.0.0
+  description: Contract defining test coverage requirements and validation rules
+
+paths:
+  /coverage/validate:
+    post:
+      summary: Validate coverage meets requirements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoverageReport'
+      responses:
+        '200':
+          description: Coverage meets requirements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400':
+          description: Coverage does not meet requirements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+components:
+  schemas:
+    CoverageReport:
+      type: object
+      required:
+        - packages
+        - overall_coverage
+        - timestamp
+      properties:
+        packages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageCoverage'
+        overall_coverage:
+          type: number
+          minimum: 100.0
+          maximum: 100.0
+          description: Overall coverage percentage (must be 100%)
+        timestamp:
+          type: string
+          format: date-time
+        test_count:
+          type: integer
+          minimum: 1
+        execution_time:
+          type: number
+          maximum: 30.0
+          description: Total execution time in seconds (must be < 30s)
+
+    PackageCoverage:
+      type: object
+      required:
+        - name
+        - coverage
+        - test_count
+      properties:
+        name:
+          type: string
+          pattern: '^src/[a-z]+$'
+          description: Package name (must be under src/)
+        coverage:
+          type: number
+          minimum: 100.0
+          maximum: 100.0
+          description: Package coverage percentage (must be 100%)
+        test_count:
+          type: integer
+          minimum: 1
+          description: Number of tests in package
+        uncovered_lines:
+          type: array
+          items:
+            type: integer
+          maxItems: 0
+          description: List of uncovered lines (must be empty)
+
+    ValidationResult:
+      type: object
+      required:
+        - valid
+        - message
+      properties:
+        valid:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+          enum: ["All coverage requirements met"]
+        details:
+          type: object
+          properties:
+            total_packages:
+              type: integer
+            all_at_100:
+              type: boolean
+              enum: [true]
+            execution_time_ok:
+              type: boolean
+              enum: [true]
+
+    ValidationError:
+      type: object
+      required:
+        - valid
+        - message
+        - failures
+      properties:
+        valid:
+          type: boolean
+          enum: [false]
+        message:
+          type: string
+        failures:
+          type: array
+          items:
+            type: object
+            properties:
+              package:
+                type: string
+              current_coverage:
+                type: number
+              required_coverage:
+                type: number
+                enum: [100.0]
+              gap:
+                type: number

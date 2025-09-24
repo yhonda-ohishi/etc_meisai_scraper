@@ -63,6 +63,13 @@ func (h *HealthHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	// Check if service registry is available
+	if h.ServiceRegistry == nil {
+		h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+			"Service registry not initialized", nil)
+		return
+	}
+
 	// Get base service for health check
 	baseService := h.ServiceRegistry.GetBaseService()
 	if baseService == nil {
@@ -131,6 +138,17 @@ func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
+
+	// Check if service registry is available
+	if h.ServiceRegistry == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "not_ready",
+			"message": "Service registry not initialized",
+		})
+		return
+	}
 
 	// Check if services are ready
 	baseService := h.ServiceRegistry.GetBaseService()

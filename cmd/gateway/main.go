@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -14,8 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"etc_meisai/src/pb"
-	"etc_meisai/src/middleware"
+	pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
+	"github.com/yhonda-ohishi/etc_meisai/src/middleware"
 )
 
 type Config struct {
@@ -135,12 +134,10 @@ func main() {
 	defer conn.Close()
 
 	// Create gRPC-Gateway mux
-	mux := runtime.NewServeMux(
-		runtime.WithHealthzEndpoint(pb.NewEtcServiceClient(conn)),
-	)
+	mux := runtime.NewServeMux()
 
 	// Register gRPC-Gateway handlers
-	if err := pb.RegisterEtcServiceHandler(ctx, mux, conn); err != nil {
+	if err := pb.RegisterETCMeisaiServiceHandler(ctx, mux, conn); err != nil {
 		log.Fatalf("Failed to register gateway handlers: %v", err)
 	}
 

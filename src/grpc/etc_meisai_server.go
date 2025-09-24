@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/yhonda-ohishi/etc_meisai/src/adapters"
-	"github.com/yhonda-ohishi/etc_meisai/src/models"
 	"github.com/yhonda-ohishi/etc_meisai/src/pb"
 	"github.com/yhonda-ohishi/etc_meisai/src/services"
 )
@@ -22,23 +20,39 @@ import (
 // ETCMeisaiServer implements the ETCMeisaiServiceServer interface
 type ETCMeisaiServer struct {
 	pb.UnimplementedETCMeisaiServiceServer
-	etcMeisaiService  *services.ETCMeisaiService
-	etcMappingService *services.ETCMappingService
-	importService     *services.ImportService
-	statisticsService *services.StatisticsService
-	logger           *log.Logger
+	etcMeisaiService  ETCMeisaiServiceInterface
+	etcMappingService ETCMappingServiceInterface
+	importService     ImportServiceInterface
+	statisticsService StatisticsServiceInterface
+	logger           LoggerInterface
 }
 
-// NewETCMeisaiServer creates a new gRPC server instance
+// NewETCMeisaiServer creates a new gRPC server instance with interface dependencies
 func NewETCMeisaiServer(
-	etcMeisaiService *services.ETCMeisaiService,
-	etcMappingService *services.ETCMappingService,
-	importService *services.ImportService,
-	statisticsService *services.StatisticsService,
-	logger *log.Logger,
+	etcMeisaiService ETCMeisaiServiceInterface,
+	etcMappingService ETCMappingServiceInterface,
+	importService ImportServiceInterface,
+	statisticsService StatisticsServiceInterface,
+	logger LoggerInterface,
 ) *ETCMeisaiServer {
+	// Validate all dependencies are non-nil
+	if etcMeisaiService == nil {
+		panic("etcMeisaiService cannot be nil")
+	}
+	if etcMappingService == nil {
+		panic("etcMappingService cannot be nil")
+	}
+	if importService == nil {
+		panic("importService cannot be nil")
+	}
+	if statisticsService == nil {
+		panic("statisticsService cannot be nil")
+	}
 	if logger == nil {
-		logger = log.New(log.Writer(), "[ETCMeisaiServer] ", log.LstdFlags|log.Lshortfile)
+		// Default logger if not provided
+		logger = &defaultLogger{
+			logger: log.New(log.Writer(), "[ETCMeisaiServer] ", log.LstdFlags|log.Lshortfile),
+		}
 	}
 
 	return &ETCMeisaiServer{
@@ -95,7 +109,7 @@ func (s *ETCMeisaiServer) GetRecord(ctx context.Context, req *pb.GetRecordReques
 		return nil, status.Error(codes.InvalidArgument, "invalid record ID")
 	}
 
-	record, err := s.etcMeisaiService.GetRecordByID(ctx, req.Id)
+	record, err := s.etcMeisaiService.GetRecord(ctx, req.Id)
 	if err != nil {
 		s.logger.Printf("Error getting record: %v", err)
 		if strings.Contains(err.Error(), "not found") {
@@ -138,11 +152,13 @@ func (s *ETCMeisaiServer) ListRecords(ctx context.Context, req *pb.ListRecordsRe
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	records, totalCount, err := s.etcMeisaiService.ListRecords(ctx, params)
+	response, err := s.etcMeisaiService.ListRecords(ctx, params)
 	if err != nil {
 		s.logger.Printf("Error listing records: %v", err)
 		return nil, status.Error(codes.Internal, "failed to list records")
 	}
+		records := response.Records
+	totalCount := response.TotalCount
 
 	// Convert records to proto
 	protoRecords := make([]*pb.ETCMeisaiRecord, len(records))
@@ -242,13 +258,13 @@ func (s *ETCMeisaiServer) ImportCSV(ctx context.Context, req *pb.ImportCSVReques
 		FileSize:    int64(len(req.FileContent)),
 	}
 
-	session, err := s.importService.ImportCSV(ctx, params, req.FileContent)
+	result, err := s.importService.ImportCSV(ctx, params, strings.NewReader(string(req.FileContent)))
 	if err != nil {
 		s.logger.Printf("Error importing CSV: %v", err)
 		return nil, status.Error(codes.Internal, "failed to import CSV")
 	}
 
-	protoSession, err := adapters.ImportSessionToProto(session)
+	protoSession, err := adapters.ImportSessionToProto(result.Session)
 	if err != nil {
 		s.logger.Printf("Error converting session to proto: %v", err)
 		return nil, status.Error(codes.Internal, "failed to convert response")
@@ -316,14 +332,15 @@ func (s *ETCMeisaiServer) ImportCSVStream(stream pb.ETCMeisaiService_ImportCSVSt
 		FileSize:    int64(len(allData)),
 	}
 
-	session, err := s.importService.ImportCSV(ctx, params, allData)
+	result, err := s.importService.ImportCSV(ctx, params, strings.NewReader(string(allData)))
 	if err != nil {
 		s.logger.Printf("Error processing stream import: %v", err)
 		// Send error progress
+		errMsg := err.Error()
 		stream.Send(&pb.ImportProgress{
 			SessionId:    sessionID,
 			Status:       pb.ImportStatus_IMPORT_STATUS_FAILED,
-			ErrorMessage: &err.Error(),
+			ErrorMessage: &errMsg,
 		})
 		return status.Error(codes.Internal, "failed to process import")
 	}
@@ -331,10 +348,10 @@ func (s *ETCMeisaiServer) ImportCSVStream(stream pb.ETCMeisaiService_ImportCSVSt
 	// Send final progress
 	return stream.Send(&pb.ImportProgress{
 		SessionId:          sessionID,
-		ProcessedRows:      int32(session.ProcessedRows),
-		SuccessRows:        int32(session.SuccessRows),
-		ErrorRows:          int32(session.ErrorRows),
-		DuplicateRows:      int32(session.DuplicateRows),
+		ProcessedRows:      int32(result.Session.ProcessedRows),
+		SuccessRows:        int32(result.SuccessCount),
+		ErrorRows:          int32(result.ErrorCount),
+		DuplicateRows:      int32(result.DuplicateCount),
 		ProgressPercentage: 100.0,
 		Status:            pb.ImportStatus_IMPORT_STATUS_COMPLETED,
 	})
@@ -380,12 +397,18 @@ func (s *ETCMeisaiServer) ListImportSessions(ctx context.Context, req *pb.ListIm
 		req.PageSize = 50
 	}
 
-	// Convert to service parameters (simplified)
-	sessions, totalCount, err := s.importService.ListImportSessions(ctx, int(req.Page), int(req.PageSize))
+	// Convert to service parameters
+	params := &services.ListImportSessionsParams{
+		Page:     int(req.Page),
+		PageSize: int(req.PageSize),
+	}
+	response, err := s.importService.ListImportSessions(ctx, params)
 	if err != nil {
 		s.logger.Printf("Error listing import sessions: %v", err)
 		return nil, status.Error(codes.Internal, "failed to list sessions")
 	}
+	sessions := response.Sessions
+	totalCount := response.TotalCount
 
 	// Convert to proto
 	protoSessions := make([]*pb.ImportSession, len(sessions))
@@ -448,7 +471,7 @@ func (s *ETCMeisaiServer) GetMapping(ctx context.Context, req *pb.GetMappingRequ
 		return nil, status.Error(codes.InvalidArgument, "invalid mapping ID")
 	}
 
-	mapping, err := s.etcMappingService.GetMappingByID(ctx, req.Id)
+	mapping, err := s.etcMappingService.GetMapping(ctx, req.Id)
 	if err != nil {
 		s.logger.Printf("Error getting mapping: %v", err)
 		if strings.Contains(err.Error(), "not found") {
@@ -488,11 +511,13 @@ func (s *ETCMeisaiServer) ListMappings(ctx context.Context, req *pb.ListMappings
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	mappings, totalCount, err := s.etcMappingService.ListMappings(ctx, params)
+	response, err := s.etcMappingService.ListMappings(ctx, params)
 	if err != nil {
 		s.logger.Printf("Error listing mappings: %v", err)
 		return nil, status.Error(codes.Internal, "failed to list mappings")
 	}
+		mappings := response.Mappings
+	totalCount := response.TotalCount
 
 	// Convert to proto
 	protoMappings := make([]*pb.ETCMapping, len(mappings))
@@ -525,7 +550,7 @@ func (s *ETCMeisaiServer) UpdateMapping(ctx context.Context, req *pb.UpdateMappi
 	}
 
 	// Convert proto to service parameters
-	params, err := s.protoToCreateMappingParams(req.Mapping)
+	params, err := s.protoToUpdateMappingParams(req.Id, req.Mapping)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid mapping data")
 	}
@@ -592,8 +617,8 @@ func (s *ETCMeisaiServer) GetStatistics(ctx context.Context, req *pb.GetStatisti
 	return &pb.GetStatisticsResponse{
 		TotalRecords: stats.TotalRecords,
 		TotalAmount:  stats.TotalAmount,
-		UniqueCars:   int32(stats.UniqueCarNumbers),
-		UniqueCards:  int32(stats.UniqueETCCards),
+		UniqueCars:   int32(stats.UniqueVehicles),
+		UniqueCards:  int32(stats.UniqueCards),
 		DailyStats:   []*pb.DailyStatistics{}, // TODO: Implement conversion
 		IcStats:      []*pb.ICStatistics{},    // TODO: Implement conversion
 	}, nil
@@ -711,14 +736,10 @@ func (s *ETCMeisaiServer) protoToListRecordsParams(req *pb.ListRecordsRequest) (
 		params.CarNumber = req.CarNumber
 	}
 	if req.EtcCardNumber != nil {
-		params.ETCCardNumber = req.EtcCardNumber
+		params.ETCNumber = req.EtcCardNumber
 	}
-	if req.EntranceIc != nil {
-		params.EntranceIC = req.EntranceIc
-	}
-	if req.ExitIc != nil {
-		params.ExitIC = req.ExitIc
-	}
+	// Note: EntranceIC and ExitIC filtering not supported by ListRecordsParams
+	// These would need to be added to the service layer if needed
 
 	return params, nil
 }
@@ -747,6 +768,39 @@ func (s *ETCMeisaiServer) protoToCreateMappingParams(mapping *pb.ETCMapping) (*s
 	default:
 		params.Status = "pending"
 	}
+
+	// Handle metadata conversion (simplified)
+	if mapping.Metadata != nil {
+		params.Metadata = mapping.Metadata.AsMap()
+	}
+
+	return params, nil
+}
+
+// protoToUpdateMappingParams converts proto mapping to update service parameters
+func (s *ETCMeisaiServer) protoToUpdateMappingParams(id int64, mapping *pb.ETCMapping) (*services.UpdateMappingParams, error) {
+	params := &services.UpdateMappingParams{
+		MappingType:      &mapping.MappingType,
+		MappedEntityID:   &mapping.MappedEntityId,
+		MappedEntityType: &mapping.MappedEntityType,
+		Confidence:       &mapping.Confidence,
+	}
+
+	// Convert status enum to string
+	var status string
+	switch mapping.Status {
+	case pb.MappingStatus_MAPPING_STATUS_ACTIVE:
+		status = "active"
+	case pb.MappingStatus_MAPPING_STATUS_INACTIVE:
+		status = "inactive"
+	case pb.MappingStatus_MAPPING_STATUS_PENDING:
+		status = "pending"
+	case pb.MappingStatus_MAPPING_STATUS_REJECTED:
+		status = "rejected"
+	default:
+		status = "pending"
+	}
+	params.Status = &status
 
 	// Handle metadata conversion (simplified)
 	if mapping.Metadata != nil {

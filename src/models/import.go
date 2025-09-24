@@ -14,6 +14,8 @@ type ETCImportRequest struct {
 type ETCImportResult struct {
 	Success      bool      `json:"success"`
 	RecordCount  int       `json:"record_count"`
+	RecordsRead  int       `json:"records_read"`   // Total records read from source
+	RecordsSaved int       `json:"records_saved"`  // Records successfully saved
 	ImportedRows int       `json:"imported_rows"`
 	Duration     int64     `json:"duration_ms"`
 	Message      string    `json:"message"`

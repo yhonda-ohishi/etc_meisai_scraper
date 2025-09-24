@@ -6,25 +6,24 @@ import (
 	"log"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
+	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
 )
 
 // ETCMeisaiService handles business logic for ETC record management
 type ETCMeisaiService struct {
-	db     *gorm.DB
+	repo   repositories.ETCMeisaiRecordRepository
 	logger *log.Logger
 }
 
 // NewETCMeisaiService creates a new ETC record management service
-func NewETCMeisaiService(db *gorm.DB, logger *log.Logger) *ETCMeisaiService {
+func NewETCMeisaiService(repo repositories.ETCMeisaiRecordRepository, logger *log.Logger) *ETCMeisaiService {
 	if logger == nil {
 		logger = log.New(log.Writer(), "[ETCMeisaiService] ", log.LstdFlags|log.Lshortfile)
 	}
 
 	return &ETCMeisaiService{
-		db:     db,
+		repo:   repo,
 		logger: logger,
 	}
 }
@@ -81,43 +80,46 @@ func (s *ETCMeisaiService) CreateRecord(ctx context.Context, params *CreateRecor
 		DtakoRowID:    params.DtakoRowID,
 	}
 
-	// Validate the record (this will also generate the hash)
-	if err := record.BeforeCreate(s.db); err != nil {
+	// Generate hash for the record
+	record.Hash = record.GenerateHash()
+
+	// Validate the record
+	if err := record.Validate(); err != nil {
 		s.logger.Printf("Validation failed for record: %v", err)
 		return nil, fmt.Errorf("record validation failed: %w", err)
 	}
 
 	// Start transaction
-	tx := s.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", tx.Error)
+	txRepo, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			txRepo.RollbackTx()
 		}
 	}()
 
 	// Check for duplicate hash
-	var existingRecord models.ETCMeisaiRecord
-	err := tx.Where("hash = ?", record.Hash).First(&existingRecord).Error
-	if err == nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("duplicate record with hash: %s", record.Hash)
-	} else if err != gorm.ErrRecordNotFound {
-		tx.Rollback()
+	isDuplicate, err := txRepo.CheckDuplicateHash(ctx, record.Hash)
+	if err != nil {
+		txRepo.RollbackTx()
 		return nil, fmt.Errorf("failed to check for duplicates: %w", err)
+	}
+	if isDuplicate {
+		txRepo.RollbackTx()
+		return nil, fmt.Errorf("duplicate record with hash: %s", record.Hash)
 	}
 
 	// Create the record
-	if err := tx.Create(record).Error; err != nil {
-		tx.Rollback()
+	if err := txRepo.Create(ctx, record); err != nil {
+		txRepo.RollbackTx()
 		s.logger.Printf("Failed to create record: %v", err)
 		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
 
 	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
+	if err := txRepo.CommitTx(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -133,16 +135,13 @@ func (s *ETCMeisaiService) GetRecord(ctx context.Context, id int64) (*models.ETC
 
 	s.logger.Printf("Retrieving ETC record with ID: %d", id)
 
-	var record models.ETCMeisaiRecord
-	err := s.db.WithContext(ctx).First(&record, id).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, fmt.Errorf("record not found with ID: %d", id)
-	} else if err != nil {
+	record, err := s.repo.GetByID(ctx, id)
+	if err != nil {
 		s.logger.Printf("Failed to retrieve record: %v", err)
 		return nil, fmt.Errorf("failed to retrieve record: %w", err)
 	}
 
-	return &record, nil
+	return record, nil
 }
 
 // ListRecords lists ETC records with filtering and pagination
@@ -166,39 +165,21 @@ func (s *ETCMeisaiService) ListRecords(ctx context.Context, params *ListRecordsP
 
 	s.logger.Printf("Listing ETC records - page: %d, size: %d", params.Page, params.PageSize)
 
-	// Build query
-	query := s.db.WithContext(ctx).Model(&models.ETCMeisaiRecord{})
-
-	// Apply filters
-	if params.DateFrom != nil {
-		query = query.Where("date >= ?", *params.DateFrom)
-	}
-	if params.DateTo != nil {
-		query = query.Where("date <= ?", *params.DateTo)
-	}
-	if params.CarNumber != nil && *params.CarNumber != "" {
-		query = query.Where("car_number LIKE ?", "%"+*params.CarNumber+"%")
-	}
-	if params.ETCNumber != nil && *params.ETCNumber != "" {
-		query = query.Where("etc_card_number LIKE ?", "%"+*params.ETCNumber+"%")
-	}
-	if params.ETCNum != nil && *params.ETCNum != "" {
-		query = query.Where("etc_num LIKE ?", "%"+*params.ETCNum+"%")
+	// Convert to repository params
+	repoParams := repositories.ListRecordsParams{
+		Page:      params.Page,
+		PageSize:  params.PageSize,
+		DateFrom:  params.DateFrom,
+		DateTo:    params.DateTo,
+		CarNumber: params.CarNumber,
+		ETCNumber: params.ETCNumber,
+		ETCNum:    params.ETCNum,
+		SortBy:    params.SortBy,
+		SortOrder: params.SortOrder,
 	}
 
-	// Get total count
-	var totalCount int64
-	if err := query.Count(&totalCount).Error; err != nil {
-		s.logger.Printf("Failed to count records: %v", err)
-		return nil, fmt.Errorf("failed to count records: %w", err)
-	}
-
-	// Apply sorting and pagination
-	orderClause := fmt.Sprintf("%s %s", params.SortBy, params.SortOrder)
-	offset := (params.Page - 1) * params.PageSize
-
-	var records []*models.ETCMeisaiRecord
-	err := query.Order(orderClause).Offset(offset).Limit(params.PageSize).Find(&records).Error
+	// Get records from repository
+	records, totalCount, err := s.repo.List(ctx, repoParams)
 	if err != nil {
 		s.logger.Printf("Failed to retrieve records: %v", err)
 		return nil, fmt.Errorf("failed to retrieve records: %w", err)
@@ -227,24 +208,20 @@ func (s *ETCMeisaiService) UpdateRecord(ctx context.Context, id int64, params *C
 	s.logger.Printf("Updating ETC record with ID: %d", id)
 
 	// Start transaction
-	tx := s.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", tx.Error)
+	txRepo, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			txRepo.RollbackTx()
 		}
 	}()
 
 	// Get existing record
-	var record models.ETCMeisaiRecord
-	err := tx.First(&record, id).Error
-	if err == gorm.ErrRecordNotFound {
-		tx.Rollback()
-		return nil, fmt.Errorf("record not found with ID: %d", id)
-	} else if err != nil {
-		tx.Rollback()
+	record, err := txRepo.GetByID(ctx, id)
+	if err != nil {
+		txRepo.RollbackTx()
 		return nil, fmt.Errorf("failed to retrieve record: %w", err)
 	}
 
@@ -260,40 +237,40 @@ func (s *ETCMeisaiService) UpdateRecord(ctx context.Context, id int64, params *C
 	record.DtakoRowID = params.DtakoRowID
 
 	// Regenerate hash with new data
-	record.Hash = record.generateHash()
+	record.Hash = record.GenerateHash()
 
 	// Validate the updated record
-	if err := record.BeforeSave(tx); err != nil {
-		tx.Rollback()
+	if err := record.Validate(); err != nil {
+		txRepo.RollbackTx()
 		s.logger.Printf("Validation failed for updated record: %v", err)
 		return nil, fmt.Errorf("record validation failed: %w", err)
 	}
 
 	// Check for duplicate hash (excluding current record)
-	var existingRecord models.ETCMeisaiRecord
-	err = tx.Where("hash = ? AND id != ?", record.Hash, record.ID).First(&existingRecord).Error
-	if err == nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("duplicate record with hash: %s", record.Hash)
-	} else if err != gorm.ErrRecordNotFound {
-		tx.Rollback()
+	isDuplicate, err := txRepo.CheckDuplicateHash(ctx, record.Hash, record.ID)
+	if err != nil {
+		txRepo.RollbackTx()
 		return nil, fmt.Errorf("failed to check for duplicates: %w", err)
+	}
+	if isDuplicate {
+		txRepo.RollbackTx()
+		return nil, fmt.Errorf("duplicate record with hash: %s", record.Hash)
 	}
 
 	// Save the updated record
-	if err := tx.Save(&record).Error; err != nil {
-		tx.Rollback()
+	if err := txRepo.Update(ctx, record); err != nil {
+		txRepo.RollbackTx()
 		s.logger.Printf("Failed to update record: %v", err)
 		return nil, fmt.Errorf("failed to update record: %w", err)
 	}
 
 	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
+	if err := txRepo.CommitTx(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	s.logger.Printf("Successfully updated ETC record with ID: %d", record.ID)
-	return &record, nil
+	return record, nil
 }
 
 // DeleteRecord performs soft delete on an ETC record
@@ -305,36 +282,32 @@ func (s *ETCMeisaiService) DeleteRecord(ctx context.Context, id int64) error {
 	s.logger.Printf("Deleting ETC record with ID: %d", id)
 
 	// Start transaction
-	tx := s.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return fmt.Errorf("failed to start transaction: %w", tx.Error)
+	txRepo, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			txRepo.RollbackTx()
 		}
 	}()
 
 	// Check if record exists
-	var record models.ETCMeisaiRecord
-	err := tx.First(&record, id).Error
-	if err == gorm.ErrRecordNotFound {
-		tx.Rollback()
-		return fmt.Errorf("record not found with ID: %d", id)
-	} else if err != nil {
-		tx.Rollback()
+	_, err = txRepo.GetByID(ctx, id)
+	if err != nil {
+		txRepo.RollbackTx()
 		return fmt.Errorf("failed to retrieve record: %w", err)
 	}
 
 	// Perform soft delete
-	if err := tx.Delete(&record).Error; err != nil {
-		tx.Rollback()
+	if err := txRepo.Delete(ctx, id); err != nil {
+		txRepo.RollbackTx()
 		s.logger.Printf("Failed to delete record: %v", err)
 		return fmt.Errorf("failed to delete record: %w", err)
 	}
 
 	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
+	if err := txRepo.CommitTx(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -350,16 +323,13 @@ func (s *ETCMeisaiService) GetRecordByHash(ctx context.Context, hash string) (*m
 
 	s.logger.Printf("Retrieving ETC record with hash: %s", hash)
 
-	var record models.ETCMeisaiRecord
-	err := s.db.WithContext(ctx).Where("hash = ?", hash).First(&record).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, fmt.Errorf("record not found with hash: %s", hash)
-	} else if err != nil {
+	record, err := s.repo.GetByHash(ctx, hash)
+	if err != nil {
 		s.logger.Printf("Failed to retrieve record by hash: %v", err)
 		return nil, fmt.Errorf("failed to retrieve record: %w", err)
 	}
 
-	return &record, nil
+	return record, nil
 }
 
 // ValidateRecord validates an ETC record without saving it
@@ -378,19 +348,18 @@ func (s *ETCMeisaiService) ValidateRecord(ctx context.Context, params *CreateRec
 	}
 
 	// Validate the record
-	return record.BeforeCreate(s.db)
+	return record.Validate()
 }
 
 // HealthCheck performs health check for the service
 func (s *ETCMeisaiService) HealthCheck(ctx context.Context) error {
-	// Check database connectivity
-	sqlDB, err := s.db.DB()
-	if err != nil {
-		return fmt.Errorf("failed to get database connection: %w", err)
+	if s.repo == nil {
+		return fmt.Errorf("repository not initialized")
 	}
 
-	if err := sqlDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("database ping failed: %w", err)
+	// Check repository connectivity
+	if err := s.repo.Ping(ctx); err != nil {
+		return fmt.Errorf("repository ping failed: %w", err)
 	}
 
 	return nil

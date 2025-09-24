@@ -219,13 +219,13 @@ func Logging() func(http.Handler) http.Handler {
 	}
 }
 
-// responseWriter wrapper to capture status code
-type responseWriter struct {
+// securityResponseWriter wrapper to capture status code
+type securityResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
 
-func (w *responseWriter) WriteHeader(statusCode int) {
+func (w *securityResponseWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
 }
@@ -346,6 +346,11 @@ func (rl *EnhancedRateLimiter) allow(ip string) bool {
 	return true
 }
 
+// Allow is the public interface for checking rate limits
+func (rl *EnhancedRateLimiter) Allow(ip string) bool {
+	return rl.allow(ip)
+}
+
 // Global enhanced rate limiter instance
 var globalEnhancedRateLimiter *EnhancedRateLimiter
 
@@ -446,6 +451,11 @@ func (rl *RateLimiter) allow(ip string) bool {
 	v.lastAccess = now
 
 	return v.count <= rl.rate
+}
+
+// Allow is the public interface for checking rate limits
+func (rl *RateLimiter) Allow(ip string) bool {
+	return rl.allow(ip)
 }
 
 func (rl *RateLimiter) cleanup() {

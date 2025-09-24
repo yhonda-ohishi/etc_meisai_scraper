@@ -177,3 +177,145 @@ func (c *AccountsConfig) GetPersonalAccounts() []ETCAccount {
 	}
 	return personal
 }
+
+// ParseAccounts parses a comma-separated string into a slice of account names
+func ParseAccounts(input string) []string {
+	if input == "" {
+		return []string{}
+	}
+
+	// Split by comma and trim whitespace
+	parts := strings.Split(input, ",")
+	accounts := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			accounts = append(accounts, trimmed)
+		}
+	}
+
+	return accounts
+}
+
+// AccountConfig represents a single ETC account configuration
+type AccountConfig struct {
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	AccountType string `json:"account_type"` // "corporate" or "personal"
+	Index       int    `json:"index"`
+}
+
+// Validate validates the account configuration
+func (a *AccountConfig) Validate() error {
+	if a.Username == "" {
+		return fmt.Errorf("Username is required")
+	}
+	if a.Password == "" {
+		return fmt.Errorf("Password is required")
+	}
+	if a.AccountType != "corporate" && a.AccountType != "personal" {
+		return fmt.Errorf("AccountType must be 'corporate' or 'personal'")
+	}
+	if a.Index < 0 {
+		return fmt.Errorf("Index must be non-negative")
+	}
+	return nil
+}
+
+// String returns a string representation of the account (masks password)
+func (a *AccountConfig) String() string {
+	return fmt.Sprintf("AccountConfig{Username: %s, AccountType: %s, Index: %d, Password: ***}",
+		a.Username, a.AccountType, a.Index)
+}
+
+// GetIdentifier returns a unique identifier for this account
+func (a *AccountConfig) GetIdentifier() string {
+	return fmt.Sprintf("%s_%d_%s", a.AccountType, a.Index, a.Username)
+}
+
+// IsCorporate returns true if this is a corporate account
+func (a *AccountConfig) IsCorporate() bool {
+	return a.AccountType == "corporate"
+}
+
+// IsPersonal returns true if this is a personal account
+func (a *AccountConfig) IsPersonal() bool {
+	return a.AccountType == "personal"
+}
+
+// BuildAccountConfigs builds account configs from a slice of usernames
+func BuildAccountConfigs(usernames []string, accountType string) []*AccountConfig {
+	configs := make([]*AccountConfig, len(usernames))
+	for i, username := range usernames {
+		configs[i] = &AccountConfig{
+			Username:    username,
+			AccountType: accountType,
+			Index:       i,
+		}
+	}
+	return configs
+}
+
+// AccountManager manages a collection of account configurations
+type AccountManager struct {
+	accounts map[string]*AccountConfig // key: accountType_index
+}
+
+// NewAccountManager creates a new account manager
+func NewAccountManager() *AccountManager {
+	return &AccountManager{
+		accounts: make(map[string]*AccountConfig),
+	}
+}
+
+// AddAccount adds an account to the manager
+func (m *AccountManager) AddAccount(account *AccountConfig) error {
+	if err := account.Validate(); err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("%s_%d", account.AccountType, account.Index)
+	if _, exists := m.accounts[key]; exists {
+		return fmt.Errorf("account with type %s and index %d already exists", account.AccountType, account.Index)
+	}
+
+	m.accounts[key] = account
+	return nil
+}
+
+// GetAccount retrieves an account by type and index
+func (m *AccountManager) GetAccount(accountType string, index int) *AccountConfig {
+	key := fmt.Sprintf("%s_%d", accountType, index)
+	return m.accounts[key]
+}
+
+// GetAllAccounts returns all accounts
+func (m *AccountManager) GetAllAccounts() []*AccountConfig {
+	accounts := make([]*AccountConfig, 0, len(m.accounts))
+	for _, account := range m.accounts {
+		accounts = append(accounts, account)
+	}
+	return accounts
+}
+
+// GetAccountsByType returns all accounts of a specific type
+func (m *AccountManager) GetAccountsByType(accountType string) []*AccountConfig {
+	accounts := make([]*AccountConfig, 0)
+	for _, account := range m.accounts {
+		if account.AccountType == accountType {
+			accounts = append(accounts, account)
+		}
+	}
+	return accounts
+}
+
+// RemoveAccount removes an account by type and index
+func (m *AccountManager) RemoveAccount(accountType string, index int) bool {
+	key := fmt.Sprintf("%s_%d", accountType, index)
+	if _, exists := m.accounts[key]; exists {
+		delete(m.accounts, key)
+		return true
+	}
+	return false
+}

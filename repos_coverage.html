@@ -1,0 +1,734 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>repositories: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/yhonda-ohishi/etc_meisai/src/repositories/grpc_repository.go (100.0%)</option>
+				
+				<option value="file1">github.com/yhonda-ohishi/etc_meisai/src/repositories/mapping_grpc_repository.go (100.0%)</option>
+				
+				<option value="file2">github.com/yhonda-ohishi/etc_meisai/src/repositories/mock_etc_mapping_repository.go (85.0%)</option>
+				
+				<option value="file3">github.com/yhonda-ohishi/etc_meisai/src/repositories/mock_etc_meisai_record_repository.go (90.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package repositories
+
+import (
+        // "context" // Commented out - not used when clients package is deleted
+        "fmt"
+        "time"
+
+        // "github.com/yhonda-ohishi/etc_meisai/src/clients" // Commented out - clients package deleted
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+        // "github.com/yhonda-ohishi/etc_meisai/src/pb" // Commented out - not used when clients package is deleted
+        // "google.golang.org/protobuf/types/known/timestamppb" // Commented out - not used when clients package is deleted
+)
+
+// GRPCRepository implements ETCRepository interface using gRPC client only
+type GRPCRepository struct {
+        client interface{} // TODO: Replace with proper type when clients package is restored
+}
+
+// NewGRPCRepository creates a new gRPC-only repository
+func NewGRPCRepository(client interface{}) ETCRepository <span class="cov8" title="1">{
+        return &amp;GRPCRepository{
+                client: client,
+        }
+}</span>
+
+// Create creates a new ETC record via gRPC
+func (r *GRPCRepository) Create(etc *models.ETCMeisai) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.CreateETCMeisaiRequest{
+        //        UseDate:   timestamppb.New(etc.UseDate),
+        //        UseTime:   etc.UseTime,
+        //        EntryIc:   etc.EntryIC,
+        //        ExitIc:    etc.ExitIC,
+        //        Amount:    etc.Amount,
+        //        CarNumber: etc.CarNumber,
+        //        EtcNumber: etc.ETCNumber,
+        // }
+        //
+        // resp, err := r.client.CreateETCMeisai(ctx, req)
+        // if err != nil {
+        //        return fmt.Errorf("gRPC create failed: %w", err)
+        // }
+        //
+        // // Update the model with response data
+        // etc.ID = resp.Id
+        // etc.Hash = resp.Hash
+        // etc.CreatedAt = resp.CreatedAt.AsTime()
+        // etc.UpdatedAt = resp.UpdatedAt.AsTime()
+        return fmt.Errorf("CreateETCMeisai not available - clients package deleted")
+}</span>
+
+// GetByID retrieves an ETC record by ID via gRPC
+func (r *GRPCRepository) GetByID(id int64) (*models.ETCMeisai, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.GetETCMeisaiRequest{
+        //        Id: id,
+        // }
+        //
+        // resp, err := r.client.GetETCMeisai(ctx, req)
+        // if err != nil {
+        //        return nil, fmt.Errorf("gRPC get failed: %w", err)
+        // }
+        //
+        // // Convert response to model
+        // etc := &amp;models.ETCMeisai{
+        //        ID:        resp.Id,
+        //        UseDate:   resp.UseDate.AsTime(),
+        //        UseTime:   resp.UseTime,
+        //        EntryIC:   resp.EntryIc,
+        //        ExitIC:    resp.ExitIc,
+        //        Amount:    resp.Amount,
+        //        CarNumber: resp.CarNumber,
+        //        ETCNumber: resp.EtcNumber,
+        //        Hash:      resp.Hash,
+        //        CreatedAt: resp.CreatedAt.AsTime(),
+        //        UpdatedAt: resp.UpdatedAt.AsTime(),
+        // }
+        //
+        // return etc, nil
+        return nil, fmt.Errorf("GetETCMeisai not available - clients package deleted")
+}</span>
+
+// Update updates an existing ETC record (not supported in gRPC mode)
+func (r *GRPCRepository) Update(etc *models.ETCMeisai) error <span class="cov8" title="1">{
+        // Update operations should be implemented in db_service
+        return fmt.Errorf("update operation not supported in gRPC-only mode")
+}</span>
+
+// Delete deletes an ETC record (not supported in gRPC mode)
+func (r *GRPCRepository) Delete(id int64) error <span class="cov8" title="1">{
+        // Delete operations should be implemented in db_service
+        return fmt.Errorf("delete operation not supported in gRPC-only mode")
+}</span>
+
+// GetByDateRange retrieves records within a date range via gRPC
+func (r *GRPCRepository) GetByDateRange(from, to time.Time) ([]*models.ETCMeisai, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListETCMeisaiRequest{
+        //        FromDate: timestamppb.New(from),
+        //        ToDate:   timestamppb.New(to),
+        //        Limit:    1000,
+        // }
+        return nil, fmt.Errorf("ListETCMeisai not available - clients package deleted")
+}</span>
+
+// List retrieves records with pagination via gRPC
+func (r *GRPCRepository) List(params *models.ETCListParams) ([]*models.ETCMeisai, int64, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListETCMeisaiRequest{
+        //        Limit:     int32(params.Limit),
+        //        Offset:    int32(params.Offset),
+        //        CarNumber: params.CarNumber,
+        //        EtcNumber: params.ETCNumber,
+        // }
+        //
+        // if params.StartDate != nil {
+        //        req.FromDate = timestamppb.New(*params.StartDate)
+        // }
+        // if params.EndDate != nil {
+        //        req.ToDate = timestamppb.New(*params.EndDate)
+        // }
+        return nil, 0, fmt.Errorf("ListETCMeisai not available - clients package deleted")
+}</span>
+
+// GetByHash retrieves a record by its hash via gRPC
+func (r *GRPCRepository) GetByHash(hash string) (*models.ETCMeisai, error) <span class="cov8" title="1">{
+        // Use GetETCMeisaiByHash if available in proto, otherwise use List with hash filter
+        // For now, we'll implement using a stub
+        // In a real implementation, this would call db_service's GetETCMeisaiByHash method
+        return nil, fmt.Errorf("GetByHash not yet implemented in db_service")
+}</span>
+
+// BulkInsert creates multiple records via gRPC
+func (r *GRPCRepository) BulkInsert(records []*models.ETCMeisai) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // var pbRecords []*pb.CreateETCMeisaiRequest
+        // for _, record := range records {
+        //        pbRecord := &amp;pb.CreateETCMeisaiRequest{
+        //                UseDate:   timestamppb.New(record.UseDate),
+        //                UseTime:   record.UseTime,
+        //                EntryIc:   record.EntryIC,
+        //                ExitIc:    record.ExitIC,
+        //                Amount:    record.Amount,
+        //                CarNumber: record.CarNumber,
+        //                EtcNumber: record.ETCNumber,
+        //        }
+        //        pbRecords = append(pbRecords, pbRecord)
+        // }
+        //
+        // req := &amp;pb.BulkCreateETCMeisaiRequest{
+        //        Records: pbRecords,
+        // }
+        //
+        // resp, err := r.client.BulkCreateETCMeisai(ctx, req)
+        // if err != nil {
+        //        return fmt.Errorf("gRPC bulk create failed: %w", err)
+        // }
+        //
+        // if !resp.Success {
+        //        return fmt.Errorf("bulk insert failed: %s", resp.Message)
+        // }
+        return fmt.Errorf("BulkCreateETCMeisai not available - clients package deleted")
+}</span>
+
+// CheckDuplicatesByHash checks for duplicates (delegated to db_service)
+func (r *GRPCRepository) CheckDuplicatesByHash(hashes []string) (map[string]bool, error) <span class="cov8" title="1">{
+        // This should be implemented in db_service
+        // For now, return empty map (no duplicates)
+        result := make(map[string]bool)
+        for _, hash := range hashes </span><span class="cov8" title="1">{
+                result[hash] = false
+        }</span>
+        <span class="cov8" title="1">return result, nil</span>
+}
+
+// CountByDateRange counts records in a date range via gRPC
+func (r *GRPCRepository) CountByDateRange(from, to time.Time) (int64, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.GetETCSummaryRequest{
+        //        FromDate: timestamppb.New(from),
+        //        ToDate:   timestamppb.New(to),
+        // }
+        return 0, fmt.Errorf("GetETCSummary not available - clients package deleted")
+}</span>
+
+// GetByETCNumber retrieves records by ETC number via gRPC
+func (r *GRPCRepository) GetByETCNumber(etcNumber string, limit int) ([]*models.ETCMeisai, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListETCMeisaiRequest{
+        //        EtcNumber: etcNumber,
+        //        Limit:     int32(limit),
+        // }
+        return nil, fmt.Errorf("ListETCMeisai by ETC number not available - clients package deleted")
+}</span>
+
+// GetByCarNumber retrieves records by car number via gRPC
+func (r *GRPCRepository) GetByCarNumber(carNumber string, limit int) ([]*models.ETCMeisai, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListETCMeisaiRequest{
+        //        CarNumber: carNumber,
+        //        Limit:     int32(limit),
+        // }
+        return nil, fmt.Errorf("ListETCMeisai by car number not available - clients package deleted")
+}</span>
+
+// GetSummaryByDateRange gets aggregated summary via gRPC
+func (r *GRPCRepository) GetSummaryByDateRange(from, to time.Time) (*models.ETCSummary, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.GetETCSummaryRequest{
+        //        FromDate: timestamppb.New(from),
+        //        ToDate:   timestamppb.New(to),
+        // }
+        return nil, fmt.Errorf("GetETCSummary not available - clients package deleted")
+}</pre>
+		
+		<pre class="file" id="file1" style="display: none">package repositories
+
+import (
+        // "context" // Commented out - not used when clients package is deleted
+        "fmt"
+
+        // "github.com/yhonda-ohishi/etc_meisai/src/clients" // Commented out - clients package deleted
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+        // "github.com/yhonda-ohishi/etc_meisai/src/pb" // Commented out - not used when clients package is deleted
+)
+
+// MappingGRPCRepository implements MappingRepository interface using gRPC client
+type MappingGRPCRepository struct {
+        client interface{} // TODO: Replace with proper type when clients package is restored
+}
+
+// NewMappingGRPCRepository creates a new gRPC-based mapping repository
+func NewMappingGRPCRepository(client interface{}) MappingRepository <span class="cov8" title="1">{
+        return &amp;MappingGRPCRepository{
+                client: client,
+        }
+}</span>
+
+// Create creates a new mapping record via gRPC
+func (r *MappingGRPCRepository) Create(mapping *models.ETCMeisaiMapping) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.CreateMappingRequest{
+        //        EtcMeisaiId:  mapping.ETCMeisaiID,
+        //        DtakoRowId:   mapping.DTakoRowID,
+        //        MappingType:  mapping.MappingType,
+        //        Confidence:   mapping.Confidence,
+        //        Notes:        mapping.Notes,
+        // }
+        return fmt.Errorf("CreateMapping not available - clients package deleted")
+}</span>
+
+// GetByID retrieves a mapping by ID via gRPC
+func (r *MappingGRPCRepository) GetByID(id int64) (*models.ETCMeisaiMapping, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.GetMappingRequest{
+        //        Id: id,
+        // }
+        return nil, fmt.Errorf("GetMapping not available - clients package deleted")
+}</span>
+
+// Update updates an existing mapping record via gRPC
+func (r *MappingGRPCRepository) Update(mapping *models.ETCMeisaiMapping) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.UpdateMappingRequest{
+        //        Id:          mapping.ID,
+        //        MappingType: mapping.MappingType,
+        //        Confidence:  mapping.Confidence,
+        //        Notes:       mapping.Notes,
+        // }
+        return fmt.Errorf("UpdateMapping not available - clients package deleted")
+}</span>
+
+// Delete deletes a mapping record via gRPC
+func (r *MappingGRPCRepository) Delete(id int64) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.DeleteMappingRequest{
+        //        Id: id,
+        // }
+        return fmt.Errorf("DeleteMapping not available - clients package deleted")
+}</span>
+
+// GetByETCMeisaiID retrieves mappings by ETC Meisai ID via gRPC
+func (r *MappingGRPCRepository) GetByETCMeisaiID(etcMeisaiID int64) ([]*models.ETCMeisaiMapping, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListMappingsRequest{
+        //        EtcMeisaiId: etcMeisaiID,
+        //        Limit:       100,
+        // }
+        return nil, fmt.Errorf("ListMappings not available - clients package deleted")
+}</span>
+
+// GetByDTakoRowID retrieves a mapping by DTako row ID via gRPC
+func (r *MappingGRPCRepository) GetByDTakoRowID(dtakoRowID string) (*models.ETCMeisaiMapping, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListMappingsRequest{
+        //        DtakoRowId: dtakoRowID,
+        //        Limit:      1,
+        // }
+        return nil, fmt.Errorf("GetByDTakoRowID not available - clients package deleted")
+}</span>
+
+// List retrieves mappings with pagination via gRPC
+func (r *MappingGRPCRepository) List(params *models.MappingListParams) ([]*models.ETCMeisaiMapping, int64, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.ListMappingsRequest{
+        //        Limit:  int32(params.Limit),
+        //        Offset: int32(params.Offset),
+        // }
+        //
+        // if params.ETCMeisaiID != nil {
+        //        req.EtcMeisaiId = *params.ETCMeisaiID
+        // }
+        // if params.DTakoRowID != "" {
+        //        req.DtakoRowId = params.DTakoRowID
+        // }
+        // if params.MappingType != "" {
+        //        req.MappingType = params.MappingType
+        // }
+        // if params.MinConfidence != nil {
+        //        req.MinConfidence = *params.MinConfidence
+        // }
+        return nil, 0, fmt.Errorf("List mappings not available - clients package deleted")
+}</span>
+
+// BulkCreateMappings creates multiple mappings via gRPC
+func (r *MappingGRPCRepository) BulkCreateMappings(mappings []*models.ETCMeisaiMapping) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // var pbMappings []*pb.CreateMappingRequest
+        // for _, mapping := range mappings {
+        //        pbMapping := &amp;pb.CreateMappingRequest{
+        //                EtcMeisaiId:  mapping.ETCMeisaiID,
+        //                DtakoRowId:   mapping.DTakoRowID,
+        //                MappingType:  mapping.MappingType,
+        //                Confidence:   mapping.Confidence,
+        //                Notes:        mapping.Notes,
+        //        }
+        //        pbMappings = append(pbMappings, pbMapping)
+        // }
+        //
+        // req := &amp;pb.BulkCreateMappingsRequest{
+        //        Mappings: pbMappings,
+        // }
+        return fmt.Errorf("BulkCreateMappings not available - clients package deleted")
+}</span>
+
+// DeleteByETCMeisaiID deletes all mappings for an ETC Meisai ID via gRPC
+func (r *MappingGRPCRepository) DeleteByETCMeisaiID(etcMeisaiID int64) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.DeleteMappingsByETCMeisaiRequest{
+        //        EtcMeisaiId: etcMeisaiID,
+        // }
+        return fmt.Errorf("DeleteMappingsByETCMeisai not available - clients package deleted")
+}</span>
+
+// FindPotentialMatches finds potential DTako matches for an ETC Meisai record via gRPC
+func (r *MappingGRPCRepository) FindPotentialMatches(etcMeisaiID int64, threshold float32) ([]*models.PotentialMatch, error) <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.FindPotentialMatchesRequest{
+        //        EtcMeisaiId: etcMeisaiID,
+        //        Threshold:   threshold,
+        // }
+        return nil, fmt.Errorf("FindPotentialMatches not available - clients package deleted")
+}</span>
+
+// UpdateConfidenceScore updates the confidence score of a mapping via gRPC
+func (r *MappingGRPCRepository) UpdateConfidenceScore(id int64, confidence float32) error <span class="cov8" title="1">{
+        // TODO: Restore when clients package is available
+        // ctx := context.Background()
+        //
+        // req := &amp;pb.UpdateMappingConfidenceRequest{
+        //        Id:         id,
+        //        Confidence: confidence,
+        // }
+        return fmt.Errorf("UpdateMappingConfidence not available - clients package deleted")
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">package repositories
+
+import (
+        "context"
+
+        "github.com/stretchr/testify/mock"
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+)
+
+// MockETCMappingRepository is a mock implementation of ETCMappingRepository
+type MockETCMappingRepository struct {
+        mock.Mock
+}
+
+// Create mocks the Create method
+func (m *MockETCMappingRepository) Create(ctx context.Context, mapping *models.ETCMapping) error <span class="cov8" title="1">{
+        args := m.Called(ctx, mapping)
+        return args.Error(0)
+}</span>
+
+// GetByID mocks the GetByID method
+func (m *MockETCMappingRepository) GetByID(ctx context.Context, id int64) (*models.ETCMapping, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, id)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).(*models.ETCMapping), args.Error(1)</span>
+}
+
+// Update mocks the Update method
+func (m *MockETCMappingRepository) Update(ctx context.Context, mapping *models.ETCMapping) error <span class="cov8" title="1">{
+        args := m.Called(ctx, mapping)
+        return args.Error(0)
+}</span>
+
+// Delete mocks the Delete method
+func (m *MockETCMappingRepository) Delete(ctx context.Context, id int64) error <span class="cov8" title="1">{
+        args := m.Called(ctx, id)
+        return args.Error(0)
+}</span>
+
+// GetByETCRecordID mocks the GetByETCRecordID method
+func (m *MockETCMappingRepository) GetByETCRecordID(ctx context.Context, etcRecordID int64) ([]*models.ETCMapping, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, etcRecordID)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).([]*models.ETCMapping), args.Error(1)</span>
+}
+
+// GetByMappedEntity mocks the GetByMappedEntity method
+func (m *MockETCMappingRepository) GetByMappedEntity(ctx context.Context, entityType string, entityID int64) ([]*models.ETCMapping, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, entityType, entityID)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).([]*models.ETCMapping), args.Error(1)</span>
+}
+
+// GetActiveMapping mocks the GetActiveMapping method
+func (m *MockETCMappingRepository) GetActiveMapping(ctx context.Context, etcRecordID int64) (*models.ETCMapping, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, etcRecordID)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).(*models.ETCMapping), args.Error(1)</span>
+}
+
+// List mocks the List method
+func (m *MockETCMappingRepository) List(ctx context.Context, params ListMappingsParams) ([]*models.ETCMapping, int64, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, params)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, 0, args.Error(2)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).([]*models.ETCMapping), args.Get(1).(int64), args.Error(2)</span>
+}
+
+// BulkCreate mocks the BulkCreate method
+func (m *MockETCMappingRepository) BulkCreate(ctx context.Context, mappings []*models.ETCMapping) error <span class="cov8" title="1">{
+        args := m.Called(ctx, mappings)
+        return args.Error(0)
+}</span>
+
+// UpdateStatus mocks the UpdateStatus method
+func (m *MockETCMappingRepository) UpdateStatus(ctx context.Context, id int64, status string) error <span class="cov8" title="1">{
+        args := m.Called(ctx, id, status)
+        return args.Error(0)
+}</span>
+
+// BeginTx mocks the BeginTx method
+func (m *MockETCMappingRepository) BeginTx(ctx context.Context) (ETCMappingRepository, error) <span class="cov8" title="1">{
+        args := m.Called(ctx)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).(ETCMappingRepository), args.Error(1)</span>
+}
+
+// CommitTx mocks the CommitTx method
+func (m *MockETCMappingRepository) CommitTx() error <span class="cov8" title="1">{
+        args := m.Called()
+        return args.Error(0)
+}</span>
+
+// RollbackTx mocks the RollbackTx method
+func (m *MockETCMappingRepository) RollbackTx() error <span class="cov8" title="1">{
+        args := m.Called()
+        return args.Error(0)
+}</span>
+
+// Ping mocks the Ping method
+func (m *MockETCMappingRepository) Ping(ctx context.Context) error <span class="cov8" title="1">{
+        args := m.Called(ctx)
+        return args.Error(0)
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">package repositories
+
+import (
+        "context"
+
+        "github.com/stretchr/testify/mock"
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+)
+
+// MockETCMeisaiRecordRepository is a mock implementation of ETCMeisaiRecordRepository
+type MockETCMeisaiRecordRepository struct {
+        mock.Mock
+}
+
+// Create mocks the Create method
+func (m *MockETCMeisaiRecordRepository) Create(ctx context.Context, record *models.ETCMeisaiRecord) error <span class="cov8" title="1">{
+        args := m.Called(ctx, record)
+        return args.Error(0)
+}</span>
+
+// GetByID mocks the GetByID method
+func (m *MockETCMeisaiRecordRepository) GetByID(ctx context.Context, id int64) (*models.ETCMeisaiRecord, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, id)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov8" title="1">return args.Get(0).(*models.ETCMeisaiRecord), args.Error(1)</span>
+}
+
+// Update mocks the Update method
+func (m *MockETCMeisaiRecordRepository) Update(ctx context.Context, record *models.ETCMeisaiRecord) error <span class="cov8" title="1">{
+        args := m.Called(ctx, record)
+        return args.Error(0)
+}</span>
+
+// Delete mocks the Delete method
+func (m *MockETCMeisaiRecordRepository) Delete(ctx context.Context, id int64) error <span class="cov8" title="1">{
+        args := m.Called(ctx, id)
+        return args.Error(0)
+}</span>
+
+// GetByHash mocks the GetByHash method
+func (m *MockETCMeisaiRecordRepository) GetByHash(ctx context.Context, hash string) (*models.ETCMeisaiRecord, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, hash)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).(*models.ETCMeisaiRecord), args.Error(1)</span>
+}
+
+// CheckDuplicateHash mocks the CheckDuplicateHash method
+func (m *MockETCMeisaiRecordRepository) CheckDuplicateHash(ctx context.Context, hash string, excludeID ...int64) (bool, error) <span class="cov8" title="1">{
+        // Handle variadic argument properly
+        if len(excludeID) == 0 </span><span class="cov8" title="1">{
+                args := m.Called(ctx, hash)
+                return args.Bool(0), args.Error(1)
+        }</span>
+        <span class="cov8" title="1">args := m.Called(ctx, hash, excludeID)
+        return args.Bool(0), args.Error(1)</span>
+}
+
+// List mocks the List method
+func (m *MockETCMeisaiRecordRepository) List(ctx context.Context, params ListRecordsParams) ([]*models.ETCMeisaiRecord, int64, error) <span class="cov8" title="1">{
+        args := m.Called(ctx, params)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, 0, args.Error(2)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).([]*models.ETCMeisaiRecord), args.Get(1).(int64), args.Error(2)</span>
+}
+
+// BeginTx mocks the BeginTx method
+func (m *MockETCMeisaiRecordRepository) BeginTx(ctx context.Context) (ETCMeisaiRecordRepository, error) <span class="cov8" title="1">{
+        args := m.Called(ctx)
+        if args.Get(0) == nil </span><span class="cov8" title="1">{
+                return nil, args.Error(1)
+        }</span>
+        <span class="cov0" title="0">return args.Get(0).(ETCMeisaiRecordRepository), args.Error(1)</span>
+}
+
+// CommitTx mocks the CommitTx method
+func (m *MockETCMeisaiRecordRepository) CommitTx() error <span class="cov8" title="1">{
+        args := m.Called()
+        return args.Error(0)
+}</span>
+
+// RollbackTx mocks the RollbackTx method
+func (m *MockETCMeisaiRecordRepository) RollbackTx() error <span class="cov8" title="1">{
+        args := m.Called()
+        return args.Error(0)
+}</span>
+
+// Ping mocks the Ping method
+func (m *MockETCMeisaiRecordRepository) Ping(ctx context.Context) error <span class="cov8" title="1">{
+        args := m.Called(ctx)
+        return args.Error(0)
+}</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -1,0 +1,48 @@
+# Coverage configuration for Go test coverage reporting
+
+# Exclude patterns for coverage calculation
+# These are typically generated or third-party files that shouldn't count against coverage
+
+exclude_patterns:
+  # Generated protocol buffer files
+  - "src/pb/*.pb.go"
+  - "src/pb/*.pb.gw.go"
+  - "**/pb/*.pb.go"
+  - "**/pb/*.pb.gw.go"
+
+  # Generated mock files
+  - "mocks/*.go"
+  - "**/mocks/*.go"
+  - "*_mock.go"
+
+  # Vendor directory
+  - "vendor/*"
+
+  # Test files themselves
+  - "*_test.go"
+
+  # Main files (typically minimal logic)
+  - "cmd/*/main.go"
+
+  # Migration files
+  - "migrations/*.go"
+
+  # Generated swagger files
+  - "**/swagger/*.go"
+  - "docs/swagger/*.go"
+
+# Coverage thresholds
+coverage_thresholds:
+  statement: 95    # Minimum statement coverage
+  branch: 90        # Minimum branch coverage
+  function: 95      # Minimum function coverage
+
+# Report formats
+report_formats:
+  - html
+  - json
+  - xml
+  - lcov
+
+# Output directory for reports
+report_output: "./coverage/"

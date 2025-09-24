@@ -12,7 +12,7 @@ import (
 
 // BaseHandler は全ハンドラーの基底構造体
 type BaseHandler struct {
-	ServiceRegistry *services.ServiceRegistry
+	ServiceRegistry services.ServiceRegistryInterface
 	Logger          *log.Logger
 	ErrorHandler    *GRPCErrorHandler
 }
@@ -94,7 +94,7 @@ func (h *BaseHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewBaseHandler creates a new base handler with service registry
-func NewBaseHandler(serviceRegistry *services.ServiceRegistry, logger *log.Logger) *BaseHandler {
+func NewBaseHandler(serviceRegistry services.ServiceRegistryInterface, logger *log.Logger) *BaseHandler {
 	return &BaseHandler{
 		ServiceRegistry: serviceRegistry,
 		Logger:          logger,

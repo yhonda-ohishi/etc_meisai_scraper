@@ -1,0 +1,533 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>parser: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/yhonda-ohishi/etc_meisai/src/parser/csv_parser.go (86.7%)</option>
+				
+				<option value="file1">github.com/yhonda-ohishi/etc_meisai/src/parser/encoding_detector.go (80.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package parser
+
+import (
+        "encoding/csv"
+        "fmt"
+        "io"
+        "strconv"
+        "strings"
+        "time"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+)
+
+// ETCCSVParser handles CSV parsing for ETC meisai data
+type ETCCSVParser struct {
+        dateFormats       []string
+        encodingDetector  *EncodingDetector
+}
+
+// NewETCCSVParser creates a new CSV parser
+func NewETCCSVParser() *ETCCSVParser <span class="cov8" title="1">{
+        return &amp;ETCCSVParser{
+                dateFormats: []string{
+                        "06/01/02",    // 2桁年形式 (25/07/30)
+                        "2006/01/02",  // 4桁年形式 (2025/07/30)
+                        "06/1/2",      // 2桁年・0埋めなし (25/7/30)
+                        "2006/1/2",    // 4桁年・0埋めなし (2025/7/30)
+                        "2006-01-02",  // ハイフン形式
+                        "2006.01.02",  // ドット形式
+                        "20060102",    // 区切りなし
+                },
+                encodingDetector: NewEncodingDetector(),
+        }
+}</span>
+
+// ParseFile parses an ETC meisai CSV file
+func (p *ETCCSVParser) ParseFile(filePath string) ([]models.ETCMeisai, error) <span class="cov8" title="1">{
+        // Detect encoding and open with appropriate reader
+        fileReader, encoding, err := p.encodingDetector.OpenFileWithDetectedEncoding(filePath)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to open CSV file with encoding detection: %w", err)
+        }</span>
+
+        // Close the underlying file if it's a file closer
+        <span class="cov8" title="1">if closer, ok := fileReader.(io.Closer); ok </span><span class="cov8" title="1">{
+                defer closer.Close()
+        }</span>
+
+        <span class="cov8" title="1">reader := csv.NewReader(fileReader)
+        reader.LazyQuotes = true
+        reader.TrimLeadingSpace = true
+
+        fmt.Printf("Detected encoding: %s\n", encoding.String())
+
+        var records []models.ETCMeisai
+        lineNum := 0
+
+        for </span><span class="cov8" title="1">{
+                row, err := reader.Read()
+                if err == io.EOF </span><span class="cov8" title="1">{
+                        break</span>
+                }
+                <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("error reading line %d: %w", lineNum, err)
+                }</span>
+
+                <span class="cov8" title="1">lineNum++
+
+                // Skip header row
+                if lineNum == 1 &amp;&amp; (strings.Contains(row[0], "利用") || strings.Contains(row[0], "日付")) </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                // Parse row
+                <span class="cov8" title="1">meisai, err := p.parseRow(row)
+                if err != nil </span><span class="cov0" title="0">{
+                        // Log error but continue processing
+                        fmt.Printf("Warning: Failed to parse line %d: %v\n", lineNum, err)
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">records = append(records, *meisai)</span>
+        }
+
+        <span class="cov8" title="1">return records, nil</span>
+}
+
+// ParseCSVFile is an alias for ParseFile for compatibility
+func (p *ETCCSVParser) ParseCSVFile(filePath string, isCorporate bool) ([]models.ETCMeisai, error) <span class="cov8" title="1">{
+        records, err := p.ParseFile(filePath)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Account type was passed as metadata but is not stored in the model
+        // (account type removed from model when migrating to gRPC-only architecture)
+
+        <span class="cov8" title="1">return records, nil</span>
+}
+
+// Parse parses CSV content from a reader and returns a ParseResult
+func (p *ETCCSVParser) Parse(r io.Reader) (*ParseResult, error) <span class="cov8" title="1">{
+        reader := csv.NewReader(r)
+        reader.LazyQuotes = true
+        reader.TrimLeadingSpace = true
+
+        result := &amp;ParseResult{
+                Records: []*models.ETCMeisai{},
+                Errors:  []ParseError{},
+        }
+
+        lineNum := 0
+
+        for </span><span class="cov8" title="1">{
+                row, err := reader.Read()
+                if err == io.EOF </span><span class="cov8" title="1">{
+                        break</span>
+                }
+                <span class="cov8" title="1">if err != nil </span><span class="cov8" title="1">{
+                        result.ErrorRows++
+                        result.Errors = append(result.Errors, ParseError{
+                                Row:     lineNum,
+                                Message: err.Error(),
+                        })
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">lineNum++
+                result.TotalRows++
+
+                // Skip header row
+                if lineNum == 1 &amp;&amp; (strings.Contains(row[0], "利用") || strings.Contains(row[0], "日付")) </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+
+                // Parse row
+                <span class="cov8" title="1">meisai, err := p.parseRow(row)
+                if err != nil </span><span class="cov8" title="1">{
+                        result.ErrorRows++
+                        result.Errors = append(result.Errors, ParseError{
+                                Row:     lineNum,
+                                Message: err.Error(),
+                        })
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">result.Records = append(result.Records, meisai)
+                result.ValidRows++</span>
+        }
+
+        <span class="cov8" title="1">return result, nil</span>
+}
+
+// parseRow parses a single CSV row
+func (p *ETCCSVParser) parseRow(row []string) (*models.ETCMeisai, error) <span class="cov8" title="1">{
+        // ETC CSVは13列
+        if len(row) &lt; 13 </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("insufficient columns: %d", len(row))
+        }</span>
+
+        <span class="cov8" title="1">meisai := &amp;models.ETCMeisai{}
+
+        // Parse start date (利用年月日（自）)
+        dateStr := strings.TrimSpace(row[0])
+        if dateStr == "" </span><span class="cov0" title="0">{
+                // 日付が空の場合は、終了日付（至）を使用
+                if len(row) &gt; 2 &amp;&amp; strings.TrimSpace(row[2]) != "" </span><span class="cov0" title="0">{
+                        dateStr = strings.TrimSpace(row[2])
+                }</span> else<span class="cov0" title="0"> {
+                        // それも空なら現在日付を使用
+                        meisai.UseDate = time.Now()
+                }</span>
+        }
+
+        <span class="cov8" title="1">if dateStr != "" </span><span class="cov8" title="1">{
+                date, err := p.parseDate(dateStr)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to parse date '%s': %w", dateStr, err)
+                }</span>
+                <span class="cov8" title="1">meisai.UseDate = date</span>
+        }
+
+        // Parse other fields based on actual CSV format
+        // 列: 利用年月日（自）,時刻（自）,利用年月日（至）,時刻（至）,利用ＩＣ（自）,利用ＩＣ（至）,
+        //     料金所名,通行料金,通行区分,車種,車両番号,ＥＴＣカード番号,備考
+        <span class="cov8" title="1">meisai.UseTime = strings.TrimSpace(row[1])        // 時刻（自）
+        meisai.EntryIC = strings.TrimSpace(row[4])        // 利用ＩＣ（自）
+        meisai.ExitIC = strings.TrimSpace(row[5])         // 利用ＩＣ（至）
+        // meisai.TollGate = strings.TrimSpace(row[6])   // 料金所名 (not in model)
+        meisai.CarNumber = strings.TrimSpace(row[10])     // 車両番号
+        meisai.ETCNumber = strings.TrimSpace(row[11])     // ＥＴＣカード番号
+
+        // Parse amounts
+        amount := p.parseAmount(row[7])                   // 通行料金
+        meisai.Amount = int32(amount)                     // Amount is int32 in model
+
+        // meisai.VehicleType = strings.TrimSpace(row[9])    // 車種 (not in model)
+        // meisai.Remarks = strings.TrimSpace(row[12])       // 備考 (not in model)
+        // meisai.UsageType = strings.TrimSpace(row[8])      // 通行区分 (not in model)
+
+        // Set timestamps
+        meisai.CreatedAt = time.Now()
+        meisai.UpdatedAt = time.Now()
+
+        // Generate hash
+        meisai.Hash = meisai.GenerateHash()
+
+        return meisai, nil</span>
+}
+
+// parseDate tries multiple date formats to parse the date string
+func (p *ETCCSVParser) parseDate(dateStr string) (time.Time, error) <span class="cov8" title="1">{
+        dateStr = strings.TrimSpace(dateStr)
+
+        // Try each date format
+        for _, format := range p.dateFormats </span><span class="cov8" title="1">{
+                if date, err := time.Parse(format, dateStr); err == nil </span><span class="cov8" title="1">{
+                        // Handle 2-digit years (assume 20xx for years 00-50, 19xx for 51-99)
+                        if format == "06/01/02" || format == "06/1/2" </span><span class="cov8" title="1">{
+                                year := date.Year()
+                                if year &lt; 100 </span><span class="cov0" title="0">{
+                                        if year &lt;= 50 </span><span class="cov0" title="0">{
+                                                date = date.AddDate(2000, 0, 0)
+                                        }</span> else<span class="cov0" title="0"> {
+                                                date = date.AddDate(1900, 0, 0)
+                                        }</span>
+                                }
+                        }
+                        <span class="cov8" title="1">return date, nil</span>
+                }
+        }
+
+        <span class="cov0" title="0">return time.Time{}, fmt.Errorf("unable to parse date '%s' with any supported format", dateStr)</span>
+}
+
+// parseAmount parses amount string to int
+func (p *ETCCSVParser) parseAmount(s string) int <span class="cov8" title="1">{
+        // Remove non-numeric characters
+        s = strings.ReplaceAll(s, ",", "")
+        s = strings.ReplaceAll(s, "円", "")
+        s = strings.ReplaceAll(s, "¥", "")
+        s = strings.ReplaceAll(s, "￥", "")
+        s = strings.TrimSpace(s)
+
+        amount, _ := strconv.Atoi(s)
+        return amount
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package parser
+
+import (
+        "bytes"
+        "fmt"
+        "io"
+        "os"
+
+        "golang.org/x/text/encoding/japanese"
+        "golang.org/x/text/transform"
+)
+
+// EncodingType represents the detected encoding
+type EncodingType int
+
+const (
+        EncodingUTF8 EncodingType = iota
+        EncodingShiftJIS
+        EncodingUnknown
+)
+
+// String returns the string representation of the encoding type
+func (e EncodingType) String() string <span class="cov8" title="1">{
+        switch e </span>{
+        case EncodingUTF8:<span class="cov0" title="0">
+                return "UTF-8"</span>
+        case EncodingShiftJIS:<span class="cov0" title="0">
+                return "Shift-JIS"</span>
+        default:<span class="cov8" title="1">
+                return "Unknown"</span>
+        }
+}
+
+// EncodingDetector handles automatic encoding detection
+type EncodingDetector struct{}
+
+// NewEncodingDetector creates a new encoding detector
+func NewEncodingDetector() *EncodingDetector <span class="cov8" title="1">{
+        return &amp;EncodingDetector{}
+}</span>
+
+// DetectFileEncoding detects the encoding of a file
+func (d *EncodingDetector) DetectFileEncoding(filePath string) (EncodingType, error) <span class="cov8" title="1">{
+        file, err := os.Open(filePath)
+        if err != nil </span><span class="cov0" title="0">{
+                return EncodingUnknown, fmt.Errorf("failed to open file: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer file.Close()
+
+        // Read the first few bytes to detect encoding
+        buffer := make([]byte, 1024)
+        n, err := file.Read(buffer)
+        if err != nil &amp;&amp; err != io.EOF </span><span class="cov0" title="0">{
+                return EncodingUnknown, fmt.Errorf("failed to read file: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return d.DetectEncoding(buffer[:n]), nil</span>
+}
+
+// DetectEncoding detects encoding from byte slice
+func (d *EncodingDetector) DetectEncoding(data []byte) EncodingType <span class="cov8" title="1">{
+        // Check for BOM
+        if len(data) &gt;= 3 &amp;&amp; bytes.Equal(data[:3], []byte{0xEF, 0xBB, 0xBF}) </span><span class="cov8" title="1">{
+                return EncodingUTF8
+        }</span>
+
+        // Check if valid UTF-8
+        <span class="cov8" title="1">if d.isValidUTF8(data) </span><span class="cov8" title="1">{
+                return EncodingUTF8
+        }</span>
+
+        // Try to decode as Shift-JIS and see if it produces valid results
+        <span class="cov8" title="1">if d.canDecodeAsShiftJIS(data) </span><span class="cov0" title="0">{
+                return EncodingShiftJIS
+        }</span>
+
+        <span class="cov8" title="1">return EncodingUnknown</span>
+}
+
+// OpenFileWithDetectedEncoding opens a file and returns a reader with the correct encoding
+func (d *EncodingDetector) OpenFileWithDetectedEncoding(filePath string) (io.Reader, EncodingType, error) <span class="cov8" title="1">{
+        file, err := os.Open(filePath)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, EncodingUnknown, fmt.Errorf("failed to open file: %w", err)
+        }</span>
+
+        // First, detect the encoding
+        <span class="cov8" title="1">encoding, err := d.DetectFileEncoding(filePath)
+        if err != nil </span><span class="cov0" title="0">{
+                file.Close()
+                return nil, EncodingUnknown, err
+        }</span>
+
+        // Reopen the file for reading
+        <span class="cov8" title="1">file.Close()
+        file, err = os.Open(filePath)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, EncodingUnknown, fmt.Errorf("failed to reopen file: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">switch encoding </span>{
+        case EncodingShiftJIS:<span class="cov0" title="0">
+                // Convert Shift-JIS to UTF-8
+                utf8Reader := transform.NewReader(file, japanese.ShiftJIS.NewDecoder())
+                return utf8Reader, encoding, nil</span>
+        case EncodingUTF8:<span class="cov8" title="1">
+                // Skip BOM if present
+                if d.hasBOM(file) </span><span class="cov0" title="0">{
+                        file.Seek(3, io.SeekStart)
+                }</span>
+                <span class="cov8" title="1">return file, encoding, nil</span>
+        default:<span class="cov8" title="1">
+                // Default to UTF-8
+                return file, encoding, nil</span>
+        }
+}
+
+// isValidUTF8 checks if the data is valid UTF-8
+func (d *EncodingDetector) isValidUTF8(data []byte) bool <span class="cov8" title="1">{
+        // Simple heuristic: if we can successfully convert to string and it contains
+        // no replacement characters, it's likely UTF-8
+        str := string(data)
+
+        // Check for replacement characters
+        for _, r := range str </span><span class="cov8" title="1">{
+                if r == '\uFFFD' </span><span class="cov8" title="1">{ // Unicode replacement character
+                        return false
+                }</span>
+        }
+
+        // Additional check: look for common CSV characters in reasonable positions
+        <span class="cov8" title="1">return d.looksLikeCSV(str)</span>
+}
+
+// canDecodeAsShiftJIS attempts to decode as Shift-JIS and checks if result is reasonable
+func (d *EncodingDetector) canDecodeAsShiftJIS(data []byte) bool <span class="cov8" title="1">{
+        decoder := japanese.ShiftJIS.NewDecoder()
+        result, err := decoder.Bytes(data)
+        if err != nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        // Check if the decoded result looks like reasonable text
+        <span class="cov8" title="1">str := string(result)
+        return d.looksLikeCSV(str)</span>
+}
+
+// looksLikeCSV performs heuristic checks to see if the string looks like CSV data
+func (d *EncodingDetector) looksLikeCSV(str string) bool <span class="cov8" title="1">{
+        // Look for common CSV indicators
+        hasCommas := bytes.Count([]byte(str), []byte(",")) &gt; 0
+        hasNewlines := bytes.Count([]byte(str), []byte("\n")) &gt; 0
+
+        // Look for Japanese characters that would indicate ETC data
+        hasJapanese := false
+        for _, r := range str </span><span class="cov8" title="1">{
+                if (r &gt;= 0x3040 &amp;&amp; r &lt;= 0x309F) || // Hiragana
+                   (r &gt;= 0x30A0 &amp;&amp; r &lt;= 0x30FF) || // Katakana
+                   (r &gt;= 0x4E00 &amp;&amp; r &lt;= 0x9FAF) </span><span class="cov8" title="1">{  // CJK Unified Ideographs
+                        hasJapanese = true
+                        break</span>
+                }
+        }
+
+        <span class="cov8" title="1">return hasCommas &amp;&amp; hasNewlines &amp;&amp; hasJapanese</span>
+}
+
+// hasBOM checks if the file starts with a UTF-8 BOM
+func (d *EncodingDetector) hasBOM(file *os.File) bool <span class="cov8" title="1">{
+        file.Seek(0, io.SeekStart)
+        buffer := make([]byte, 3)
+        n, err := file.Read(buffer)
+        file.Seek(0, io.SeekStart) // Reset position
+
+        if err != nil || n &lt; 3 </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        <span class="cov8" title="1">return bytes.Equal(buffer, []byte{0xEF, 0xBB, 0xBF})</span>
+}</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

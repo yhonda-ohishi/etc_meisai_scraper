@@ -14,7 +14,7 @@ import (
 // DownloadHandler はダウンロード関連のハンドラー
 type DownloadHandler struct {
 	BaseHandler
-	DownloadService *services.DownloadService
+	DownloadService services.DownloadServiceInterface
 }
 
 // DownloadRequest はダウンロードリクエスト
@@ -36,7 +36,7 @@ type JobStatus struct {
 }
 
 // NewDownloadHandler creates a new download handler
-func NewDownloadHandler(base BaseHandler, downloadService *services.DownloadService) *DownloadHandler {
+func NewDownloadHandler(base BaseHandler, downloadService services.DownloadServiceInterface) *DownloadHandler {
 	return &DownloadHandler{
 		BaseHandler:     base,
 		DownloadService: downloadService,

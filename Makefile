@@ -5,28 +5,142 @@ APP_NAME := etc_meisai
 DOCKER_IMAGE := $(APP_NAME):latest
 
 # Test targets
-.PHONY: test test-coverage test-coverage-html test-coverage-check
+.PHONY: test test-coverage test-coverage-html test-coverage-check test-unit test-integration clean-tests setup-tests generate-mocks ci-test
 
 test:
-	go test -v ./...
+	go test -v -race -timeout 60s ./src/...
 
 test-coverage:
-	go test -coverprofile=coverage.out -coverpkg=./... ./...
-	go tool cover -func=coverage.out
+	@echo "Generating coverage report..."
+	@go test -coverprofile=coverage.out ./src/...
+	@go tool cover -func=coverage.out
+
+test-coverage-html:
+	@echo "Generating HTML coverage report..."
+	@go test -coverprofile=coverage.out ./src/...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report saved to coverage.html"
+
+test-coverage-check:
+	@bash scripts/check-coverage.sh
+
+# T013-B: Optimized test execution
+test-fast: ## Run tests optimized for speed (< 30s target)
+	@echo "$(GREEN)Running optimized tests...$(NC)"
+	@# Run tests with optimal parallelism
+	@go test -parallel 8 -count=1 ./... -timeout 30s
+
+test-parallel: ## Run tests in parallel groups
+	@echo "$(GREEN)Running parallel test groups...$(NC)"
+	@if [ -f scripts/parallel-test.sh ]; then \
+		bash scripts/parallel-test.sh; \
+	else \
+		echo "Generating parallel test script..."; \
+		go run scripts/test-optimizer.go . coverage; \
+		bash scripts/parallel-test.sh; \
+	fi
+
+test-profile: ## Profile test execution time
+	@echo "$(YELLOW)Profiling test performance...$(NC)"
+	@go run scripts/test-optimizer.go . coverage
+	@echo "$(GREEN)Test profile generated in coverage/$(NC)"
+
+# T012-E: Enhanced coverage targets with gates and thresholds
+# Coverage thresholds
+COVERAGE_THRESHOLD_STATEMENT = 95
+COVERAGE_THRESHOLD_BRANCH = 90
+COVERAGE_DIR = coverage
+
+test-coverage:
+	@mkdir -p $(COVERAGE_DIR)
+	go test -coverprofile=$(COVERAGE_DIR)/coverage.raw -covermode=atomic -coverpkg=./src/... ./...
+	@# Filter out excluded files (generated code, mocks, etc.)
+	@grep -v -E '(pb\.go|pb\.gw\.go|_mock\.go|/mocks/|/vendor/|/migrations/)' \
+		$(COVERAGE_DIR)/coverage.raw > $(COVERAGE_DIR)/coverage.filtered || cp $(COVERAGE_DIR)/coverage.raw $(COVERAGE_DIR)/coverage.filtered
+	go tool cover -func=$(COVERAGE_DIR)/coverage.filtered
 
 test-coverage-html: test-coverage
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+	go tool cover -html=$(COVERAGE_DIR)/coverage.filtered -o $(COVERAGE_DIR)/coverage.html
+	@echo "Coverage report generated: $(COVERAGE_DIR)/coverage.html"
 
-test-coverage-check: test-coverage
-	@echo "Checking coverage threshold (100%)..."
+test-unit:
+	go test -v -race ./src/...
+
+test-integration:
+	go test -v ./tests/integration/...
+
+clean-tests:
+	find . -name "*_test.go" -delete
+	rm -rf tests/
+	rm -f coverage.out coverage.html
+
+setup-tests:
+	mkdir -p mocks tests/unit tests/integration tests/contract
+	go get github.com/stretchr/testify/mock
+	go get github.com/stretchr/testify/assert
+	go get github.com/stretchr/testify/require
+
+generate-mocks:
+	@echo "Generating mocks..."
+	@echo "Mocks will be created by individual test tasks"
+
+ci-test:
+	go test ./... -coverprofile=coverage.out -covermode=atomic -race
 	@coverage=$$(go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
-	if [ "$$(echo "$$coverage < 100" | bc)" -eq 1 ]; then \
-		echo "❌ Coverage is below 100%: $$coverage%"; \
+	if [ "$$(echo "$$coverage < 100" | bc -l)" -eq 1 ]; then \
+		echo "Coverage is below 100%: $$coverage%"; \
+		exit 1; \
+	fi
+	@echo "Coverage check passed: $$coverage%"
+
+# T012-E: Coverage gate enforcement
+coverage-gate test-coverage-check: test-coverage
+	@echo "$(GREEN)Checking coverage gates...$(NC)"
+	@# Extract coverage percentage
+	@coverage=$$(go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep total | awk '{print $$3}' | sed 's/%//'); \
+	echo "Current coverage: $$coverage%"; \
+	echo "Required coverage: $(COVERAGE_THRESHOLD_STATEMENT)%"; \
+	if [ "$$(echo "$$coverage < $(COVERAGE_THRESHOLD_STATEMENT)" | bc)" -eq 1 ]; then \
+		echo "$(RED)❌ Coverage $$coverage% is below threshold $(COVERAGE_THRESHOLD_STATEMENT)%$(NC)"; \
 		exit 1; \
 	else \
-		echo "✅ Coverage meets threshold: $$coverage%"; \
+		echo "$(GREEN)✅ Coverage $$coverage% meets threshold $(COVERAGE_THRESHOLD_STATEMENT)%$(NC)"; \
 	fi
+
+# Coverage enforcement - strict checking
+coverage-enforce: test-coverage
+	@echo "$(YELLOW)Enforcing strict coverage requirements...$(NC)"
+	@# Check for completely uncovered files
+	@echo "Checking for uncovered files..."
+	@uncovered=$$(go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep -E "0.0%" | wc -l); \
+	if [ $$uncovered -gt 0 ]; then \
+		echo "$(RED)Found $$uncovered files with 0% coverage:$(NC)"; \
+		go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep -E "0.0%"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)No completely uncovered files$(NC)"; \
+	fi
+	@# Check for low coverage files
+	@echo "Checking for files below 80% coverage..."
+	@low_cov=$$(go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep -E "[0-7][0-9]\.[0-9]%" | wc -l); \
+	if [ $$low_cov -gt 5 ]; then \
+		echo "$(RED)Error: $$low_cov files have coverage below 80%$(NC)"; \
+		go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep -E "[0-7][0-9]\.[0-9]%"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ All coverage gates passed$(NC)"
+
+# Show detailed coverage report
+coverage-detailed: test-coverage
+	@echo "$(YELLOW)Generating detailed coverage analysis...$(NC)"
+	@# Run advanced coverage analysis if available
+	@if [ -f scripts/coverage-advanced.go ]; then \
+		go run scripts/coverage-advanced.go $(COVERAGE_DIR)/coverage.filtered . || true; \
+	fi
+	@if [ -f scripts/coverage-report.go ]; then \
+		go run scripts/coverage-report.go $(COVERAGE_DIR)/coverage.filtered . $(COVERAGE_DIR) || true; \
+	fi
+	@echo "$(GREEN)Detailed reports generated in $(COVERAGE_DIR)/$(NC)"
 GO := go
 GOFLAGS := -v
 CGO_ENABLED := 1

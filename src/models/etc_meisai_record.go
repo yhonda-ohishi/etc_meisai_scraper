@@ -197,6 +197,16 @@ func (r *ETCMeisaiRecord) GetDateString() string {
 	return r.Date.Format("2006-01-02")
 }
 
+// GenerateHash creates a SHA256 hash for the record (public method)
+func (r *ETCMeisaiRecord) GenerateHash() string {
+	return r.generateHash()
+}
+
+// Validate performs comprehensive validation of the record (public method)
+func (r *ETCMeisaiRecord) Validate() error {
+	return r.validate()
+}
+
 // GetMaskedETCCardNumber returns a masked version of the ETC card number
 func (r *ETCMeisaiRecord) GetMaskedETCCardNumber() string {
 	if len(r.ETCCardNumber) <= 4 {
@@ -210,4 +220,45 @@ func (r *ETCMeisaiRecord) GetMaskedETCCardNumber() string {
 // IsValidForMapping checks if the record has required fields for mapping
 func (r *ETCMeisaiRecord) IsValidForMapping() bool {
 	return r.ID > 0 && r.Hash != "" && !r.Date.IsZero()
+}
+
+// Public wrapper methods for tests
+
+// BeforeUpdate hook for testing (accepts no parameters)
+func (r *ETCMeisaiRecord) BeforeUpdate() error {
+	r.Hash = r.generateHash()
+	return nil
+}
+
+// String returns a string representation of the record
+func (r *ETCMeisaiRecord) String() string {
+	return fmt.Sprintf("ETCMeisaiRecord{ID:%d, Date:%s, EntranceIC:%s, ExitIC:%s, Amount:%d, ETCCardNumber:%s}",
+		r.ID, r.Date.Format("2006-01-02"), r.EntranceIC, r.ExitIC, r.TollAmount, r.ETCCardNumber)
+}
+
+// GetETCNum returns the ETC number value or empty string if nil
+func (r *ETCMeisaiRecord) GetETCNum() string {
+	if r.ETCNum == nil {
+		return ""
+	}
+	return *r.ETCNum
+}
+
+// SetETCNum sets the ETC number, converting empty string to nil
+func (r *ETCMeisaiRecord) SetETCNum(etcNum string) {
+	if etcNum == "" {
+		r.ETCNum = nil
+	} else {
+		r.ETCNum = &etcNum
+	}
+}
+
+// Public validation helper functions
+
+// IsTimeValid checks if a time string is in valid HH:MM format
+func IsTimeValid(timeStr string) bool {
+	// Check HH:MM format
+	pattern := `^([01]?[0-9]|2[0-3]):[0-5][0-9]$`
+	matched, _ := regexp.MatchString(pattern, timeStr)
+	return matched
 }

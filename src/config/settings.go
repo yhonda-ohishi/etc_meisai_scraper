@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,6 +18,17 @@ type Settings struct {
 	Scraping ScrapingSettings `json:"scraping"`
 	Import   ImportSettings   `json:"import"`
 	Logging  LoggingSettings  `json:"logging"`
+
+	// Additional settings for backward compatibility with tests
+	RequestTimeout         time.Duration `json:"request_timeout"`
+	MaxRetries             int           `json:"max_retries"`
+	RetryDelay             time.Duration `json:"retry_delay"`
+	BatchSize              int           `json:"batch_size"`
+	MaxConcurrentDownloads int           `json:"max_concurrent_downloads"`
+	EnableProgressTracking bool          `json:"enable_progress_tracking"`
+	EnableDebugLogging     bool          `json:"enable_debug_logging"`
+	SessionTimeout         time.Duration `json:"session_timeout"`
+	MaxFileSize            int           `json:"max_file_size"`
 }
 
 // DatabaseSettings holds database configuration
@@ -132,6 +144,17 @@ func NewSettings() *Settings {
 			EnableConsole: true,
 			EnableJSON:    true,
 		},
+
+		// Additional settings defaults
+		RequestTimeout:         5 * time.Second,
+		MaxRetries:             3,
+		RetryDelay:             time.Second,
+		BatchSize:              1000,
+		MaxConcurrentDownloads: 5,
+		EnableProgressTracking: true,
+		EnableDebugLogging:     false,
+		SessionTimeout:         30 * time.Second,
+		MaxFileSize:            100 * 1024 * 1024, // 100MB
 	}
 }
 
@@ -254,6 +277,11 @@ func LoadFromFile(path string) (*Settings, error) {
 
 // Validate validates all settings
 func (s *Settings) Validate() error {
+	// Validate test-specific fields first for early error detection
+	if err := s.validateTestFields(); err != nil {
+		return err
+	}
+
 	// Database validation
 	if s.Database.Driver == "" {
 		return fmt.Errorf("database driver is required")
@@ -389,4 +417,186 @@ func InitSettings() error {
 	}
 
 	return nil
+}
+
+// Additional validation for test-specific fields
+func (s *Settings) validateTestFields() error {
+	if s.RequestTimeout <= 0 {
+		return fmt.Errorf("RequestTimeout must be positive")
+	}
+	if s.MaxRetries < 0 {
+		return fmt.Errorf("MaxRetries must be non-negative")
+	}
+	if s.RetryDelay <= 0 {
+		return fmt.Errorf("RetryDelay must be positive")
+	}
+	if s.BatchSize <= 0 {
+		return fmt.Errorf("BatchSize must be positive")
+	}
+	if s.MaxConcurrentDownloads <= 0 {
+		return fmt.Errorf("MaxConcurrentDownloads must be positive")
+	}
+	if s.SessionTimeout <= 0 {
+		return fmt.Errorf("SessionTimeout must be positive")
+	}
+	if s.MaxFileSize <= 0 {
+		return fmt.Errorf("MaxFileSize must be positive")
+	}
+
+	// Additional validation for reasonable limits
+	if s.MaxConcurrentDownloads > 10 {
+		return fmt.Errorf("MaxConcurrentDownloads should not exceed 10")
+	}
+	if s.BatchSize > 10000 {
+		return fmt.Errorf("BatchSize should not exceed 10000")
+	}
+
+	return nil
+}
+
+// Setter methods for test compatibility
+func (s *Settings) SetRequestTimeout(timeout time.Duration) {
+	s.RequestTimeout = timeout
+}
+
+func (s *Settings) SetMaxRetries(retries int) {
+	s.MaxRetries = retries
+}
+
+func (s *Settings) SetRetryDelay(delay time.Duration) {
+	s.RetryDelay = delay
+}
+
+func (s *Settings) SetBatchSize(size int) {
+	s.BatchSize = size
+}
+
+func (s *Settings) SetMaxConcurrentDownloads(max int) {
+	s.MaxConcurrentDownloads = max
+}
+
+func (s *Settings) SetSessionTimeout(timeout time.Duration) {
+	s.SessionTimeout = timeout
+}
+
+func (s *Settings) SetMaxFileSize(size int) {
+	s.MaxFileSize = size
+}
+
+func (s *Settings) SetDebugLogging(enabled bool) {
+	s.EnableDebugLogging = enabled
+}
+
+func (s *Settings) SetProgressTracking(enabled bool) {
+	s.EnableProgressTracking = enabled
+}
+
+// String returns a string representation of the settings
+func (s *Settings) String() string {
+	return fmt.Sprintf("Settings{RequestTimeout: %v, MaxRetries: %d, BatchSize: %d, EnableDebugLogging: %t}",
+		s.RequestTimeout, s.MaxRetries, s.BatchSize, s.EnableDebugLogging)
+}
+
+// Clone creates a copy of the settings
+func (s *Settings) Clone() *Settings {
+	clone := *s
+	return &clone
+}
+
+// ToMap converts settings to a map
+func (s *Settings) ToMap() map[string]string {
+	return map[string]string{
+		"request_timeout":           s.RequestTimeout.String(),
+		"max_retries":               fmt.Sprintf("%d", s.MaxRetries),
+		"retry_delay":               s.RetryDelay.String(),
+		"batch_size":                fmt.Sprintf("%d", s.BatchSize),
+		"max_concurrent_downloads":  fmt.Sprintf("%d", s.MaxConcurrentDownloads),
+		"enable_debug_logging":      fmt.Sprintf("%t", s.EnableDebugLogging),
+		"enable_progress_tracking":  fmt.Sprintf("%t", s.EnableProgressTracking),
+		"session_timeout":           s.SessionTimeout.String(),
+		"max_file_size":             fmt.Sprintf("%d", s.MaxFileSize),
+	}
+}
+
+// FromMap loads settings from a map
+func (s *Settings) FromMap(settingsMap map[string]string) error {
+	for key, value := range settingsMap {
+		switch key {
+		case "request_timeout":
+			if timeout, err := time.ParseDuration(value); err != nil {
+				return fmt.Errorf("invalid request_timeout: %w", err)
+			} else {
+				s.RequestTimeout = timeout
+			}
+		case "max_retries":
+			if retries, err := strconv.Atoi(value); err != nil {
+				return fmt.Errorf("invalid max_retries: %w", err)
+			} else {
+				s.MaxRetries = retries
+			}
+		case "retry_delay":
+			if delay, err := time.ParseDuration(value); err != nil {
+				return fmt.Errorf("invalid retry_delay: %w", err)
+			} else {
+				s.RetryDelay = delay
+			}
+		case "batch_size":
+			if size, err := strconv.Atoi(value); err != nil {
+				return fmt.Errorf("invalid batch_size: %w", err)
+			} else {
+				s.BatchSize = size
+			}
+		case "max_concurrent_downloads":
+			if max, err := strconv.Atoi(value); err != nil {
+				return fmt.Errorf("invalid max_concurrent_downloads: %w", err)
+			} else {
+				s.MaxConcurrentDownloads = max
+			}
+		case "enable_debug_logging":
+			if enabled, err := strconv.ParseBool(value); err != nil {
+				return fmt.Errorf("invalid enable_debug_logging: %w", err)
+			} else {
+				s.EnableDebugLogging = enabled
+			}
+		case "enable_progress_tracking":
+			if enabled, err := strconv.ParseBool(value); err != nil {
+				return fmt.Errorf("invalid enable_progress_tracking: %w", err)
+			} else {
+				s.EnableProgressTracking = enabled
+			}
+		case "session_timeout":
+			if timeout, err := time.ParseDuration(value); err != nil {
+				return fmt.Errorf("invalid session_timeout: %w", err)
+			} else {
+				s.SessionTimeout = timeout
+			}
+		case "max_file_size":
+			if size, err := strconv.Atoi(value); err != nil {
+				return fmt.Errorf("invalid max_file_size: %w", err)
+			} else {
+				s.MaxFileSize = size
+			}
+		}
+	}
+	return nil
+}
+
+// GetRetryBackoff returns exponential backoff duration for retry attempts
+func (s *Settings) GetRetryBackoff(attempt int) time.Duration {
+	if attempt == 0 {
+		return s.RetryDelay
+	}
+	// Exponential backoff: base * 2^attempt
+	multiplier := 1 << attempt // 2^attempt
+	return s.RetryDelay * time.Duration(multiplier)
+}
+
+// IsMaxRetriesReached returns true if the attempt count has reached max retries
+func (s *Settings) IsMaxRetriesReached(attempt int) bool {
+	return attempt >= s.MaxRetries
+}
+
+// GetTimeoutContext returns a context with request timeout
+func (s *Settings) GetTimeoutContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), s.RequestTimeout)
 }

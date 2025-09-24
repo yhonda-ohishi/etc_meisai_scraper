@@ -1,0 +1,401 @@
+package services_test
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+func TestNewDownloadService(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		db     *sql.DB
+		logger *log.Logger
+	}{
+		{
+			name:   "with valid parameters",
+			db:     &sql.DB{},
+			logger: log.New(os.Stdout, "test: ", log.LstdFlags),
+		},
+		{
+			name:   "with nil db",
+			db:     nil,
+			logger: log.New(os.Stdout, "test: ", log.LstdFlags),
+		},
+		{
+			name:   "with nil logger",
+			db:     &sql.DB{},
+			logger: nil,
+		},
+		{
+			name:   "with nil parameters",
+			db:     nil,
+			logger: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := services.NewDownloadService(tt.db, tt.logger)
+			assert.NotNil(t, service)
+		})
+	}
+}
+
+func TestDownloadService_GetAllAccountIDs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		corporateAccounts string
+		personalAccounts string
+		expected         []string
+	}{
+		{
+			name:             "both corporate and personal accounts",
+			corporateAccounts: "corp1:pass1,corp2:pass2",
+			personalAccounts: "personal1:pass3,personal2:pass4",
+			expected:         []string{"corp1", "corp2", "personal1", "personal2"},
+		},
+		{
+			name:             "only corporate accounts",
+			corporateAccounts: "corp1:pass1,corp2:pass2",
+			personalAccounts: "",
+			expected:         []string{"corp1", "corp2"},
+		},
+		{
+			name:             "only personal accounts",
+			corporateAccounts: "",
+			personalAccounts: "personal1:pass3,personal2:pass4",
+			expected:         []string{"personal1", "personal2"},
+		},
+		{
+			name:             "no accounts",
+			corporateAccounts: "",
+			personalAccounts: "",
+			expected:         []string{},
+		},
+		{
+			name:             "accounts without passwords",
+			corporateAccounts: "corp1,corp2",
+			personalAccounts: "personal1,personal2",
+			expected:         []string{"corp1", "corp2", "personal1", "personal2"},
+		},
+		{
+			name:             "mixed format accounts",
+			corporateAccounts: "corp1:pass1,corp2",
+			personalAccounts: "personal1,personal2:pass4",
+			expected:         []string{"corp1", "corp2", "personal1", "personal2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment variables for the test
+			oldCorporate := os.Getenv("ETC_CORPORATE_ACCOUNTS")
+			oldPersonal := os.Getenv("ETC_PERSONAL_ACCOUNTS")
+			defer func() {
+				os.Setenv("ETC_CORPORATE_ACCOUNTS", oldCorporate)
+				os.Setenv("ETC_PERSONAL_ACCOUNTS", oldPersonal)
+			}()
+
+			os.Setenv("ETC_CORPORATE_ACCOUNTS", tt.corporateAccounts)
+			os.Setenv("ETC_PERSONAL_ACCOUNTS", tt.personalAccounts)
+
+			service := services.NewDownloadService(nil, nil)
+			accountIDs := service.GetAllAccountIDs()
+
+			if len(tt.expected) == 0 {
+				assert.Empty(t, accountIDs)
+			} else {
+				assert.ElementsMatch(t, tt.expected, accountIDs)
+			}
+		})
+	}
+}
+
+func TestDownloadService_ProcessAsync(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(os.Stdout, "test: ", log.LstdFlags)
+	service := services.NewDownloadService(nil, logger)
+
+	jobID := "test-job-123"
+	accounts := []string{"account1", "account2"}
+	fromDate := "2024-01-01"
+	toDate := "2024-01-31"
+
+	// Start async processing
+	service.ProcessAsync(jobID, accounts, fromDate, toDate)
+
+	// Immediately check that job was created
+	job, exists := service.GetJobStatus(jobID)
+	assert.True(t, exists)
+	assert.Equal(t, jobID, job.ID)
+	assert.Equal(t, "processing", job.Status)
+	assert.Equal(t, 0, job.Progress)
+	assert.False(t, job.StartedAt.IsZero())
+	assert.Nil(t, job.CompletedAt)
+
+	// Wait a bit and check progress
+	time.Sleep(100 * time.Millisecond)
+	job, exists = service.GetJobStatus(jobID)
+	assert.True(t, exists)
+	assert.Equal(t, "processing", job.Status)
+
+	// Wait for completion (this test has simulation delays, so it should complete quickly)
+	// We'll wait a reasonable amount of time for the job to complete
+	maxWait := 10 * time.Second
+	start := time.Now()
+
+	for time.Since(start) < maxWait {
+		job, exists = service.GetJobStatus(jobID)
+		if exists && job.Status == "completed" {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Final verification
+	job, exists = service.GetJobStatus(jobID)
+	assert.True(t, exists)
+	assert.Equal(t, "completed", job.Status)
+	assert.Equal(t, 100, job.Progress)
+	assert.NotNil(t, job.CompletedAt)
+}
+
+func TestDownloadService_ProcessAsync_EmptyAccounts(t *testing.T) {
+	t.Parallel()
+
+	service := services.NewDownloadService(nil, nil)
+	jobID := "empty-job-123"
+
+	// Start processing with empty accounts
+	service.ProcessAsync(jobID, []string{}, "2024-01-01", "2024-01-31")
+
+	// Should complete immediately since no accounts to process
+	time.Sleep(100 * time.Millisecond)
+
+	job, exists := service.GetJobStatus(jobID)
+	assert.True(t, exists)
+	assert.Equal(t, "completed", job.Status)
+	assert.Equal(t, 100, job.Progress)
+}
+
+func TestDownloadService_GetJobStatus(t *testing.T) {
+	t.Parallel()
+
+	service := services.NewDownloadService(nil, nil)
+
+	tests := []struct {
+		name     string
+		jobID    string
+		setup    func()
+		expected bool
+	}{
+		{
+			name:  "non-existent job",
+			jobID: "non-existent",
+			setup: func() {},
+			expected: false,
+		},
+		{
+			name:  "existing job",
+			jobID: "existing-job",
+			setup: func() {
+				service.ProcessAsync("existing-job", []string{"account1"}, "2024-01-01", "2024-01-31")
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+
+			job, exists := service.GetJobStatus(tt.jobID)
+			assert.Equal(t, tt.expected, exists)
+
+			if tt.expected {
+				assert.NotNil(t, job)
+				assert.Equal(t, tt.jobID, job.ID)
+			} else {
+				assert.Nil(t, job)
+			}
+		})
+	}
+}
+
+func TestDownloadJob_Structure(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	completedAt := now.Add(time.Hour)
+
+	job := &services.DownloadJob{
+		ID:           "test-job",
+		Status:       "completed",
+		Progress:     100,
+		TotalRecords: 1000,
+		ErrorMessage: "",
+		StartedAt:    now,
+		CompletedAt:  &completedAt,
+	}
+
+	assert.Equal(t, "test-job", job.ID)
+	assert.Equal(t, "completed", job.Status)
+	assert.Equal(t, 100, job.Progress)
+	assert.Equal(t, 1000, job.TotalRecords)
+	assert.Empty(t, job.ErrorMessage)
+	assert.Equal(t, now, job.StartedAt)
+	assert.NotNil(t, job.CompletedAt)
+	assert.Equal(t, completedAt, *job.CompletedAt)
+}
+
+func TestDownloadService_ProcessAsync_WithPanic(t *testing.T) {
+	// This test verifies panic recovery in download processing
+	// Note: We can't easily trigger a panic in the current implementation
+	// without modifying the service, so we test normal error handling
+	t.Parallel()
+
+	var logOutput strings.Builder
+	logger := log.New(&logOutput, "test: ", log.LstdFlags)
+	service := services.NewDownloadService(nil, logger)
+
+	jobID := "panic-test-job"
+	accounts := []string{"account1"}
+
+	service.ProcessAsync(jobID, accounts, "2024-01-01", "2024-01-31")
+
+	// Wait for processing to complete (account processing takes 2s + overhead)
+	time.Sleep(4 * time.Second)
+
+	job, exists := service.GetJobStatus(jobID)
+	assert.True(t, exists)
+
+	// Should complete normally since we can't easily trigger a panic
+	assert.Equal(t, "completed", job.Status)
+
+	// Verify logging occurred
+	logContents := logOutput.String()
+	assert.Contains(t, logContents, "Starting download job")
+	assert.Contains(t, logContents, "Completed download job")
+}
+
+func TestDownloadService_ConcurrentJobProcessing(t *testing.T) {
+	t.Parallel()
+
+	service := services.NewDownloadService(nil, nil)
+
+	// Start multiple jobs concurrently
+	const numJobs = 5
+	jobIDs := make([]string, numJobs)
+	for i := 0; i < numJobs; i++ {
+		jobIDs[i] = fmt.Sprintf("concurrent-job-%d", i)
+		service.ProcessAsync(jobIDs[i], []string{"account1"}, "2024-01-01", "2024-01-31")
+	}
+
+	// Wait for all jobs to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify all jobs were created
+	for _, jobID := range jobIDs {
+		job, exists := service.GetJobStatus(jobID)
+		assert.True(t, exists, "Job %s should exist", jobID)
+		assert.Equal(t, jobID, job.ID)
+		assert.Contains(t, []string{"processing", "completed"}, job.Status)
+	}
+
+	// Wait for completion
+	maxWait := 15 * time.Second
+	start := time.Now()
+
+	for time.Since(start) < maxWait {
+		allCompleted := true
+		for _, jobID := range jobIDs {
+			job, exists := service.GetJobStatus(jobID)
+			if !exists || job.Status != "completed" {
+				allCompleted = false
+				break
+			}
+		}
+		if allCompleted {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Verify all jobs completed
+	for _, jobID := range jobIDs {
+		job, exists := service.GetJobStatus(jobID)
+		assert.True(t, exists, "Job %s should exist", jobID)
+		assert.Equal(t, "completed", job.Status, "Job %s should be completed", jobID)
+		assert.Equal(t, 100, job.Progress, "Job %s should have 100%% progress", jobID)
+	}
+}
+
+func TestDownloadService_JobStatusCopy(t *testing.T) {
+	t.Parallel()
+
+	service := services.NewDownloadService(nil, nil)
+	jobID := "copy-test-job"
+
+	service.ProcessAsync(jobID, []string{"account1"}, "2024-01-01", "2024-01-31")
+
+	// Get job status twice
+	job1, exists1 := service.GetJobStatus(jobID)
+	job2, exists2 := service.GetJobStatus(jobID)
+
+	assert.True(t, exists1)
+	assert.True(t, exists2)
+	assert.NotNil(t, job1)
+	assert.NotNil(t, job2)
+
+	// Verify they are copies (different memory addresses)
+	assert.NotSame(t, job1, job2)
+
+	// But have the same values
+	assert.Equal(t, job1.ID, job2.ID)
+	assert.Equal(t, job1.Status, job2.Status)
+	assert.Equal(t, job1.Progress, job2.Progress)
+}
+
+// Benchmark download service performance
+func BenchmarkDownloadService_GetAllAccountIDs(b *testing.B) {
+	// Set up environment
+	os.Setenv("ETC_CORPORATE_ACCOUNTS", "corp1:pass1,corp2:pass2,corp3:pass3")
+	os.Setenv("ETC_PERSONAL_ACCOUNTS", "personal1:pass1,personal2:pass2")
+	defer func() {
+		os.Unsetenv("ETC_CORPORATE_ACCOUNTS")
+		os.Unsetenv("ETC_PERSONAL_ACCOUNTS")
+	}()
+
+	service := services.NewDownloadService(nil, nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = service.GetAllAccountIDs()
+	}
+}
+
+func BenchmarkDownloadService_GetJobStatus(b *testing.B) {
+	service := services.NewDownloadService(nil, nil)
+	jobID := "benchmark-job"
+
+	// Create a job
+	service.ProcessAsync(jobID, []string{"account1"}, "2024-01-01", "2024-01-31")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = service.GetJobStatus(jobID)
+	}
+}

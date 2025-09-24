@@ -9,24 +9,24 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/clients"
+	// "github.com/yhonda-ohishi/etc_meisai/src/clients" // Commented out - clients package deleted
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
 	"github.com/yhonda-ohishi/etc_meisai/src/parser"
-	"github.com/yhonda-ohishi/etc_meisai/src/pb"
+	// "github.com/yhonda-ohishi/etc_meisai/src/pb" // Commented out - not used when clients package is deleted
 	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
 )
 
-// ImportService handles CSV import operations
-type ImportService struct {
-	dbClient    *clients.DBServiceClient
+// ImportServiceLegacy handles CSV import operations (legacy gRPC version)
+type ImportServiceLegacy struct {
+	dbClient    interface{} // TODO: Replace with proper type when clients package is restored
 	etcRepo     repositories.ETCRepository
 	mappingRepo repositories.MappingRepository
 	parser      *parser.ETCCSVParser
 }
 
-// NewImportService creates a new import service
-func NewImportService(dbClient *clients.DBServiceClient, etcRepo repositories.ETCRepository, mappingRepo repositories.MappingRepository) *ImportService {
-	return &ImportService{
+// NewImportServiceLegacy creates a new legacy import service
+func NewImportServiceLegacy(dbClient interface{}, etcRepo repositories.ETCRepository, mappingRepo repositories.MappingRepository) *ImportServiceLegacy {
+	return &ImportServiceLegacy{
 		dbClient:    dbClient,
 		etcRepo:     etcRepo,
 		mappingRepo: mappingRepo,
@@ -35,67 +35,70 @@ func NewImportService(dbClient *clients.DBServiceClient, etcRepo repositories.ET
 }
 
 // ProcessCSVFile processes a CSV file and imports the data
-func (s *ImportService) ProcessCSVFile(ctx context.Context, filePath string, accountID string, importType string) (*models.ETCImportBatch, error) {
+func (s *ImportServiceLegacy) ProcessCSVFile(ctx context.Context, filePath string, accountID string, importType string) (*models.ETCImportBatch, error) {
+	// TODO: Restore when clients package is available
 	// Read the CSV file
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV file: %w", err)
-	}
-
+	// data, err := os.ReadFile(filePath)
+	// if err != nil {
+	//	return nil, fmt.Errorf("failed to read CSV file: %w", err)
+	// }
+	//
 	// Create import batch via gRPC
-	batchReq := &pb.CreateImportBatchRequest{
-		FileName:    filepath.Base(filePath),
-		FileSize:    int64(len(data)),
-		AccountId:   accountID,
-		ImportType:  importType,
-		Status:      "processing",
-		TotalRows:   0,
-		ProcessedRows: 0,
-	}
+	// batchReq := &pb.CreateImportBatchRequest{
+	//	FileName:    filepath.Base(filePath),
+	//	FileSize:    int64(len(data)),
+	//	AccountId:   accountID,
+	//	ImportType:  importType,
+	//	Status:      "processing",
+	//	TotalRows:   0,
+	//	ProcessedRows: 0,
+	// }
+	//
+	// batchResp, err := s.dbClient.CreateImportBatch(ctx, batchReq)
+	// if err != nil {
+	//	return nil, fmt.Errorf("failed to create import batch: %w", err)
+	// }
+	return nil, fmt.Errorf("CreateImportBatch not available - clients package deleted")
 
-	batchResp, err := s.dbClient.CreateImportBatch(ctx, batchReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create import batch: %w", err)
-	}
-
+	// TODO: Restore when clients package is available
 	// Process CSV data via gRPC
-	processReq := &pb.ProcessCSVDataRequest{
-		BatchId:    batchResp.Id,
-		CsvContent: string(data),
-		AccountId:  accountID,
-	}
-
-	processResp, err := s.dbClient.ProcessCSVData(ctx, processReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process CSV data: %w", err)
-	}
-
-	// Convert response to model
-	batch := &models.ETCImportBatch{
-		ID:            batchResp.Id,
-		FileName:      batchResp.FileName,
-		FileSize:      batchResp.FileSize,
-		AccountID:     batchResp.AccountId,
-		ImportType:    batchResp.ImportType,
-		Status:        processResp.Status,
-		TotalRows:     processResp.TotalRows,
-		ProcessedRows: processResp.ProcessedRows,
-		SuccessCount:  processResp.SuccessCount,
-		ErrorCount:    processResp.ErrorCount,
-		CreatedAt:     batchResp.CreatedAt.AsTime(),
-		UpdatedAt:     processResp.UpdatedAt.AsTime(),
-	}
-
-	if batchResp.CompletedAt != nil {
-		completedAt := batchResp.CompletedAt.AsTime()
-		batch.CompletedAt = &completedAt
-	}
-
-	return batch, nil
+	// processReq := &pb.ProcessCSVDataRequest{
+	//	BatchId:    batchResp.Id,
+	//	CsvContent: string(data),
+	//	AccountId:  accountID,
+	// }
+	//
+	// processResp, err := s.dbClient.ProcessCSVData(ctx, processReq)
+	// if err != nil {
+	//	return nil, fmt.Errorf("failed to process CSV data: %w", err)
+	// }
+	//
+	// // Convert response to model
+	// batch := &models.ETCImportBatch{
+	//	ID:            batchResp.Id,
+	//	FileName:      batchResp.FileName,
+	//	FileSize:      batchResp.FileSize,
+	//	AccountID:     batchResp.AccountId,
+	//	ImportType:    batchResp.ImportType,
+	//	Status:        processResp.Status,
+	//	TotalRows:     processResp.TotalRows,
+	//	ProcessedRows: processResp.ProcessedRows,
+	//	SuccessCount:  processResp.SuccessCount,
+	//	ErrorCount:    processResp.ErrorCount,
+	//	CreatedAt:     batchResp.CreatedAt.AsTime(),
+	//	UpdatedAt:     processResp.UpdatedAt.AsTime(),
+	// }
+	//
+	// if batchResp.CompletedAt != nil {
+	//	completedAt := batchResp.CompletedAt.AsTime()
+	//	batch.CompletedAt = &completedAt
+	// }
+	//
+	// return batch, nil
 }
 
 // ParseAndValidateCSV parses and validates CSV content without importing
-func (s *ImportService) ParseAndValidateCSV(ctx context.Context, content string, accountID string) (*parser.ParseResult, error) {
+func (s *ImportServiceLegacy) ParseAndValidateCSV(ctx context.Context, content string, accountID string) (*parser.ParseResult, error) {
 	// Parse CSV content
 	result, err := s.parser.Parse(strings.NewReader(content))
 	if err != nil {
@@ -119,7 +122,7 @@ func (s *ImportService) ParseAndValidateCSV(ctx context.Context, content string,
 }
 
 // ImportParsedRecords imports pre-parsed records
-func (s *ImportService) ImportParsedRecords(ctx context.Context, records []*models.ETCMeisai, batchID int64) error {
+func (s *ImportServiceLegacy) ImportParsedRecords(ctx context.Context, records []*models.ETCMeisai, batchID int64) error {
 	// Bulk create via repository
 	if err := s.etcRepo.BulkInsert(records); err != nil {
 		return fmt.Errorf("failed to bulk create records: %w", err)
@@ -129,31 +132,34 @@ func (s *ImportService) ImportParsedRecords(ctx context.Context, records []*mode
 }
 
 // GetImportProgress gets the progress of an import batch
-func (s *ImportService) GetImportProgress(ctx context.Context, batchID int64) (*models.ImportProgress, error) {
-	req := &pb.GetImportProgressRequest{
-		BatchId: batchID,
-	}
+func (s *ImportServiceLegacy) GetImportProgress(ctx context.Context, batchID int64) (*models.ImportProgress, error) {
+	// TODO: Restore when clients package is available
+	// req := &pb.GetImportProgressRequest{
+	//	BatchId: batchID,
+	// }
+	//
+	// resp, err := s.dbClient.GetImportProgress(ctx, req)
+	// if err != nil {
+	//	return nil, fmt.Errorf("failed to get import progress: %w", err)
+	// }
+	return nil, fmt.Errorf("GetImportProgress not available - clients package deleted")
 
-	resp, err := s.dbClient.GetImportProgress(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get import progress: %w", err)
-	}
-
-	return &models.ImportProgress{
-		BatchID:       resp.BatchId,
-		Status:        resp.Status,
-		TotalRows:     resp.TotalRows,
-		ProcessedRows: resp.ProcessedRows,
-		SuccessCount:  resp.SuccessCount,
-		ErrorCount:    resp.ErrorCount,
-		Percentage:    resp.Percentage,
-		Message:       resp.Message,
-		UpdatedAt:     resp.UpdatedAt.AsTime(),
-	}, nil
+	// TODO: Restore when clients package is available
+	// return &models.ImportProgress{
+	//	BatchID:       resp.BatchId,
+	//	Status:        resp.Status,
+	//	TotalRows:     resp.TotalRows,
+	//	ProcessedRows: resp.ProcessedRows,
+	//	SuccessCount:  resp.SuccessCount,
+	//	ErrorCount:    resp.ErrorCount,
+	//	Percentage:    resp.Percentage,
+	//	Message:       resp.Message,
+	//	UpdatedAt:     resp.UpdatedAt.AsTime(),
+	// }, nil
 }
 
 // generateRecordHash generates a SHA256 hash for duplicate detection
-func (s *ImportService) generateRecordHash(record *models.ETCMeisai) string {
+func (s *ImportServiceLegacy) generateRecordHash(record *models.ETCMeisai) string {
 	// Create a unique string from key fields
 	hashInput := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d",
 		record.ETCNumber,
@@ -170,7 +176,7 @@ func (s *ImportService) generateRecordHash(record *models.ETCMeisai) string {
 }
 
 // ValidateImportFile validates an import file before processing
-func (s *ImportService) ValidateImportFile(filePath string) error {
+func (s *ImportServiceLegacy) ValidateImportFile(filePath string) error {
 	// Check file exists
 	info, err := os.Stat(filePath)
 	if err != nil {
@@ -192,7 +198,7 @@ func (s *ImportService) ValidateImportFile(filePath string) error {
 }
 
 // CancelImport cancels an ongoing import
-func (s *ImportService) CancelImport(ctx context.Context, batchID int64) error {
+func (s *ImportServiceLegacy) CancelImport(ctx context.Context, batchID int64) error {
 	// Update batch status via gRPC
 	// This would require adding a CancelImport RPC to the proto definition
 	// For now, we'll return an error indicating it's not implemented
@@ -200,14 +206,14 @@ func (s *ImportService) CancelImport(ctx context.Context, batchID int64) error {
 }
 
 // GetImportHistory retrieves import history for an account
-func (s *ImportService) GetImportHistory(ctx context.Context, accountID string, limit int) ([]*models.ETCImportBatch, error) {
+func (s *ImportServiceLegacy) GetImportHistory(ctx context.Context, accountID string, limit int) ([]*models.ETCImportBatch, error) {
 	// This would require adding a GetImportHistory RPC to the proto definition
 	// For now, return empty list
 	return []*models.ETCImportBatch{}, nil
 }
 
 // RetryImport retries a failed import batch
-func (s *ImportService) RetryImport(ctx context.Context, batchID int64) (*models.ETCImportBatch, error) {
+func (s *ImportServiceLegacy) RetryImport(ctx context.Context, batchID int64) (*models.ETCImportBatch, error) {
 	// Get the original batch details
 	_, err := s.GetImportProgress(ctx, batchID)
 	if err != nil {
@@ -220,7 +226,7 @@ func (s *ImportService) RetryImport(ctx context.Context, batchID int64) (*models
 }
 
 // HealthCheck performs a health check on the import service
-func (s *ImportService) HealthCheck(ctx context.Context) error {
+func (s *ImportServiceLegacy) HealthCheck(ctx context.Context) error {
 	// Check gRPC client connectivity
 	if s.dbClient == nil {
 		return fmt.Errorf("db client not initialized")

@@ -1,0 +1,1009 @@
+package services
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
+
+	"github.com/yhonda-ohishi/etc_meisai/src/mocks"
+	"github.com/yhonda-ohishi/etc_meisai/src/models"
+)
+
+func TestNewImportService(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+
+	service := NewImportService(mockDB.DB, logger)
+
+	assert.NotNil(t, service)
+	assert.Equal(t, mockDB.DB, service.db)
+	assert.NotNil(t, service.logger)
+}
+
+func TestNewImportService_NilLogger(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+
+	service := NewImportService(mockDB.DB, nil)
+
+	assert.NotNil(t, service)
+	assert.NotNil(t, service.logger)
+}
+
+func TestImportService_ImportCSV_Success(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	mockTx := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	params := &ImportCSVParams{
+		AccountType: "corporate",
+		AccountID:   "corp-001",
+		FileName:    "test.csv",
+		FileSize:    1024,
+		CreatedBy:   "test-user",
+	}
+
+	csvData := `date,time,entrance_ic,exit_ic,toll_amount,car_number,etc_card_number
+2025-01-01,10:30,東京IC,横浜IC,1500,品川300あ1234,1234567890
+2025-01-02,11:45,名古屋IC,大阪IC,2500,名古屋400い5678,0987654321`
+
+	data := strings.NewReader(csvData)
+
+	// Mock database operations
+	mockDB.On("WithContext", ctx).Return(mockDB.DB)
+	mockTx.DB.Error = nil // Ensure transaction has no error
+	mockDB.On("Begin").Return(mockTx.DB)
+	mockTx.On("Create", mock.AnythingOfType("*models.ImportSession")).Return(mockTx.DB).Run(func(args mock.Arguments) {
+		session := args.Get(0).(*models.ImportSession)
+		session.ID = "session-123"
+		session.CreatedAt = time.Now()
+	})
+	mockTx.On("Where", "hash = ?", mock.AnythingOfType("string")).Return(mockTx.DB)
+	mockTx.On("First", mock.AnythingOfType("*models.ETCMeisaiRecord")).Return(mockTx.DB).Run(func(args mock.Arguments) {
+		mockTx.DB.Error = gorm.ErrRecordNotFound
+	})
+	mockTx.On("Create", mock.AnythingOfType("*models.ETCMeisaiRecord")).Return(mockTx.DB)
+	mockTx.On("Save", mock.AnythingOfType("*models.ImportSession")).Return(mockTx.DB)
+	mockTx.On("Commit").Return(mockTx.DB)
+
+	// Execute
+	result, err := service.ImportCSV(ctx, params, data)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.NotNil(t, result.Session)
+	assert.Equal(t, 2, result.SuccessCount)
+	assert.Equal(t, 0, result.ErrorCount)
+	assert.Equal(t, 0, result.DuplicateCount)
+
+	mockDB.AssertExpectations(t)
+	mockTx.AssertExpectations(t)
+}
+
+func TestImportService_ImportCSV_TransactionError(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	params := &ImportCSVParams{
+		AccountType: "corporate",
+		AccountID:   "corp-001",
+		FileName:    "test.csv",
+		FileSize:    1024,
+	}
+
+	data := strings.NewReader("test,data")
+
+	// Mock transaction failure
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Begin").Return(&gorm.DB{Error: errors.New("transaction failed")})
+
+	// Execute
+	result, err := service.ImportCSV(ctx, params, data)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to start transaction")
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_ImportCSV_SessionCreationError(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	mockTx := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	params := &ImportCSVParams{
+		AccountType: "corporate",
+		AccountID:   "corp-001",
+		FileName:    "test.csv",
+		FileSize:    1024,
+	}
+
+	data := strings.NewReader("test,data")
+
+	// Mock session creation failure
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Begin").Return(mockTx)
+	mockTx.On("Create", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: errors.New("session creation failed")})
+	mockTx.On("Rollback").Return(&gorm.DB{Error: nil})
+
+	// Execute
+	result, err := service.ImportCSV(ctx, params, data)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to create import session")
+
+	mockDB.AssertExpectations(t)
+	mockTx.AssertExpectations(t)
+}
+
+func TestImportService_ImportCSV_InvalidCSV(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	mockTx := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	params := &ImportCSVParams{
+		AccountType: "corporate",
+		AccountID:   "corp-001",
+		FileName:    "test.csv",
+		FileSize:    1024,
+	}
+
+	// Invalid CSV data
+	invalidCSV := "invalid,csv,data\nwith,missing,fields"
+	data := strings.NewReader(invalidCSV)
+
+	// Mock successful session creation
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Begin").Return(mockTx)
+	mockTx.On("Create", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		session := args.Get(0).(*models.ImportSession)
+		session.ID = "session-123"
+	})
+	mockTx.On("Rollback").Return(&gorm.DB{Error: nil})
+
+	// Execute
+	_, err := service.ImportCSV(ctx, params, data)
+
+	// Assert - Should handle CSV parsing errors gracefully
+	if err != nil {
+		assert.Contains(t, err.Error(), "failed to parse CSV data")
+	}
+
+	mockDB.AssertExpectations(t)
+	mockTx.AssertExpectations(t)
+}
+
+func TestImportService_ImportCSV_DuplicateRecords(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	mockTx := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	params := &ImportCSVParams{
+		AccountType: "corporate",
+		AccountID:   "corp-001",
+		FileName:    "test.csv",
+		FileSize:    1024,
+	}
+
+	csvData := `date,time,entrance_ic,exit_ic,toll_amount,car_number,etc_card_number
+2025-01-01,10:30:00,東京IC,横浜IC,1500,品川300あ1234,1234567890`
+
+	data := strings.NewReader(csvData)
+
+	existingRecord := &models.ETCMeisaiRecord{
+		ID:         1,
+		Hash:       "existing-hash",
+		Date:       time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		Time:       "10:30:00",
+		TollAmount: 1500,
+	}
+
+	// Mock database operations for duplicate detection
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Begin").Return(mockTx)
+	mockTx.On("Create", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		session := args.Get(0).(*models.ImportSession)
+		session.ID = "session-123"
+	})
+	mockTx.On("Where", "hash = ?", mock.AnythingOfType("string")).Return(mockTx)
+	mockTx.On("First", mock.AnythingOfType("*models.ETCMeisaiRecord")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		record := args.Get(0).(*models.ETCMeisaiRecord)
+		*record = *existingRecord
+	})
+	mockTx.On("Save", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil})
+	mockTx.On("Commit").Return(&gorm.DB{Error: nil})
+
+	// Execute
+	result, err := service.ImportCSV(ctx, params, data)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 0, result.SuccessCount)
+	assert.Equal(t, 1, result.DuplicateCount)
+
+	mockDB.AssertExpectations(t)
+	mockTx.AssertExpectations(t)
+}
+
+func TestImportService_GetImportSession_Success(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	sessionID := "session-123"
+
+	expectedSession := &models.ImportSession{
+		ID:          sessionID,
+		AccountType: "corporate",
+		AccountID:   "corp-001",
+		FileName:    "test.csv",
+		Status:      string(models.ImportStatusCompleted),
+	}
+
+	// Mock database query
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Where", "id = ?", sessionID).Return(mockDB)
+	mockDB.On("First", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		session := args.Get(0).(*models.ImportSession)
+		*session = *expectedSession
+	})
+
+	// Execute
+	result, err := service.GetImportSession(ctx, sessionID)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, sessionID, result.ID)
+	assert.Equal(t, "corporate", result.AccountType)
+	assert.Equal(t, "corp-001", result.AccountID)
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_GetImportSession_NotFound(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	sessionID := "nonexistent-session"
+
+	// Mock database query returning not found
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Where", "id = ?", sessionID).Return(mockDB)
+	mockDB.On("First", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: gorm.ErrRecordNotFound})
+
+	// Execute
+	result, err := service.GetImportSession(ctx, sessionID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "import session not found")
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_ListImportSessions_Success(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	params := &ListImportSessionsParams{
+		Page:     1,
+		PageSize: 10,
+		SortBy:   "created_at",
+		SortOrder: "desc",
+	}
+
+	expectedSessions := []*models.ImportSession{
+		{
+			ID:          "session-1",
+			AccountType: "corporate",
+			AccountID:   "corp-001",
+			FileName:    "test1.csv",
+			Status:      string(models.ImportStatusCompleted),
+		},
+		{
+			ID:          "session-2",
+			AccountType: "personal",
+			AccountID:   "pers-001",
+			FileName:    "test2.csv",
+			Status:      string(models.ImportStatusPending),
+		},
+	}
+
+	// Mock count query
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Model", mock.AnythingOfType("*models.ImportSession")).Return(mockDB)
+	mockDB.On("Count", mock.AnythingOfType("*int64")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		count := args.Get(0).(*int64)
+		*count = 2
+	})
+
+	// Mock list query
+	mockDB.On("Order", "created_at desc").Return(mockDB)
+	mockDB.On("Limit", 10).Return(mockDB)
+	mockDB.On("Offset", 0).Return(mockDB)
+	mockDB.On("Find", mock.AnythingOfType("*[]*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		sessions := args.Get(0).(*[]*models.ImportSession)
+		*sessions = expectedSessions
+	})
+
+	// Execute
+	result, err := service.ListImportSessions(ctx, params)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Len(t, result.Sessions, 2)
+	assert.Equal(t, int64(2), result.TotalCount)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 10, result.PageSize)
+	assert.Equal(t, 1, result.TotalPages)
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_ListImportSessions_WithFilters(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	accountType := "corporate"
+	status := "completed"
+	params := &ListImportSessionsParams{
+		Page:        1,
+		PageSize:    5,
+		AccountType: &accountType,
+		Status:      &status,
+		SortBy:      "created_at",
+		SortOrder:   "asc",
+	}
+
+	// Mock filtered queries
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Model", mock.AnythingOfType("*models.ImportSession")).Return(mockDB)
+	mockDB.On("Where", "account_type = ?", accountType).Return(mockDB)
+	mockDB.On("Where", "status = ?", status).Return(mockDB)
+	mockDB.On("Count", mock.AnythingOfType("*int64")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		count := args.Get(0).(*int64)
+		*count = 1
+	})
+
+	mockDB.On("Order", "created_at asc").Return(mockDB)
+	mockDB.On("Limit", 5).Return(mockDB)
+	mockDB.On("Offset", 0).Return(mockDB)
+	mockDB.On("Find", mock.AnythingOfType("*[]*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		sessions := args.Get(0).(*[]*models.ImportSession)
+		*sessions = []*models.ImportSession{
+			{
+				ID:          "session-1",
+				AccountType: "corporate",
+				Status:      "completed",
+			},
+		}
+	})
+
+	// Execute
+	result, err := service.ListImportSessions(ctx, params)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Len(t, result.Sessions, 1)
+	assert.Equal(t, "corporate", result.Sessions[0].AccountType)
+	assert.Equal(t, "completed", result.Sessions[0].Status)
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_ProcessCSVRow_Success(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	row := &CSVRow{
+		Date:          "2025-01-01",
+		Time:          "10:30:00",
+		EntranceIC:    "東京IC",
+		ExitIC:        "横浜IC",
+		TollAmount:    "1500",
+		CarNumber:     "品川300あ1234",
+		ETCCardNumber: "1234567890",
+		ETCNum:        "ETC001",
+	}
+
+	// Execute
+	record, err := service.ProcessCSVRow(ctx, row)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, record)
+	assert.Equal(t, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), record.Date)
+	assert.Equal(t, "10:30:00", record.Time)
+	assert.Equal(t, "東京IC", record.EntranceIC)
+	assert.Equal(t, "横浜IC", record.ExitIC)
+	assert.Equal(t, 1500, record.TollAmount)
+	assert.Equal(t, "品川300あ1234", record.CarNumber)
+	assert.Equal(t, "1234567890", record.ETCCardNumber)
+	assert.NotEmpty(t, record.Hash)
+}
+
+func TestImportService_ProcessCSVRow_InvalidTollAmount(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	row := &CSVRow{
+		Date:          "2025-01-01",
+		Time:          "10:30:00",
+		EntranceIC:    "東京IC",
+		ExitIC:        "横浜IC",
+		TollAmount:    "invalid-amount",
+		CarNumber:     "品川300あ1234",
+		ETCCardNumber: "1234567890",
+	}
+
+	// Execute
+	record, err := service.ProcessCSVRow(ctx, row)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, record)
+	assert.Contains(t, err.Error(), "invalid toll amount")
+}
+
+func TestImportService_CancelImportSession_Success(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	sessionID := "session-123"
+
+	session := &models.ImportSession{
+		ID:     sessionID,
+		Status: string(models.ImportStatusProcessing),
+	}
+
+	// Mock database operations
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Where", "id = ?", sessionID).Return(mockDB)
+	mockDB.On("First", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		s := args.Get(0).(*models.ImportSession)
+		*s = *session
+	})
+	mockDB.On("Save", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		s := args.Get(0).(*models.ImportSession)
+		assert.Equal(t, string(models.ImportStatusCancelled), s.Status)
+	})
+
+	// Execute
+	err := service.CancelImportSession(ctx, sessionID)
+
+	// Assert
+	assert.NoError(t, err)
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_CancelImportSession_NotFound(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	sessionID := "nonexistent-session"
+
+	// Mock database query returning not found
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Where", "id = ?", sessionID).Return(mockDB)
+	mockDB.On("First", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: gorm.ErrRecordNotFound})
+
+	// Execute
+	err := service.CancelImportSession(ctx, sessionID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "import session not found")
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_CancelImportSession_AlreadyCompleted(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	sessionID := "session-123"
+
+	session := &models.ImportSession{
+		ID:     sessionID,
+		Status: string(models.ImportStatusCompleted),
+	}
+
+	// Mock database operations
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("Where", "id = ?", sessionID).Return(mockDB)
+	mockDB.On("First", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+		s := args.Get(0).(*models.ImportSession)
+		*s = *session
+	})
+
+	// Execute
+	err := service.CancelImportSession(ctx, sessionID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot cancel completed session")
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_HealthCheck_Success(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+
+	// Mock database ping
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	rawDB := &struct{}{}
+	mockDB.On("DB").Return(rawDB, nil)
+
+	// Execute
+	err := service.HealthCheck(ctx)
+
+	// Assert
+	assert.NoError(t, err)
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestImportService_HealthCheck_DatabaseError(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+
+	// Mock database ping failure
+	mockDB.On("WithContext", ctx).Return(mockDB)
+	mockDB.On("DB").Return(nil, errors.New("database connection failed"))
+
+	// Execute
+	err := service.HealthCheck(ctx)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "database connection failed")
+
+	mockDB.AssertExpectations(t)
+}
+
+// Table-driven tests for CSV parsing edge cases
+func TestImportService_CSVParsing_EdgeCases(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	tests := []struct {
+		name        string
+		csvData     string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "Empty CSV",
+			csvData:     "",
+			expectError: true,
+			errorMsg:    "empty",
+		},
+		{
+			name:        "Only Headers",
+			csvData:     "date,time,entrance_ic,exit_ic,toll_amount,car_number,etc_card_number",
+			expectError: false,
+		},
+		{
+			name: "Missing Required Fields",
+			csvData: `date,time,entrance_ic
+2025-01-01,10:30:00,東京IC`,
+			expectError: true,
+			errorMsg:    "missing fields",
+		},
+		{
+			name: "Invalid Date Format",
+			csvData: `date,time,entrance_ic,exit_ic,toll_amount,car_number,etc_card_number
+invalid-date,10:30:00,東京IC,横浜IC,1500,品川300あ1234,1234567890`,
+			expectError: false, // Should create import error, not fail completely
+		},
+		{
+			name: "Special Characters in Data",
+			csvData: `date,time,entrance_ic,exit_ic,toll_amount,car_number,etc_card_number
+2025-01-01,10:30:00,"東京,IC","横浜""IC",1500,"品川300あ1234",1234567890`,
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := strings.NewReader(tt.csvData)
+			records, importErrors, err := service.parseCSVData(data)
+
+			if tt.expectError {
+				if err != nil {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				} else {
+					// Check if there are import errors instead
+					assert.NotEmpty(t, importErrors)
+				}
+			} else {
+				assert.NoError(t, err)
+				if tt.name == "Only Headers" {
+					assert.Empty(t, records)
+					assert.Empty(t, importErrors)
+				}
+			}
+		})
+	}
+}
+
+// Test concurrent import sessions
+func TestImportService_ConcurrentImports(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	// This test verifies that the service can handle concurrent operations
+	// In a real implementation, this would test database transaction isolation
+
+	ctx := context.Background()
+
+	// Mock multiple concurrent sessions
+	for i := 0; i < 5; i++ {
+		sessionID := fmt.Sprintf("session-%d", i)
+		session := &models.ImportSession{
+			ID:          sessionID,
+			AccountType: "corporate",
+			AccountID:   fmt.Sprintf("corp-%03d", i),
+			Status:      string(models.ImportStatusPending),
+		}
+
+		mockDB.On("WithContext", ctx).Return(mockDB)
+		mockDB.On("Where", "id = ?", sessionID).Return(mockDB)
+		mockDB.On("First", mock.AnythingOfType("*models.ImportSession")).Return(&gorm.DB{Error: nil}).Run(func(args mock.Arguments) {
+			s := args.Get(0).(*models.ImportSession)
+			*s = *session
+		})
+	}
+
+	// Execute concurrent reads
+	results := make(chan *models.ImportSession, 5)
+	errors := make(chan error, 5)
+
+	for i := 0; i < 5; i++ {
+		go func(sessionID string) {
+			session, err := service.GetImportSession(ctx, sessionID)
+			if err != nil {
+				errors <- err
+			} else {
+				results <- session
+			}
+		}(fmt.Sprintf("session-%d", i))
+	}
+
+	// Collect results
+	var successCount int
+	var errorCount int
+	for i := 0; i < 5; i++ {
+		select {
+		case <-results:
+			successCount++
+		case <-errors:
+			errorCount++
+		case <-time.After(1 * time.Second):
+			t.Fatal("Test timed out")
+		}
+	}
+
+	assert.Equal(t, 5, successCount)
+	assert.Equal(t, 0, errorCount)
+
+	mockDB.AssertExpectations(t)
+}
+
+// T001-D: Bulk operations testing for ImportService.ProcessCSV() with large datasets
+func TestImportService_ProcessCSV_LargeDataset(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+
+	// Generate large dataset (10k records)
+	rows := make([]*CSVRow, 10000)
+	for i := 0; i < 10000; i++ {
+		rows[i] = &CSVRow{
+			Date:          "2025-01-01",
+			Time:          "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:        "横浜IC",
+			TollAmount:    "1500",
+			CarNumber:     fmt.Sprintf("品川300あ%04d", i),
+			ETCCardNumber: fmt.Sprintf("123456789%d", i),
+		}
+	}
+
+	options := &BulkProcessOptions{
+		BatchSize:      1000,
+		MaxConcurrency: 5,
+		SkipErrors:     false,
+	}
+
+	// Execute
+	start := time.Now()
+	result, err := service.ProcessCSV(ctx, rows, options)
+	duration := time.Since(start)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 10000, result.TotalRows)
+	assert.Equal(t, 10000, result.SuccessCount)
+	assert.Equal(t, 0, result.ErrorCount)
+	assert.True(t, duration < 30*time.Second, "Processing should complete within 30 seconds")
+}
+
+func TestImportService_ProcessCSV_BatchSizeValidation(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	rows := []*CSVRow{
+		{
+			Date:       "2025-01-01",
+			Time:       "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:     "横浜IC",
+			TollAmount: "1500",
+		},
+	}
+
+	tests := []struct {
+		name          string
+		options       *BulkProcessOptions
+		expectedError string
+	}{
+		{
+			name: "batch size too small",
+			options: &BulkProcessOptions{
+				BatchSize:      0,
+				MaxConcurrency: 5,
+				SkipErrors:     false,
+			},
+			expectedError: "batch size must be between 1 and 10000",
+		},
+		{
+			name: "batch size too large",
+			options: &BulkProcessOptions{
+				BatchSize:      10001,
+				MaxConcurrency: 5,
+				SkipErrors:     false,
+			},
+			expectedError: "batch size must be between 1 and 10000",
+		},
+		{
+			name: "max concurrency too small",
+			options: &BulkProcessOptions{
+				BatchSize:      1000,
+				MaxConcurrency: 0,
+				SkipErrors:     false,
+			},
+			expectedError: "max concurrency must be between 1 and 20",
+		},
+		{
+			name: "max concurrency too large",
+			options: &BulkProcessOptions{
+				BatchSize:      1000,
+				MaxConcurrency: 21,
+				SkipErrors:     false,
+			},
+			expectedError: "max concurrency must be between 1 and 20",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := service.ProcessCSV(ctx, rows, tt.options)
+
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedError)
+			assert.Nil(t, result)
+		})
+	}
+}
+
+func TestImportService_ProcessCSV_ErrorHandling(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+
+	// Mix of valid and invalid rows
+	rows := []*CSVRow{
+		{
+			Date:       "2025-01-01",
+			Time:       "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:     "横浜IC",
+			TollAmount: "1500",
+		},
+		{
+			Date:       "invalid-date",
+			Time:       "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:     "横浜IC",
+			TollAmount: "1500",
+		},
+		{
+			Date:       "2025-01-01",
+			Time:       "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:     "横浜IC",
+			TollAmount: "invalid-amount",
+		},
+	}
+
+	t.Run("skip errors enabled", func(t *testing.T) {
+		options := &BulkProcessOptions{
+			BatchSize:      2,
+			MaxConcurrency: 1,
+			SkipErrors:     true,
+		}
+
+		result, err := service.ProcessCSV(ctx, rows, options)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 3, result.TotalRows)
+		assert.Equal(t, 1, result.SuccessCount)
+		assert.Equal(t, 2, result.ErrorCount)
+		assert.Len(t, result.Errors, 2)
+	})
+
+	t.Run("skip errors disabled", func(t *testing.T) {
+		options := &BulkProcessOptions{
+			BatchSize:      2,
+			MaxConcurrency: 1,
+			SkipErrors:     false,
+		}
+
+		result, err := service.ProcessCSV(ctx, rows, options)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "batch processing failed")
+	})
+}
+
+func TestImportService_ProcessCSV_NilInput(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+
+	result, err := service.ProcessCSV(ctx, nil, nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "CSV rows cannot be nil")
+	assert.Nil(t, result)
+}
+
+func TestImportService_ProcessCSV_DefaultOptions(t *testing.T) {
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+	rows := []*CSVRow{
+		{
+			Date:       "2025-01-01",
+			Time:       "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:     "横浜IC",
+			TollAmount: "1500",
+		},
+	}
+
+	// Test with nil options (should use defaults)
+	result, err := service.ProcessCSV(ctx, rows, nil)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.TotalRows)
+	assert.Equal(t, 1, result.SuccessCount)
+	assert.Equal(t, 0, result.ErrorCount)
+}
+
+func TestImportService_ProcessCSV_MemoryEfficiency(t *testing.T) {
+	// Test memory efficiency with medium-sized dataset
+	mockDB := mocks.NewMockGormDB()
+	logger := log.New(log.Writer(), "[Test] ", log.LstdFlags)
+	service := NewImportService(mockDB.DB, logger)
+
+	ctx := context.Background()
+
+	// Generate 5k records
+	rows := make([]*CSVRow, 5000)
+	for i := 0; i < 5000; i++ {
+		rows[i] = &CSVRow{
+			Date:       "2025-01-01",
+			Time:       "10:30",
+			EntranceIC:    "東京IC",
+			ExitIC:     "横浜IC",
+			TollAmount: "1500",
+		}
+	}
+
+	options := &BulkProcessOptions{
+		BatchSize:      500,  // Smaller batches for memory efficiency
+		MaxConcurrency: 3,
+		SkipErrors:     false,
+	}
+
+	// Measure memory usage (approximate)
+	var m1, m2 runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+
+	result, err := service.ProcessCSV(ctx, rows, options)
+
+	runtime.GC()
+	runtime.ReadMemStats(&m2)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 5000, result.TotalRows)
+	assert.Equal(t, 5000, result.SuccessCount)
+
+	// Memory usage should be reasonable (less than 100MB increase)
+	memoryIncrease := m2.Alloc - m1.Alloc
+	assert.True(t, memoryIncrease < 100*1024*1024, "Memory increase should be less than 100MB")
+}

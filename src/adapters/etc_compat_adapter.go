@@ -1,9 +1,13 @@
 package adapters
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
+	"github.com/yhonda-ohishi/etc_meisai/src/pb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ETCMeisaiCompatAdapter provides compatibility between new GORM model and legacy 38-field API
@@ -335,4 +339,350 @@ func (a *ETCMeisaiCompatAdapter) ConvertToStandardFormat(compat *ETCMeisaiCompat
 	}
 
 	return &normalized
+}
+
+// ConvertToProto converts ETCMeisaiCompat to protobuf format
+func (a *ETCMeisaiCompatAdapter) ConvertToProto(compat *ETCMeisaiCompat) (*pb.ETCMeisaiRecord, error) {
+	if compat == nil {
+		return nil, fmt.Errorf("compat cannot be nil")
+	}
+
+	// Normalize the compatibility record first
+	normalized := a.ConvertToStandardFormat(compat)
+	if normalized == nil {
+		return nil, fmt.Errorf("failed to normalize compatibility record")
+	}
+
+	proto := &pb.ETCMeisaiRecord{
+		Id:            normalized.ID,
+		Hash:          normalized.Hash,
+		Date:          normalized.UseDate.Format("2006-01-02"),
+		Time:          normalized.UseTime,
+		EntranceIc:    normalized.EntryIC,
+		ExitIc:        normalized.ExitIC,
+		TollAmount:    normalized.Amount,
+		CarNumber:     normalized.CarNumber,
+		EtcCardNumber: normalized.ETCNumber,
+	}
+
+	// Convert timestamps
+	if !normalized.CreatedAt.IsZero() {
+		proto.CreatedAt = timestamppb.New(normalized.CreatedAt)
+	}
+	if !normalized.UpdatedAt.IsZero() {
+		proto.UpdatedAt = timestamppb.New(normalized.UpdatedAt)
+	}
+
+	return proto, nil
+}
+
+// ConvertToProtoList converts a slice of ETCMeisaiCompat to protobuf format
+func (a *ETCMeisaiCompatAdapter) ConvertToProtoList(compatList []*ETCMeisaiCompat) ([]*pb.ETCMeisaiRecord, error) {
+	if compatList == nil {
+		return nil, nil
+	}
+
+	protoList := make([]*pb.ETCMeisaiRecord, 0, len(compatList))
+	for i, compat := range compatList {
+		if compat == nil {
+			return nil, fmt.Errorf("compat at index %d cannot be nil", i)
+		}
+
+		proto, err := a.ConvertToProto(compat)
+		if err != nil {
+			return nil, fmt.Errorf("error converting compat at index %d: %w", i, err)
+		}
+
+		protoList = append(protoList, proto)
+	}
+
+	return protoList, nil
+}
+
+// ConvertFromLegacy converts legacy data map to ETCMeisaiRecord
+func (a *ETCMeisaiCompatAdapter) ConvertFromLegacy(legacyData map[string]interface{}) (*models.ETCMeisaiRecord, error) {
+	if legacyData == nil {
+		return nil, fmt.Errorf("legacy data cannot be nil")
+	}
+
+	if len(legacyData) == 0 {
+		return nil, fmt.Errorf("legacy data is empty")
+	}
+
+	record := &models.ETCMeisaiRecord{}
+
+	// Required fields validation
+	requiredFields := []string{"use_date", "use_time", "entry_ic", "exit_ic", "amount", "car_number", "etc_number"}
+	for _, field := range requiredFields {
+		if _, exists := legacyData[field]; !exists {
+			// Check for alternative field names (Japanese)
+			alternativeFields := map[string][]string{
+				"use_date":   {"利用年月日", "date"},
+				"use_time":   {"利用時刻", "time"},
+				"entry_ic":   {"入口IC", "入口"},
+				"exit_ic":    {"出口IC", "出口"},
+				"amount":     {"料金", "toll_amount"},
+				"car_number": {"車両番号", "vehicle_number"},
+				"etc_number": {"ETCカード番号", "etc_card_number"},
+			}
+
+			found := false
+			if alternatives, ok := alternativeFields[field]; ok {
+				for _, alt := range alternatives {
+					if _, exists := legacyData[alt]; exists {
+						found = true
+						break
+					}
+				}
+			}
+
+			if !found {
+				return nil, fmt.Errorf("missing required field: %s", field)
+			}
+		}
+	}
+
+	// Date parsing
+	dateStr := getStringValue(legacyData, "use_date", "利用年月日", "date")
+	if dateStr != "" {
+		if parsedDate, err := time.Parse("2006-01-02", dateStr); err == nil {
+			record.Date = parsedDate
+		} else {
+			return nil, fmt.Errorf("invalid date format")
+		}
+	}
+
+	// Time
+	record.Time = getStringValue(legacyData, "use_time", "利用時刻", "time")
+
+	// IC fields
+	record.EntranceIC = getStringValue(legacyData, "entry_ic", "入口IC", "入口")
+	record.ExitIC = getStringValue(legacyData, "exit_ic", "出口IC", "出口")
+
+	// Amount
+	amountVal := getValue(legacyData, "amount", "料金", "toll_amount")
+	if amountVal != nil {
+		if amount, ok := amountVal.(int); ok {
+			record.TollAmount = amount
+		} else if amountStr, ok := amountVal.(string); ok {
+			if parsed, err := strconv.Atoi(amountStr); err == nil {
+				record.TollAmount = parsed
+			} else {
+				return nil, fmt.Errorf("invalid amount format")
+			}
+		} else {
+			return nil, fmt.Errorf("invalid amount format")
+		}
+	}
+
+	// Car number
+	record.CarNumber = getStringValue(legacyData, "car_number", "車両番号", "vehicle_number")
+
+	// ETC number
+	record.ETCCardNumber = getStringValue(legacyData, "etc_number", "ETCカード番号", "etc_card_number")
+
+	return record, nil
+}
+
+// ConvertToLegacy converts ETCMeisaiRecord to legacy format
+func (a *ETCMeisaiCompatAdapter) ConvertToLegacy(record *models.ETCMeisaiRecord, format string) (map[string]interface{}, error) {
+	if record == nil {
+		return nil, fmt.Errorf("record cannot be nil")
+	}
+
+	switch format {
+	case "legacy":
+		return map[string]interface{}{
+			"use_date":   record.Date.Format("2006-01-02"),
+			"use_time":   record.Time,
+			"entry_ic":   record.EntranceIC,
+			"exit_ic":    record.ExitIC,
+			"amount":     record.TollAmount,
+			"car_number": record.CarNumber,
+			"etc_number": record.ETCCardNumber,
+		}, nil
+	case "japanese":
+		return map[string]interface{}{
+			"利用年月日":    record.Date.Format("2006-01-02"),
+			"利用時刻":     record.Time,
+			"入口IC":      record.EntranceIC,
+			"出口IC":      record.ExitIC,
+			"料金":       record.TollAmount,
+			"車両番号":     record.CarNumber,
+			"ETCカード番号": record.ETCCardNumber,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+// ConvertBatch converts multiple legacy data maps to ETCMeisaiRecord slice
+func (a *ETCMeisaiCompatAdapter) ConvertBatch(legacyBatch []map[string]interface{}) ([]*models.ETCMeisaiRecord, error) {
+	if legacyBatch == nil {
+		return nil, fmt.Errorf("batch cannot be nil")
+	}
+
+	if len(legacyBatch) == 0 {
+		return nil, fmt.Errorf("batch cannot be empty")
+	}
+
+	records := make([]*models.ETCMeisaiRecord, 0, len(legacyBatch))
+	for i, legacyData := range legacyBatch {
+		record, err := a.ConvertFromLegacy(legacyData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert record at index %d: %w", i, err)
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// ValidateCompatibility validates if legacy data is compatible
+func (a *ETCMeisaiCompatAdapter) ValidateCompatibility(legacyData map[string]interface{}) error {
+	if legacyData == nil {
+		return fmt.Errorf("legacy data cannot be nil")
+	}
+
+	// Check for incompatible version
+	if version, exists := legacyData["version"]; exists {
+		if versionStr, ok := version.(string); ok && versionStr == "v1.0.0" {
+			return fmt.Errorf("incompatible version: %s", versionStr)
+		}
+	}
+
+	// Check for critical fields
+	criticalFields := []string{"use_date", "entry_ic", "exit_ic"}
+	missingFields := []string{}
+
+	for _, field := range criticalFields {
+		if _, exists := legacyData[field]; !exists {
+			// Check alternative names
+			alternatives := map[string][]string{
+				"use_date": {"利用年月日", "date"},
+				"entry_ic": {"入口IC", "入口"},
+				"exit_ic":  {"出口IC", "出口"},
+			}
+
+			found := false
+			if alts, ok := alternatives[field]; ok {
+				for _, alt := range alts {
+					if _, exists := legacyData[alt]; exists {
+						found = true
+						break
+					}
+				}
+			}
+
+			if !found {
+				missingFields = append(missingFields, field)
+			}
+		}
+	}
+
+	if len(missingFields) > 0 {
+		return fmt.Errorf("missing critical fields: %v", missingFields)
+	}
+
+	return nil
+}
+
+// GetFieldMapping returns field mapping for the specified format
+func (a *ETCMeisaiCompatAdapter) GetFieldMapping(format string) (map[string]string, error) {
+	switch format {
+	case "legacy":
+		return map[string]string{
+			"use_date":   "Date",
+			"use_time":   "Time",
+			"entry_ic":   "EntranceIC",
+			"exit_ic":    "ExitIC",
+			"amount":     "TollAmount",
+			"car_number": "CarNumber",
+			"etc_number": "ETCCardNumber",
+		}, nil
+	case "japanese":
+		return map[string]string{
+			"利用年月日":    "Date",
+			"利用時刻":     "Time",
+			"入口IC":      "EntranceIC",
+			"出口IC":      "ExitIC",
+			"料金":       "TollAmount",
+			"車両番号":     "CarNumber",
+			"ETCカード番号": "ETCCardNumber",
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+// NormalizeFieldNames normalizes field names to standard format
+func (a *ETCMeisaiCompatAdapter) NormalizeFieldNames(input map[string]interface{}) map[string]interface{} {
+	if input == nil {
+		return make(map[string]interface{})
+	}
+
+	result := make(map[string]interface{})
+
+	// Field mapping from various formats to standard format
+	fieldMap := map[string]string{
+		// Date fields
+		"date":        "use_date",
+		"利用日":        "use_date",
+		"利用年月日":      "use_date",
+
+		// Time fields
+		"time":        "use_time",
+		"利用時間":       "use_time",
+		"利用時刻":       "use_time",
+
+		// IC fields
+		"entry":       "entry_ic",
+		"入口":         "entry_ic",
+		"exit":        "exit_ic",
+		"出口":         "exit_ic",
+
+		// Amount fields
+		"toll_amount": "amount",
+		"料金":         "amount",
+
+		// Vehicle fields
+		"vehicle_number": "car_number",
+		"車両番号":         "car_number",
+
+		// ETC fields
+		"etc_card_number": "etc_number",
+		"ETCカード番号":       "etc_number",
+	}
+
+	for key, value := range input {
+		normalizedKey := key
+		if mapped, exists := fieldMap[key]; exists {
+			normalizedKey = mapped
+		}
+		result[normalizedKey] = value
+	}
+
+	return result
+}
+
+// Helper function to get string value from multiple possible keys
+func getStringValue(data map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		if value, exists := data[key]; exists {
+			if str, ok := value.(string); ok {
+				return str
+			}
+		}
+	}
+	return ""
+}
+
+// Helper function to get value from multiple possible keys
+func getValue(data map[string]interface{}, keys ...string) interface{} {
+	for _, key := range keys {
+		if value, exists := data[key]; exists {
+			return value
+		}
+	}
+	return nil
 }

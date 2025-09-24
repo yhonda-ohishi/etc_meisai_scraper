@@ -1,0 +1,2001 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>handlers: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/yhonda-ohishi/etc_meisai/src/handlers/accounts.go (100.0%)</option>
+				
+				<option value="file1">github.com/yhonda-ohishi/etc_meisai/src/handlers/base.go (100.0%)</option>
+				
+				<option value="file2">github.com/yhonda-ohishi/etc_meisai/src/handlers/download.go (100.0%)</option>
+				
+				<option value="file3">github.com/yhonda-ohishi/etc_meisai/src/handlers/errors.go (94.9%)</option>
+				
+				<option value="file4">github.com/yhonda-ohishi/etc_meisai/src/handlers/etc_handlers.go (44.7%)</option>
+				
+				<option value="file5">github.com/yhonda-ohishi/etc_meisai/src/handlers/health_handler.go (47.8%)</option>
+				
+				<option value="file6">github.com/yhonda-ohishi/etc_meisai/src/handlers/mapping.go (33.8%)</option>
+				
+				<option value="file7">github.com/yhonda-ohishi/etc_meisai/src/handlers/parse.go (58.1%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package handlers
+
+import (
+        "net/http"
+        "os"
+        "strings"
+)
+
+// AccountsHandler はアカウント関連のハンドラー
+type AccountsHandler struct {
+        BaseHandler
+}
+
+// Account はETCアカウント情報
+type Account struct {
+        ID       string `json:"id"`
+        Name     string `json:"name"`
+        Type     string `json:"type"`
+        Username string `json:"username"`
+        ETCNum   string `json:"etc_num,omitempty"`
+        IsActive bool   `json:"is_active"`
+}
+
+// NewAccountsHandler creates a new accounts handler
+func NewAccountsHandler(base BaseHandler) *AccountsHandler <span class="cov8" title="1">{
+        return &amp;AccountsHandler{BaseHandler: base}
+}</span>
+
+// GetAccounts は登録されているアカウント一覧を返す
+func (h *AccountsHandler) GetAccounts(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        accounts := []Account{}
+
+        // 法人アカウントの取得
+        corporateAccounts := os.Getenv("ETC_CORPORATE_ACCOUNTS")
+        if corporateAccounts != "" </span><span class="cov8" title="1">{
+                for _, accountStr := range strings.Split(corporateAccounts, ",") </span><span class="cov8" title="1">{
+                        parts := strings.Split(accountStr, ":")
+                        if len(parts) &gt;= 2 </span><span class="cov8" title="1">{
+                                account := Account{
+                                        ID:       parts[0],
+                                        Name:     parts[0],
+                                        Type:     "corporate",
+                                        Username: parts[0],
+                                        IsActive: true,
+                                }
+                                if len(parts) &gt;= 3 </span><span class="cov8" title="1">{
+                                        // If there are more than 3 parts, take the last one as ETC number
+                                        // to handle cases like "id:password:extra:colons:etc_num"
+                                        account.ETCNum = parts[len(parts)-1]
+                                }</span>
+                                <span class="cov8" title="1">accounts = append(accounts, account)</span>
+                        }
+                }
+        }
+
+        // 個人アカウントの取得
+        <span class="cov8" title="1">personalAccounts := os.Getenv("ETC_PERSONAL_ACCOUNTS")
+        if personalAccounts != "" </span><span class="cov8" title="1">{
+                for _, accountStr := range strings.Split(personalAccounts, ",") </span><span class="cov8" title="1">{
+                        parts := strings.Split(accountStr, ":")
+                        if len(parts) &gt;= 2 </span><span class="cov8" title="1">{
+                                account := Account{
+                                        ID:       parts[0],
+                                        Name:     parts[0],
+                                        Type:     "personal",
+                                        Username: parts[0],
+                                        IsActive: true,
+                                }
+                                if len(parts) &gt;= 3 </span><span class="cov8" title="1">{
+                                        // If there are more than 3 parts, take the last one as ETC number
+                                        // to handle cases like "id:password:extra:colons:etc_num"
+                                        account.ETCNum = parts[len(parts)-1]
+                                }</span>
+                                <span class="cov8" title="1">accounts = append(accounts, account)</span>
+                        }
+                }
+        }
+
+        <span class="cov8" title="1">response := map[string]interface{}{
+                "accounts": accounts,
+                "count":    len(accounts),
+        }
+
+        h.RespondSuccess(w, response, "Accounts retrieved successfully")</span>
+}</pre>
+		
+		<pre class="file" id="file1" style="display: none">package handlers
+
+import (
+        "context"
+        "encoding/json"
+        "log"
+        "net/http"
+        "time"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// BaseHandler は全ハンドラーの基底構造体
+type BaseHandler struct {
+        ServiceRegistry services.ServiceRegistryInterface
+        Logger          *log.Logger
+        ErrorHandler    *GRPCErrorHandler
+}
+
+// ErrorResponse は統一エラーレスポンス
+type ErrorResponse struct {
+        Error struct {
+                Code    string      `json:"code"`
+                Message string      `json:"message"`
+                Details interface{} `json:"details,omitempty"`
+        } `json:"error"`
+}
+
+// SuccessResponse は統一成功レスポンス
+type SuccessResponse struct {
+        Success bool        `json:"success"`
+        Data    interface{} `json:"data,omitempty"`
+        Message string      `json:"message,omitempty"`
+}
+
+// RespondJSON は JSONレスポンスを送信
+func (h *BaseHandler) RespondJSON(w http.ResponseWriter, status int, data interface{}) <span class="cov8" title="1">{
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(status)
+        if err := json.NewEncoder(w).Encode(data); err != nil </span><span class="cov8" title="1">{
+                h.Logger.Printf("Failed to encode response: %v", err)
+        }</span>
+}
+
+// RespondError はエラーレスポンスを送信
+func (h *BaseHandler) RespondError(w http.ResponseWriter, status int, code, message string, details interface{}) <span class="cov8" title="1">{
+        resp := ErrorResponse{}
+        resp.Error.Code = code
+        resp.Error.Message = message
+        resp.Error.Details = details
+        h.RespondJSON(w, status, resp)
+}</span>
+
+// RespondGRPCError はgRPCエラーを適切なHTTPレスポンスに変換して送信
+func (h *BaseHandler) RespondGRPCError(w http.ResponseWriter, err error, requestID string) <span class="cov8" title="1">{
+        if h.ErrorHandler == nil </span><span class="cov8" title="1">{
+                h.ErrorHandler = NewGRPCErrorHandler()
+        }</span>
+
+        <span class="cov8" title="1">httpStatus, errorCode, message := h.ErrorHandler.HandleGRPCError(err)
+        errorDetail := h.ErrorHandler.CreateErrorDetail(err, requestID)
+
+        h.RespondError(w, httpStatus, errorCode, message, errorDetail)</span>
+}
+
+// RespondSuccess は成功レスポンスを送信
+func (h *BaseHandler) RespondSuccess(w http.ResponseWriter, data interface{}, message string) <span class="cov8" title="1">{
+        resp := SuccessResponse{
+                Success: true,
+                Data:    data,
+                Message: message,
+        }
+        h.RespondJSON(w, http.StatusOK, resp)
+}</span>
+
+// HealthCheck performs comprehensive health check including gRPC services
+func (h *BaseHandler) HealthCheck(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+        defer cancel()
+
+        if h.ServiceRegistry == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Service registry not initialized", nil)
+                return
+        }</span>
+
+        <span class="cov8" title="1">result := h.ServiceRegistry.HealthCheck(ctx)
+
+        if result.IsHealthy() </span><span class="cov8" title="1">{
+                h.RespondJSON(w, http.StatusOK, result)
+        }</span> else<span class="cov8" title="1"> {
+                h.RespondJSON(w, http.StatusServiceUnavailable, result)
+        }</span>
+}
+
+// NewBaseHandler creates a new base handler with service registry
+func NewBaseHandler(serviceRegistry services.ServiceRegistryInterface, logger *log.Logger) *BaseHandler <span class="cov8" title="1">{
+        return &amp;BaseHandler{
+                ServiceRegistry: serviceRegistry,
+                Logger:          logger,
+                ErrorHandler:    NewGRPCErrorHandler(),
+        }
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">package handlers
+
+import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "strings"
+        "time"
+
+        "github.com/google/uuid"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// DownloadHandler はダウンロード関連のハンドラー
+type DownloadHandler struct {
+        BaseHandler
+        DownloadService services.DownloadServiceInterface
+}
+
+// DownloadRequest はダウンロードリクエスト
+type DownloadRequest struct {
+        Accounts []string `json:"accounts"`
+        FromDate string   `json:"from_date"`
+        ToDate   string   `json:"to_date"`
+        Mode     string   `json:"mode"`
+}
+
+// JobStatus はジョブステータス
+type JobStatus struct {
+        JobID        string     `json:"job_id"`
+        Status       string     `json:"status"`
+        Progress     int        `json:"progress"`
+        TotalRecords int        `json:"total_records"`
+        ErrorMessage *string    `json:"error_message,omitempty"`
+        CompletedAt  *time.Time `json:"completed_at,omitempty"`
+}
+
+// NewDownloadHandler creates a new download handler
+func NewDownloadHandler(base BaseHandler, downloadService services.DownloadServiceInterface) *DownloadHandler <span class="cov8" title="1">{
+        return &amp;DownloadHandler{
+                BaseHandler:     base,
+                DownloadService: downloadService,
+        }
+}</span>
+
+// DownloadSync は同期ダウンロードを実行
+func (h *DownloadHandler) DownloadSync(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        var req DownloadRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body", nil)
+                return
+        }</span>
+
+        // パラメータのデフォルト値設定
+        <span class="cov8" title="1">if req.FromDate == "" || req.ToDate == "" </span><span class="cov8" title="1">{
+                now := time.Now()
+                if req.ToDate == "" </span><span class="cov8" title="1">{
+                        req.ToDate = now.Format("2006-01-02")
+                }</span>
+                <span class="cov8" title="1">if req.FromDate == "" </span><span class="cov8" title="1">{
+                        lastMonth := now.AddDate(0, -1, 0)
+                        req.FromDate = lastMonth.Format("2006-01-02")
+                }</span>
+        }
+
+        <span class="cov8" title="1">if len(req.Accounts) == 0 </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "MISSING_ACCOUNTS", "At least one account is required", nil)
+                return
+        }</span>
+
+        // TODO: 実際のダウンロード処理を実装
+        <span class="cov8" title="1">response := map[string]interface{}{
+                "success":      true,
+                "record_count": 0,
+                "csv_path":     "",
+                "records":      []interface{}{},
+        }
+
+        h.RespondSuccess(w, response, "Download completed successfully")</span>
+}
+
+// DownloadAsync は非同期ダウンロードを開始
+func (h *DownloadHandler) DownloadAsync(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        var req DownloadRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body", nil)
+                return
+        }</span>
+
+        // パラメータのデフォルト値設定
+        <span class="cov8" title="1">if req.FromDate == "" || req.ToDate == "" </span><span class="cov8" title="1">{
+                now := time.Now()
+                if req.ToDate == "" </span><span class="cov8" title="1">{
+                        req.ToDate = now.Format("2006-01-02")
+                }</span>
+                <span class="cov8" title="1">if req.FromDate == "" </span><span class="cov8" title="1">{
+                        lastMonth := now.AddDate(0, -1, 0)
+                        req.FromDate = lastMonth.Format("2006-01-02")
+                }</span>
+        }
+
+        <span class="cov8" title="1">if len(req.Accounts) == 0 </span><span class="cov8" title="1">{
+                // デフォルトで全アカウントを使用
+                req.Accounts = h.DownloadService.GetAllAccountIDs()
+                if len(req.Accounts) == 0 </span><span class="cov8" title="1">{
+                        h.RespondError(w, http.StatusBadRequest, "NO_ACCOUNTS", "No accounts configured", nil)
+                        return
+                }</span>
+        }
+
+        // ジョブIDを生成
+        <span class="cov8" title="1">jobID := uuid.New().String()
+
+        // 非同期でダウンロード開始
+        go h.DownloadService.ProcessAsync(jobID, req.Accounts, req.FromDate, req.ToDate)
+
+        response := map[string]interface{}{
+                "job_id":  jobID,
+                "status":  "pending",
+                "message": "Download job started",
+        }
+
+        h.RespondJSON(w, http.StatusAccepted, response)</span>
+}
+
+// GetDownloadStatus はダウンロードステータスを取得
+func (h *DownloadHandler) GetDownloadStatus(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        jobID := r.URL.Query().Get("job_id")
+        if jobID == "" </span><span class="cov8" title="1">{
+                // URLパスから取得を試みる
+                // 例: /api/download/status/{jobId}
+                parts := strings.Split(r.URL.Path, "/")
+                if len(parts) &gt; 0 </span><span class="cov8" title="1">{
+                        jobID = parts[len(parts)-1]
+                }</span>
+        }
+
+        <span class="cov8" title="1">if jobID == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "MISSING_JOB_ID", "Job ID is required", nil)
+                return
+        }</span>
+
+        // TODO: 実際のステータス取得処理を実装
+        <span class="cov8" title="1">status := JobStatus{
+                JobID:        jobID,
+                Status:       "processing",
+                Progress:     50,
+                TotalRecords: 100,
+        }
+
+        h.RespondSuccess(w, status, fmt.Sprintf("Status for job %s", jobID))</span>
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">package handlers
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "net/http"
+
+        "google.golang.org/grpc/codes"
+        "google.golang.org/grpc/status"
+)
+
+// GRPCErrorHandler provides centralized gRPC error handling
+type GRPCErrorHandler struct{}
+
+// NewGRPCErrorHandler creates a new gRPC error handler
+func NewGRPCErrorHandler() *GRPCErrorHandler <span class="cov8" title="1">{
+        return &amp;GRPCErrorHandler{}
+}</span>
+
+// HandleGRPCError converts gRPC errors to appropriate HTTP responses
+func (e *GRPCErrorHandler) HandleGRPCError(err error) (int, string, string) <span class="cov8" title="1">{
+        if err == nil </span><span class="cov8" title="1">{
+                return http.StatusOK, "success", "Operation completed successfully"
+        }</span>
+
+        // Check if it's a gRPC status error
+        <span class="cov8" title="1">if st, ok := status.FromError(err); ok </span><span class="cov8" title="1">{
+                return e.mapGRPCStatusToHTTP(st)
+        }</span>
+
+        // Check for context errors
+        <span class="cov8" title="1">if errors.Is(err, context.DeadlineExceeded) </span><span class="cov8" title="1">{
+                return http.StatusRequestTimeout, "timeout", "Request timeout exceeded"
+        }</span>
+
+        <span class="cov8" title="1">if errors.Is(err, context.Canceled) </span><span class="cov8" title="1">{
+                return http.StatusRequestTimeout, "canceled", "Request was canceled"
+        }</span>
+
+        // Default to internal server error
+        <span class="cov8" title="1">return http.StatusInternalServerError, "internal_error", err.Error()</span>
+}
+
+// mapGRPCStatusToHTTP maps gRPC status codes to HTTP status codes
+func (e *GRPCErrorHandler) mapGRPCStatusToHTTP(st *status.Status) (int, string, string) <span class="cov8" title="1">{
+        code := st.Code()
+        message := st.Message()
+
+        switch code </span>{
+        case codes.OK:<span class="cov0" title="0">
+                return http.StatusOK, "success", "Operation completed successfully"</span>
+        case codes.InvalidArgument:<span class="cov8" title="1">
+                return http.StatusBadRequest, "invalid_argument", message</span>
+        case codes.NotFound:<span class="cov8" title="1">
+                return http.StatusNotFound, "not_found", message</span>
+        case codes.AlreadyExists:<span class="cov8" title="1">
+                return http.StatusConflict, "already_exists", message</span>
+        case codes.PermissionDenied:<span class="cov8" title="1">
+                return http.StatusForbidden, "permission_denied", message</span>
+        case codes.Unauthenticated:<span class="cov8" title="1">
+                return http.StatusUnauthorized, "unauthenticated", message</span>
+        case codes.ResourceExhausted:<span class="cov8" title="1">
+                return http.StatusTooManyRequests, "resource_exhausted", message</span>
+        case codes.FailedPrecondition:<span class="cov8" title="1">
+                return http.StatusPreconditionFailed, "failed_precondition", message</span>
+        case codes.Aborted:<span class="cov8" title="1">
+                return http.StatusConflict, "aborted", message</span>
+        case codes.OutOfRange:<span class="cov8" title="1">
+                return http.StatusBadRequest, "out_of_range", message</span>
+        case codes.Unimplemented:<span class="cov8" title="1">
+                return http.StatusNotImplemented, "unimplemented", message</span>
+        case codes.Internal:<span class="cov8" title="1">
+                return http.StatusInternalServerError, "internal_error", message</span>
+        case codes.Unavailable:<span class="cov8" title="1">
+                return http.StatusServiceUnavailable, "unavailable", message</span>
+        case codes.DataLoss:<span class="cov8" title="1">
+                return http.StatusInternalServerError, "data_loss", message</span>
+        case codes.DeadlineExceeded:<span class="cov8" title="1">
+                return http.StatusRequestTimeout, "deadline_exceeded", message</span>
+        case codes.Canceled:<span class="cov8" title="1">
+                return http.StatusRequestTimeout, "canceled", message</span>
+        default:<span class="cov8" title="1">
+                return http.StatusInternalServerError, "unknown_error",
+                        fmt.Sprintf("Unknown gRPC error: %s", message)</span>
+        }
+}
+
+// ErrorDetail provides additional error context
+type ErrorDetail struct {
+        Code       string      `json:"code"`
+        Message    string      `json:"message"`
+        Details    interface{} `json:"details,omitempty"`
+        GRPCCode   string      `json:"grpc_code,omitempty"`
+        Timestamp  string      `json:"timestamp"`
+        RequestID  string      `json:"request_id,omitempty"`
+}
+
+// CreateErrorDetail creates a detailed error response
+func (e *GRPCErrorHandler) CreateErrorDetail(err error, requestID string) *ErrorDetail <span class="cov8" title="1">{
+        httpStatus, errorCode, message := e.HandleGRPCError(err)
+
+        detail := &amp;ErrorDetail{
+                Code:      errorCode,
+                Message:   message,
+                Timestamp: fmt.Sprintf("%d", httpStatus), // Temporary use HTTP status
+                RequestID: requestID,
+        }
+
+        // Add gRPC specific details if available
+        if st, ok := status.FromError(err); ok </span><span class="cov8" title="1">{
+                detail.GRPCCode = st.Code().String()
+                if len(st.Details()) &gt; 0 </span><span class="cov0" title="0">{
+                        detail.Details = st.Details()
+                }</span>
+        }
+
+        <span class="cov8" title="1">return detail</span>
+}
+
+// ValidationError represents validation errors
+type ValidationError struct {
+        Field   string `json:"field"`
+        Message string `json:"message"`
+        Value   string `json:"value,omitempty"`
+}
+
+// BusinessLogicError represents business logic errors
+type BusinessLogicError struct {
+        Code    string `json:"code"`
+        Message string `json:"message"`
+        Context string `json:"context,omitempty"`
+}
+
+// HandleValidationErrors handles validation-specific errors
+func (e *GRPCErrorHandler) HandleValidationErrors(errors []ValidationError) (int, string, interface{}) <span class="cov8" title="1">{
+        return http.StatusBadRequest, "validation_failed", map[string]interface{}{
+                "validation_errors": errors,
+                "message":          "Request validation failed",
+        }
+}</span>
+
+// HandleBusinessLogicError handles business logic errors
+func (e *GRPCErrorHandler) HandleBusinessLogicError(err BusinessLogicError) (int, string, interface{}) <span class="cov8" title="1">{
+        return http.StatusUnprocessableEntity, err.Code, map[string]interface{}{
+                "business_error": err,
+                "message":       err.Message,
+        }
+}</pre>
+		
+		<pre class="file" id="file4" style="display: none">package handlers
+
+import (
+        "context"
+        "encoding/json"
+        "log"
+        "net/http"
+        "strconv"
+        "time"
+
+        "github.com/go-chi/chi/v5"
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// ETCHandler handles HTTP requests for ETC meisai with integrated services
+type ETCHandler struct {
+        *BaseHandler
+}
+
+// NewETCHandler creates a new ETC handler with service registry
+func NewETCHandler(serviceRegistry *services.ServiceRegistry, logger *log.Logger) *ETCHandler <span class="cov0" title="0">{
+        return &amp;ETCHandler{
+                BaseHandler: NewBaseHandler(serviceRegistry, logger),
+        }
+}</span>
+
+// ImportData handles POST /api/etc/import
+func (h *ETCHandler) ImportData(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        _, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        var req models.ETCImportRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">result, err := etcService.ImportData(req)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, result, "Import completed successfully")</span>
+}
+
+// GetMeisai handles GET /api/etc/meisai
+func (h *ETCHandler) GetMeisai(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        _, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        fromDate := r.URL.Query().Get("from_date")
+        toDate := r.URL.Query().Get("to_date")
+
+        // Validate required parameters
+        if fromDate == "" || toDate == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_parameters",
+                        "from_date and to_date are required", nil)
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">meisai, err := etcService.GetMeisaiByDateRange(fromDate, toDate)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, meisai, "Meisai data retrieved successfully")</span>
+}
+
+// GetMeisaiByID handles GET /api/etc/meisai/{id}
+func (h *ETCHandler) GetMeisaiByID(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_id",
+                        "ID parameter is required", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_id",
+                        "ID must be a valid integer", err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">meisai, err := etcService.GetByID(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, meisai, "Meisai record retrieved successfully")</span>
+}
+
+// CreateMeisai handles POST /api/etc/meisai
+func (h *ETCHandler) CreateMeisai(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        var m models.ETCMeisai
+        if err := json.NewDecoder(r.Body).Decode(&amp;m); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">created, err := etcService.Create(ctx, &amp;m)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondJSON(w, http.StatusCreated, created)</span>
+}
+
+// ListETCMeisai handles GET /api/etc - List all ETC records with filtering
+func (h *ETCHandler) ListETCMeisai(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        // Parse query parameters
+        params := &amp;models.ETCListParams{
+                Limit:  100,
+                Offset: 0,
+        }
+
+        if limitStr := r.URL.Query().Get("limit"); limitStr != "" </span><span class="cov0" title="0">{
+                if limit, err := strconv.Atoi(limitStr); err == nil </span><span class="cov0" title="0">{
+                        params.Limit = limit
+                }</span>
+        }
+
+        <span class="cov8" title="1">if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" </span><span class="cov0" title="0">{
+                if offset, err := strconv.Atoi(offsetStr); err == nil </span><span class="cov0" title="0">{
+                        params.Offset = offset
+                }</span>
+        }
+
+        <span class="cov8" title="1">if etcNum := r.URL.Query().Get("etc_number"); etcNum != "" </span><span class="cov0" title="0">{
+                params.ETCNumber = etcNum
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">records, total, err := etcService.List(ctx, params)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">response := map[string]interface{}{
+                "records": records,
+                "total":   total,
+                "limit":   params.Limit,
+                "offset":  params.Offset,
+        }
+
+        h.RespondSuccess(w, response, "Records retrieved successfully")</span>
+}
+
+// GetETCMeisai handles GET /api/etc/{id} - Get single ETC record by ID
+func (h *ETCHandler) GetETCMeisai(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "missing_id",
+                        "ID parameter is required", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_id",
+                        "ID must be a valid integer", err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">record, err := etcService.GetByID(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, record, "Record retrieved successfully")</span>
+}
+
+// CreateETCMeisai handles POST /api/etc - Create new ETC record
+func (h *ETCHandler) CreateETCMeisai(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        var record models.ETCMeisai
+        if err := json.NewDecoder(r.Body).Decode(&amp;record); err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">created, err := etcService.Create(ctx, &amp;record)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondJSON(w, http.StatusCreated, created)</span>
+}
+
+// UpdateETCMeisai handles PUT /api/etc/{id} - Update ETC record
+func (h *ETCHandler) UpdateETCMeisai(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_id",
+                        "ID parameter is required", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">_, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_id",
+                        "ID must be a valid integer", err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">var updates map[string]interface{}
+        if err := json.NewDecoder(r.Body).Decode(&amp;updates); err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        // ETCService doesn't have Update method yet, return not implemented
+        <span class="cov0" title="0">h.RespondError(w, http.StatusNotImplemented, "not_implemented",
+                "Update operation not yet implemented", nil)</span>
+}
+
+// DeleteETCMeisai handles DELETE /api/etc/{id} - Delete ETC record
+func (h *ETCHandler) DeleteETCMeisai(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_id",
+                        "ID parameter is required", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">_, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_id",
+                        "ID must be a valid integer", err.Error())
+                return
+        }</span>
+
+        // ETCService doesn't have Delete method yet, return not implemented
+        <span class="cov0" title="0">h.RespondError(w, http.StatusNotImplemented, "not_implemented",
+                "Delete operation not yet implemented", nil)</span>
+}
+
+// BulkCreateETCMeisai handles POST /api/etc/bulk - Create multiple records
+func (h *ETCHandler) BulkCreateETCMeisai(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+        defer cancel()
+
+        var records []*models.ETCMeisai
+        if err := json.NewDecoder(r.Body).Decode(&amp;records); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        <span class="cov8" title="1">if len(records) == 0 </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "empty_request",
+                        "No records provided", nil)
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">result, err := etcService.ImportCSV(ctx, records)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, result, "Bulk import completed")</span>
+}
+
+// GetETCSummary handles GET /api/etc/summary - Get summary statistics
+func (h *ETCHandler) GetETCSummary(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        fromDate := r.URL.Query().Get("from_date")
+        toDate := r.URL.Query().Get("to_date")
+
+        if fromDate == "" || toDate == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_parameters",
+                        "from_date and to_date are required", nil)
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">summary, err := etcService.GetSummary(ctx, fromDate, toDate)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, summary, "Summary retrieved successfully")</span>
+}
+
+// GetSummary handles GET /api/etc/summary
+func (h *ETCHandler) GetSummary(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        fromDate := r.URL.Query().Get("from_date")
+        toDate := r.URL.Query().Get("to_date")
+
+        if fromDate == "" || toDate == "" </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "missing_parameters",
+                        "from_date and to_date are required", nil)
+                return
+        }</span>
+
+        // Parse dates
+        <span class="cov8" title="1">from, err := time.Parse("2006-01-02", fromDate)
+        if err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_date",
+                        "Invalid from_date format", err.Error())
+                return
+        }</span>
+
+        <span class="cov8" title="1">to, err := time.Parse("2006-01-02", toDate)
+        if err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_date",
+                        "Invalid to_date format", err.Error())
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        // Get records and create summary
+        <span class="cov0" title="0">records, err := etcService.GetByDateRange(ctx, from, to)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        // Create summary from records
+        <span class="cov0" title="0">summary := h.createSummary(records)
+        h.RespondSuccess(w, summary, "Summary retrieved successfully")</span>
+}
+
+// BulkImport handles POST /api/etc/bulk-import
+func (h *ETCHandler) BulkImport(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second) // Longer timeout for bulk operations
+        defer cancel()
+
+        var records []*models.ETCMeisai
+        if err := json.NewDecoder(r.Body).Decode(&amp;records); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        <span class="cov8" title="1">etcService := h.ServiceRegistry.GetETCService()
+        if etcService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "ETC service not available", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">result, err := etcService.ImportCSV(ctx, records)
+        if err != nil </span><span class="cov0" title="0">{
+                if result != nil &amp;&amp; result.Success </span><span class="cov0" title="0">{
+                        h.RespondJSON(w, http.StatusPartialContent, result)
+                }</span> else<span class="cov0" title="0"> {
+                        h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                }</span>
+                <span class="cov0" title="0">return</span>
+        }
+
+        <span class="cov0" title="0">h.RespondSuccess(w, result, "Bulk import completed successfully")</span>
+}
+
+// Helper methods
+
+// createSummary creates a summary from ETC records
+func (h *ETCHandler) createSummary(records []*models.ETCMeisai) map[string]interface{} <span class="cov0" title="0">{
+        if records == nil </span><span class="cov0" title="0">{
+                return map[string]interface{}{
+                        "total_count":  0,
+                        "total_amount": 0,
+                        "date_range":   map[string]string{},
+                }
+        }</span>
+
+        <span class="cov0" title="0">totalAmount := int32(0)
+        var minDate, maxDate time.Time
+
+        for i, record := range records </span><span class="cov0" title="0">{
+                if record != nil </span><span class="cov0" title="0">{
+                        totalAmount += record.Amount
+
+                        if i == 0 </span><span class="cov0" title="0">{
+                                minDate = record.UseDate
+                                maxDate = record.UseDate
+                        }</span> else<span class="cov0" title="0"> {
+                                if record.UseDate.Before(minDate) </span><span class="cov0" title="0">{
+                                        minDate = record.UseDate
+                                }</span>
+                                <span class="cov0" title="0">if record.UseDate.After(maxDate) </span><span class="cov0" title="0">{
+                                        maxDate = record.UseDate
+                                }</span>
+                        }
+                }
+        }
+
+        <span class="cov0" title="0">summary := map[string]interface{}{
+                "total_count":  len(records),
+                "total_amount": totalAmount,
+        }
+
+        if !minDate.IsZero() &amp;&amp; !maxDate.IsZero() </span><span class="cov0" title="0">{
+                summary["date_range"] = map[string]string{
+                        "from": minDate.Format("2006-01-02"),
+                        "to":   maxDate.Format("2006-01-02"),
+                }
+        }</span>
+
+        <span class="cov0" title="0">return summary</span>
+}</pre>
+		
+		<pre class="file" id="file5" style="display: none">package handlers
+
+import (
+        "context"
+        "encoding/json"
+        "log"
+        "net/http"
+        "runtime"
+        "time"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// HealthHandler handles health check endpoints
+type HealthHandler struct {
+        *BaseHandler
+}
+
+// HealthStatus represents the health status of the service
+type HealthStatus struct {
+        Status    string                 `json:"status"`
+        Timestamp time.Time              `json:"timestamp"`
+        Version   string                 `json:"version"`
+        Uptime    string                 `json:"uptime"`
+        Services  map[string]ServiceInfo `json:"services"`
+        System    SystemInfo             `json:"system"`
+}
+
+// ServiceInfo represents individual service health
+type ServiceInfo struct {
+        Status  string `json:"status"`
+        Message string `json:"message,omitempty"`
+        Latency string `json:"latency,omitempty"`
+}
+
+// SystemInfo represents system resource information
+type SystemInfo struct {
+        GoVersion   string `json:"go_version"`
+        NumCPU      int    `json:"num_cpu"`
+        NumGoroutine int    `json:"num_goroutine"`
+        Memory      MemoryInfo `json:"memory"`
+}
+
+// MemoryInfo represents memory usage
+type MemoryInfo struct {
+        Alloc      uint64 `json:"alloc"`
+        TotalAlloc uint64 `json:"total_alloc"`
+        Sys        uint64 `json:"sys"`
+        NumGC      uint32 `json:"num_gc"`
+}
+
+var startTime = time.Now()
+
+// NewHealthHandler creates a new health handler
+func NewHealthHandler(serviceRegistry *services.ServiceRegistry, logger *log.Logger) *HealthHandler <span class="cov8" title="1">{
+        return &amp;HealthHandler{
+                BaseHandler: NewBaseHandler(serviceRegistry, logger),
+        }
+}</span>
+
+// HealthCheck handles GET /api/health - Main health check endpoint
+func (h *HealthHandler) HealthCheck(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+        defer cancel()
+
+        // Check if service registry is available
+        if h.ServiceRegistry == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Service registry not initialized", nil)
+                return
+        }</span>
+
+        // Get base service for health check
+        <span class="cov8" title="1">baseService := h.ServiceRegistry.GetBaseService()
+        if baseService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Base service not available", nil)
+                return
+        }</span>
+
+        // Perform health check
+        <span class="cov0" title="0">healthResult := baseService.HealthCheck(ctx)
+
+        // Build response
+        status := HealthStatus{
+                Status:    "healthy",
+                Timestamp: time.Now(),
+                Version:   "1.0.0",
+                Uptime:    time.Since(startTime).String(),
+                Services:  make(map[string]ServiceInfo),
+                System:    getSystemInfo(),
+        }
+
+        // Map service health results
+        for name, service := range healthResult.Services </span><span class="cov0" title="0">{
+                info := ServiceInfo{
+                        Status: service.Status,
+                }
+                if service.Error != "" </span><span class="cov0" title="0">{
+                        info.Message = service.Error
+                        status.Status = "degraded"
+                }</span>
+                <span class="cov0" title="0">status.Services[name] = info</span>
+        }
+
+        // Overall status
+        <span class="cov0" title="0">if !healthResult.IsHealthy() </span><span class="cov0" title="0">{
+                status.Status = "unhealthy"
+        }</span>
+
+        // Set appropriate status code
+        <span class="cov0" title="0">statusCode := http.StatusOK
+        if status.Status == "unhealthy" </span><span class="cov0" title="0">{
+                statusCode = http.StatusServiceUnavailable
+        }</span> else<span class="cov0" title="0"> if status.Status == "degraded" </span><span class="cov0" title="0">{
+                statusCode = http.StatusOK // Still return 200 for degraded
+        }</span>
+
+        <span class="cov0" title="0">w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(statusCode)
+        json.NewEncoder(w).Encode(status)</span>
+}
+
+// Liveness handles GET /api/health/live - Kubernetes liveness probe
+func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        // Simple liveness check - just return OK if server is running
+        response := map[string]interface{}{
+                "status":    "alive",
+                "timestamp": time.Now(),
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        json.NewEncoder(w).Encode(response)
+}</span>
+
+// Readiness handles GET /api/health/ready - Kubernetes readiness probe
+func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+        defer cancel()
+
+        // Check if service registry is available
+        if h.ServiceRegistry == nil </span><span class="cov8" title="1">{
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusServiceUnavailable)
+                json.NewEncoder(w).Encode(map[string]interface{}{
+                        "status":  "not_ready",
+                        "message": "Service registry not initialized",
+                })
+                return
+        }</span>
+
+        // Check if services are ready
+        <span class="cov8" title="1">baseService := h.ServiceRegistry.GetBaseService()
+        if baseService == nil </span><span class="cov8" title="1">{
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusServiceUnavailable)
+                json.NewEncoder(w).Encode(map[string]interface{}{
+                        "status":  "not_ready",
+                        "message": "Services not initialized",
+                })
+                return
+        }</span>
+
+        <span class="cov0" title="0">healthResult := baseService.HealthCheck(ctx)
+
+        // Check if all critical services are healthy
+        isReady := healthResult.IsHealthy()
+
+        statusCode := http.StatusOK
+        status := "ready"
+        if !isReady </span><span class="cov0" title="0">{
+                statusCode = http.StatusServiceUnavailable
+                status = "not_ready"
+        }</span>
+
+        <span class="cov0" title="0">response := map[string]interface{}{
+                "status":    status,
+                "timestamp": time.Now(),
+                "services":  healthResult.GetUnhealthyServices(),
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(statusCode)
+        json.NewEncoder(w).Encode(response)</span>
+}
+
+// DeepHealthCheck handles GET /api/health/deep - Detailed health check
+func (h *HealthHandler) DeepHealthCheck(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+        defer cancel()
+
+        results := make(map[string]interface{})
+
+        // Check ETC Service
+        etcService := h.ServiceRegistry.GetETCService()
+        if etcService != nil </span><span class="cov0" title="0">{
+                start := time.Now()
+                err := etcService.HealthCheck(ctx)
+                latency := time.Since(start)
+
+                results["etc_service"] = map[string]interface{}{
+                        "status":  getStatusFromError(err),
+                        "latency": latency.String(),
+                        "error":   errorString(err),
+                }
+        }</span>
+
+        // Check Mapping Service
+        <span class="cov8" title="1">mappingService := h.ServiceRegistry.GetMappingService()
+        if mappingService != nil </span><span class="cov0" title="0">{
+                start := time.Now()
+                err := mappingService.HealthCheck(ctx)
+                latency := time.Since(start)
+
+                results["mapping_service"] = map[string]interface{}{
+                        "status":  getStatusFromError(err),
+                        "latency": latency.String(),
+                        "error":   errorString(err),
+                }
+        }</span>
+
+        // Check Import Service
+        <span class="cov8" title="1">importService := h.ServiceRegistry.GetImportService()
+        if importService != nil </span><span class="cov0" title="0">{
+                start := time.Now()
+                err := importService.HealthCheck(ctx)
+                latency := time.Since(start)
+
+                results["import_service"] = map[string]interface{}{
+                        "status":  getStatusFromError(err),
+                        "latency": latency.String(),
+                        "error":   errorString(err),
+                }
+        }</span>
+
+        // Add system metrics
+        <span class="cov8" title="1">results["system"] = getSystemInfo()
+        results["timestamp"] = time.Now()
+        results["uptime"] = time.Since(startTime).String()
+
+        h.RespondSuccess(w, results, "Deep health check completed")</span>
+}
+
+// getSystemInfo returns system resource information
+func getSystemInfo() SystemInfo <span class="cov8" title="1">{
+        var m runtime.MemStats
+        runtime.ReadMemStats(&amp;m)
+
+        return SystemInfo{
+                GoVersion:    runtime.Version(),
+                NumCPU:       runtime.NumCPU(),
+                NumGoroutine: runtime.NumGoroutine(),
+                Memory: MemoryInfo{
+                        Alloc:      m.Alloc,
+                        TotalAlloc: m.TotalAlloc,
+                        Sys:        m.Sys,
+                        NumGC:      m.NumGC,
+                },
+        }
+}</span>
+
+// getStatusFromError returns status string based on error
+func getStatusFromError(err error) string <span class="cov0" title="0">{
+        if err == nil </span><span class="cov0" title="0">{
+                return "healthy"
+        }</span>
+        <span class="cov0" title="0">return "unhealthy"</span>
+}
+
+// errorString returns error string or empty if nil
+func errorString(err error) string <span class="cov0" title="0">{
+        if err == nil </span><span class="cov0" title="0">{
+                return ""
+        }</span>
+        <span class="cov0" title="0">return err.Error()</span>
+}</pre>
+		
+		<pre class="file" id="file6" style="display: none">package handlers
+
+import (
+        "context"
+        "encoding/json"
+        "log"
+        "net/http"
+        "strconv"
+        "strings"
+        "time"
+
+        "github.com/go-chi/chi/v5"
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// MappingHandler handles mapping-related HTTP requests
+type MappingHandler struct {
+        BaseHandler
+}
+
+// ETCDtakoMapping はETC明細とDtakoのマッピング
+type ETCDtakoMapping struct {
+        ID          int64   `json:"id"`
+        ETCMeisaiID int64   `json:"etc_meisai_id"`
+        DtakoRowID  int64   `json:"dtako_row_id"`
+        MatchType   string  `json:"match_type"`
+        Confidence  float64 `json:"confidence"`
+        IsManual    bool    `json:"is_manual"`
+        CreatedBy   string  `json:"created_by"`
+        CreatedAt   string  `json:"created_at"`
+}
+
+// CreateMappingRequest はマッピング作成リクエスト
+type CreateMappingRequest struct {
+        ETCMeisaiID int64  `json:"etc_meisai_id"`
+        DtakoRowID  int64  `json:"dtako_row_id"`
+        MatchType   string `json:"match_type"`
+}
+
+// UpdateMappingRequest はマッピング更新リクエスト
+type UpdateMappingRequest struct {
+        DtakoRowID *int64 `json:"dtako_row_id,omitempty"`
+        IsActive   *bool  `json:"is_active,omitempty"`
+}
+
+// AutoMatchRequest は自動マッチングリクエスト
+type AutoMatchRequest struct {
+        ETCNum    string  `json:"etc_num"`
+        FromDate  string  `json:"from_date,omitempty"`
+        ToDate    string  `json:"to_date,omitempty"`
+        Threshold float64 `json:"threshold"`
+}
+
+// NewMappingHandler creates a new mapping handler
+func NewMappingHandler(serviceRegistry *services.ServiceRegistry, logger *log.Logger) *MappingHandler <span class="cov0" title="0">{
+        return &amp;MappingHandler{
+                BaseHandler: BaseHandler{
+                        ServiceRegistry: serviceRegistry,
+                        Logger:         logger,
+                },
+        }
+}</span>
+
+// DeleteMapping deletes a mapping by ID
+func (h *MappingHandler) DeleteMapping(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        // Get ID from URL path using chi router
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_id", "Mapping ID is required", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_id", "Invalid mapping ID", nil)
+                return
+        }</span>
+
+        // Get mapping service
+        <span class="cov0" title="0">mappingService := h.ServiceRegistry.GetMappingService()
+        if mappingService == nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Mapping service not available", nil)
+                return
+        }</span>
+
+        // Delete mapping
+        <span class="cov0" title="0">if err := mappingService.DeleteMapping(ctx, id); err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">response := map[string]interface{}{
+                "success": true,
+                "message": "Mapping deleted successfully",
+                "id":      id,
+        }
+
+        h.RespondSuccess(w, response, "Mapping deleted successfully")</span>
+}
+
+// GetMappings handles GET /api/mapping
+func (h *MappingHandler) GetMappings(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        // Parse query parameters
+        params := &amp;models.MappingListParams{
+                Limit:  100,
+                Offset: 0,
+        }
+
+        // Parse limit and offset
+        if limitStr := r.URL.Query().Get("limit"); limitStr != "" </span><span class="cov0" title="0">{
+                if limit, err := strconv.Atoi(limitStr); err == nil </span><span class="cov0" title="0">{
+                        params.Limit = limit
+                }</span>
+        }
+        <span class="cov8" title="1">if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" </span><span class="cov0" title="0">{
+                if offset, err := strconv.Atoi(offsetStr); err == nil </span><span class="cov0" title="0">{
+                        params.Offset = offset
+                }</span>
+        }
+
+        // Parse filters
+        <span class="cov8" title="1">if etcMeisaiIDStr := r.URL.Query().Get("etc_meisai_id"); etcMeisaiIDStr != "" </span><span class="cov0" title="0">{
+                if id, err := strconv.ParseInt(etcMeisaiIDStr, 10, 64); err == nil </span><span class="cov0" title="0">{
+                        params.ETCMeisaiID = &amp;id
+                }</span>
+        }
+        <span class="cov8" title="1">if dtakoRowID := r.URL.Query().Get("dtako_row_id"); dtakoRowID != "" </span><span class="cov0" title="0">{
+                params.DTakoRowID = dtakoRowID
+        }</span>
+        <span class="cov8" title="1">if mappingType := r.URL.Query().Get("mapping_type"); mappingType != "" </span><span class="cov0" title="0">{
+                params.MappingType = mappingType
+        }</span>
+
+        // Get mapping service
+        <span class="cov8" title="1">mappingService := h.ServiceRegistry.GetMappingService()
+        if mappingService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Mapping service not available", nil)
+                return
+        }</span>
+
+        // Get mappings
+        <span class="cov0" title="0">mappings, total, err := mappingService.ListMappings(ctx, params)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">response := map[string]interface{}{
+                "mappings": mappings,
+                "total":    total,
+                "limit":    params.Limit,
+                "offset":   params.Offset,
+        }
+
+        h.RespondSuccess(w, response, "Mappings retrieved successfully")</span>
+}
+
+// CreateMapping handles POST /api/mapping
+func (h *MappingHandler) CreateMapping(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        var req struct {
+                ETCMeisaiID int64   `json:"etc_meisai_id"`
+                DTakoRowID  string  `json:"dtako_row_id"`
+                MappingType string  `json:"mapping_type"`
+                Confidence  float32 `json:"confidence"`
+                Notes       string  `json:"notes"`
+        }
+
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request",
+                        "Invalid request body", err.Error())
+                return
+        }</span>
+
+        // Validate required fields
+        <span class="cov8" title="1">if req.ETCMeisaiID == 0 || req.DTakoRowID == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_fields",
+                        "etc_meisai_id and dtako_row_id are required", nil)
+                return
+        }</span>
+
+        // Set defaults
+        <span class="cov8" title="1">if req.MappingType == "" </span><span class="cov8" title="1">{
+                req.MappingType = "manual"
+        }</span>
+        <span class="cov8" title="1">if req.Confidence == 0 </span><span class="cov8" title="1">{
+                req.Confidence = 1.0
+        }</span>
+
+        // Get mapping service
+        <span class="cov8" title="1">mappingService := h.ServiceRegistry.GetMappingService()
+        if mappingService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Mapping service not available", nil)
+                return
+        }</span>
+
+        // Create mapping
+        <span class="cov0" title="0">mapping := &amp;models.ETCMeisaiMapping{
+                ETCMeisaiID: req.ETCMeisaiID,
+                DTakoRowID:  req.DTakoRowID,
+                MappingType: req.MappingType,
+                Confidence:  req.Confidence,
+                Notes:       req.Notes,
+                CreatedBy:   "api_user", // TODO: Get from auth context
+        }
+
+        err := mappingService.CreateMapping(ctx, mapping)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondJSON(w, http.StatusCreated, mapping)</span>
+}
+
+// UpdateMapping は既存のマッピングを更新
+func (h *MappingHandler) UpdateMapping(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+        defer cancel()
+
+        // Get ID from URL path using chi router
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "missing_id", "Mapping ID is required", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_id", "Invalid mapping ID", nil)
+                return
+        }</span>
+
+        <span class="cov0" title="0">var req map[string]interface{}
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", err.Error())
+                return
+        }</span>
+
+        // Get mapping service
+        <span class="cov0" title="0">mappingService := h.ServiceRegistry.GetMappingService()
+        if mappingService == nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Mapping service not available", nil)
+                return
+        }</span>
+
+        // Update mapping
+        <span class="cov0" title="0">if err := mappingService.UpdateMapping(ctx, id, req); err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        // Get updated mapping
+        <span class="cov0" title="0">mapping, err := mappingService.GetMappingByID(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.RespondSuccess(w, mapping, "Mapping updated successfully")</span>
+}
+
+// AutoMatch は自動マッチングを実行
+func (h *MappingHandler) AutoMatch(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+        defer cancel()
+
+        var req AutoMatchRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">if req.Threshold == 0 </span><span class="cov0" title="0">{
+                req.Threshold = 0.8 // デフォルト値
+        }</span>
+
+        // Parse date range
+        <span class="cov0" title="0">var startDate, endDate time.Time
+        if req.FromDate != "" </span><span class="cov0" title="0">{
+                parsed, err := time.Parse("2006-01-02", req.FromDate)
+                if err != nil </span><span class="cov0" title="0">{
+                        h.RespondError(w, http.StatusBadRequest, "invalid_date", "Invalid from_date format", err.Error())
+                        return
+                }</span>
+                <span class="cov0" title="0">startDate = parsed</span>
+        } else<span class="cov0" title="0"> {
+                // Default to last 30 days
+                startDate = time.Now().AddDate(0, 0, -30)
+        }</span>
+
+        <span class="cov0" title="0">if req.ToDate != "" </span><span class="cov0" title="0">{
+                parsed, err := time.Parse("2006-01-02", req.ToDate)
+                if err != nil </span><span class="cov0" title="0">{
+                        h.RespondError(w, http.StatusBadRequest, "invalid_date", "Invalid to_date format", err.Error())
+                        return
+                }</span>
+                <span class="cov0" title="0">endDate = parsed</span>
+        } else<span class="cov0" title="0"> {
+                endDate = time.Now()
+        }</span>
+
+        // Get mapping service
+        <span class="cov0" title="0">mappingService := h.ServiceRegistry.GetMappingService()
+        if mappingService == nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Mapping service not available", nil)
+                return
+        }</span>
+
+        // Run auto-matching
+        <span class="cov0" title="0">results, err := mappingService.AutoMatch(ctx, startDate, endDate, float32(req.Threshold))
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        // Count matches and errors
+        <span class="cov0" title="0">var matchedCount, unmatchedCount, errorCount int
+        var matches []*models.ETCMeisaiMapping
+
+        for _, result := range results </span><span class="cov0" title="0">{
+                if result.Error != "" </span><span class="cov0" title="0">{
+                        errorCount++
+                }</span> else<span class="cov0" title="0"> if result.BestMatch != nil </span><span class="cov0" title="0">{
+                        matchedCount++
+                        // Create mapping for best match if confidence is high enough
+                        if result.BestMatch.Confidence &gt;= float32(req.Threshold) </span><span class="cov0" title="0">{
+                                mapping := &amp;models.ETCMeisaiMapping{
+                                        ETCMeisaiID: result.ETCMeisaiID,
+                                        DTakoRowID:  result.BestMatch.DTakoRowID,
+                                        MappingType: "auto",
+                                        Confidence:  result.BestMatch.Confidence,
+                                        Notes:       strings.Join(result.BestMatch.MatchReasons, ", "),
+                                        CreatedBy:   "auto_match",
+                                }
+                                matches = append(matches, mapping)
+                        }</span>
+                } else<span class="cov0" title="0"> {
+                        unmatchedCount++
+                }</span>
+        }
+
+        <span class="cov0" title="0">response := map[string]interface{}{
+                "matched_count":   matchedCount,
+                "unmatched_count": unmatchedCount,
+                "error_count":     errorCount,
+                "matches":         matches,
+                "threshold":       req.Threshold,
+                "date_range": map[string]string{
+                        "from": startDate.Format("2006-01-02"),
+                        "to":   endDate.Format("2006-01-02"),
+                },
+        }
+
+        h.RespondSuccess(w, response, "Auto-matching completed")</span>
+}</pre>
+		
+		<pre class="file" id="file7" style="display: none">package handlers
+
+import (
+        "context"
+        "fmt"
+        "io"
+        "log"
+        "net/http"
+        "os"
+        "path/filepath"
+        "time"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/adapters"
+        "github.com/yhonda-ohishi/etc_meisai/src/models"
+        "github.com/yhonda-ohishi/etc_meisai/src/parser"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// ParseHandler はCSV解析関連のハンドラー（統合サービス対応）
+type ParseHandler struct {
+        *BaseHandler
+        Parser        *parser.ETCCSVParser
+        CompatAdapter *adapters.ETCMeisaiCompatAdapter
+}
+
+// ParseResponse はCSV解析レスポンス
+type ParseResponse struct {
+        Success     bool                    `json:"success"`
+        RecordCount int                     `json:"record_count"`
+        Records     interface{}             `json:"records"`
+        Errors      []string                `json:"errors,omitempty"`
+        ImportResult *models.ETCImportResult `json:"import_result,omitempty"`
+}
+
+// NewParseHandler creates a new parse handler with service registry
+func NewParseHandler(serviceRegistry *services.ServiceRegistry, logger *log.Logger) *ParseHandler <span class="cov0" title="0">{
+        return &amp;ParseHandler{
+                BaseHandler:   NewBaseHandler(serviceRegistry, logger),
+                Parser:        parser.NewETCCSVParser(),
+                CompatAdapter: adapters.NewETCMeisaiCompatAdapter(),
+        }
+}</span>
+
+// ParseCSV はアップロードされたCSVファイルを解析
+func (h *ParseHandler) ParseCSV(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+        defer cancel()
+
+        // multipart/form-dataの解析
+        err := r.ParseMultipartForm(32 &lt;&lt; 20) // 32MB
+        if err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "parse_error",
+                        "Failed to parse multipart form", err.Error())
+                return
+        }</span>
+
+        // ファイルの取得
+        <span class="cov8" title="1">file, header, err := r.FormFile("file")
+        if err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "file_error",
+                        "Failed to get file from form", err.Error())
+                return
+        }</span>
+        <span class="cov8" title="1">defer file.Close()
+
+        // アカウントタイプの取得
+        accountType := r.FormValue("account_type")
+        if accountType == "" </span><span class="cov8" title="1">{
+                accountType = "corporate"
+        }</span>
+
+        // 自動保存オプション
+        <span class="cov8" title="1">autoSave := r.FormValue("auto_save") == "true"
+
+        // 一時ファイルに保存
+        tempDir := "./downloads"
+        os.MkdirAll(tempDir, 0755)
+        tempFile := filepath.Join(tempDir, fmt.Sprintf("upload_%d_%s", time.Now().Unix(), header.Filename))
+
+        dst, err := os.Create(tempFile)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusInternalServerError, "file_save_error",
+                        "Failed to save uploaded file", err.Error())
+                return
+        }</span>
+        <span class="cov8" title="1">defer dst.Close()
+        defer os.Remove(tempFile)
+
+        // ファイルの内容をコピー
+        if _, err := io.Copy(dst, file); err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusInternalServerError, "file_copy_error",
+                        "Failed to copy file content", err.Error())
+                return
+        }</span>
+
+        // CSVファイルの解析
+        <span class="cov8" title="1">rawRecords, err := h.Parser.ParseCSVFile(tempFile, accountType == "corporate")
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "csv_parse_error",
+                        "Failed to parse CSV file", err.Error())
+                return
+        }</span>
+
+        // rawRecords are already ETCMeisai models from the parser
+        <span class="cov0" title="0">var etcRecords []*models.ETCMeisai
+
+        for _, rawRecord := range rawRecords </span><span class="cov0" title="0">{
+                etcRecords = append(etcRecords, &amp;rawRecord)
+        }</span>
+
+        <span class="cov0" title="0">response := ParseResponse{
+                Success:     true,
+                RecordCount: len(etcRecords),
+                Records:     etcRecords,
+                Errors:      nil,
+        }
+
+        // 自動保存が有効な場合は、データベースに保存
+        if autoSave &amp;&amp; len(etcRecords) &gt; 0 </span><span class="cov0" title="0">{
+                importService := h.ServiceRegistry.GetImportService()
+                if importService != nil </span><span class="cov0" title="0">{
+                        // Create a batch and import records
+                        accountID := r.FormValue("account_id")
+                        if accountID == "" </span><span class="cov0" title="0">{
+                                accountID = "default"
+                        }</span>
+                        <span class="cov0" title="0">batch, err := importService.ProcessCSVFile(ctx, tempFile, accountID, accountType)
+                        if err != nil </span><span class="cov0" title="0">{
+                                h.Logger.Printf("Auto-save failed: %v", err)
+                                // エラーがあっても解析結果は返す
+                        }</span> else<span class="cov0" title="0"> {
+                                response.ImportResult = &amp;models.ETCImportResult{
+                                        Success:      batch.Status == "completed",
+                                        Message:      fmt.Sprintf("Imported %d/%d records", batch.SuccessCount, batch.TotalRows),
+                                        RecordCount:  int(batch.TotalRows),
+                                        ImportedRows: int(batch.SuccessCount),
+                                        ImportedAt:   batch.CreatedAt,
+                                }
+                        }</span>
+                }
+        }
+
+        <span class="cov0" title="0">if response.Success </span><span class="cov0" title="0">{
+                h.RespondSuccess(w, response, fmt.Sprintf("Successfully parsed %d records", len(etcRecords)))
+        }</span> else<span class="cov0" title="0"> {
+                h.RespondJSON(w, http.StatusPartialContent, response)
+        }</span>
+}
+
+// ParseAndImport はCSVファイルを解析して即座にインポート
+func (h *ParseHandler) ParseAndImport(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+        defer cancel()
+
+        // multipart/form-dataの解析
+        err := r.ParseMultipartForm(32 &lt;&lt; 20) // 32MB
+        if err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "parse_error",
+                        "Failed to parse multipart form", err.Error())
+                return
+        }</span>
+
+        // ファイルの取得
+        <span class="cov8" title="1">file, header, err := r.FormFile("file")
+        if err != nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusBadRequest, "file_error",
+                        "Failed to get file from form", err.Error())
+                return
+        }</span>
+        <span class="cov8" title="1">defer file.Close()
+
+        // アカウントタイプの取得
+        accountType := r.FormValue("account_type")
+        if accountType == "" </span><span class="cov8" title="1">{
+                accountType = "corporate"
+        }</span>
+        <span class="cov8" title="1">accountID := r.FormValue("account_id")
+        if accountID == "" </span><span class="cov8" title="1">{
+                accountID = "default"
+        }</span>
+
+        // 一時ファイルに保存
+        <span class="cov8" title="1">tempDir := "./downloads"
+        os.MkdirAll(tempDir, 0755)
+        tempFile := filepath.Join(tempDir, fmt.Sprintf("import_%d_%s", time.Now().Unix(), header.Filename))
+
+        dst, err := os.Create(tempFile)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusInternalServerError, "file_save_error",
+                        "Failed to save uploaded file", err.Error())
+                return
+        }</span>
+        <span class="cov8" title="1">defer dst.Close()
+        defer os.Remove(tempFile)
+
+        // ファイルの内容をコピー
+        if _, err := io.Copy(dst, file); err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusInternalServerError, "file_copy_error",
+                        "Failed to copy file content", err.Error())
+                return
+        }</span>
+
+        // Get import service
+        <span class="cov8" title="1">importService := h.ServiceRegistry.GetImportService()
+        if importService == nil </span><span class="cov8" title="1">{
+                h.RespondError(w, http.StatusServiceUnavailable, "service_unavailable",
+                        "Import service not available", nil)
+                return
+        }</span>
+
+        // Validate file
+        <span class="cov0" title="0">if err := importService.ValidateImportFile(tempFile); err != nil </span><span class="cov0" title="0">{
+                h.RespondError(w, http.StatusBadRequest, "invalid_file",
+                        "Invalid import file", err.Error())
+                return
+        }</span>
+
+        // Process CSV file using import service
+        <span class="cov0" title="0">batch, err := importService.ProcessCSVFile(ctx, tempFile, accountID, accountType)
+        if err != nil </span><span class="cov0" title="0">{
+                h.RespondGRPCError(w, err, r.Header.Get("X-Request-ID"))
+                return
+        }</span>
+
+        <span class="cov0" title="0">response := map[string]interface{}{
+                "success":        batch.Status == "completed",
+                "batch_id":       batch.ID,
+                "total_rows":     batch.TotalRows,
+                "processed_rows": batch.ProcessedRows,
+                "success_count":  batch.SuccessCount,
+                "error_count":    batch.ErrorCount,
+                "status":         batch.Status,
+        }
+
+        if batch.Status == "completed" </span><span class="cov0" title="0">{
+                h.RespondSuccess(w, response, fmt.Sprintf("Successfully imported %d records", batch.SuccessCount))
+        }</span> else<span class="cov0" title="0"> {
+                h.RespondJSON(w, http.StatusPartialContent, response)
+        }</span>
+}</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

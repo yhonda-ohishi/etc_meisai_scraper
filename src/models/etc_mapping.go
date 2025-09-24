@@ -61,11 +61,28 @@ func (ETCMapping) TableName() string {
 
 // BeforeCreate hook to validate data before creating
 func (m *ETCMapping) BeforeCreate(tx *gorm.DB) error {
+	// Set timestamps manually if not using GORM auto-timestamps
+	now := time.Now()
+	if m.CreatedAt.IsZero() {
+		m.CreatedAt = now
+	}
+	if m.UpdatedAt.IsZero() {
+		m.UpdatedAt = now
+	}
+
+	// Set default status if not provided
+	if m.Status == "" {
+		m.Status = string(MappingStatusActive)
+	}
+
 	return m.validate()
 }
 
 // BeforeSave hook to validate data before saving
 func (m *ETCMapping) BeforeSave(tx *gorm.DB) error {
+	// Update timestamp manually if not using GORM auto-timestamps
+	m.UpdatedAt = time.Now()
+
 	return m.validate()
 }
 
@@ -284,9 +301,9 @@ func (m *ETCMapping) GetMetadata() (map[string]interface{}, error) {
 	return metadata, nil
 }
 
-// GetConfidencePercentage returns confidence as a percentage string
-func (m *ETCMapping) GetConfidencePercentage() string {
-	return fmt.Sprintf("%.1f%%", m.Confidence*100)
+// GetConfidencePercentage returns confidence as a percentage
+func (m *ETCMapping) GetConfidencePercentage() float64 {
+	return float64(m.Confidence * 100)
 }
 
 // IsHighConfidence returns true if confidence is above 0.8
@@ -297,4 +314,79 @@ func (m *ETCMapping) IsHighConfidence() bool {
 // IsLowConfidence returns true if confidence is below 0.5
 func (m *ETCMapping) IsLowConfidence() bool {
 	return m.Confidence < 0.5
+}
+
+// Public wrapper methods for tests
+
+// Validate performs comprehensive validation of the mapping (public method)
+func (m *ETCMapping) Validate() error {
+	return m.validate()
+}
+
+// BeforeUpdate prepares the record before updating (public method for testing)
+func (m *ETCMapping) BeforeUpdate() error {
+	m.UpdatedAt = time.Now()
+	return nil
+}
+
+// GetTableName returns the table name
+func (m *ETCMapping) GetTableName() string {
+	return m.TableName()
+}
+
+// String returns a string representation of the mapping
+func (m *ETCMapping) String() string {
+	return fmt.Sprintf("ETCMapping{ID:%d, ETCRecordID:%d, Type:%s, EntityID:%d, Confidence:%.2f, Status:%s}",
+		m.ID, m.ETCRecordID, m.MappingType, m.MappedEntityID, m.Confidence, m.Status)
+}
+
+// Public validation helper functions
+
+// IsValidMappingType checks if a mapping type is valid
+func IsValidMappingType(mappingType string) bool {
+	validTypes := []string{
+		string(MappingTypeDtako),
+		string(MappingTypeExpense),
+		string(MappingTypeInvoice),
+	}
+
+	for _, validType := range validTypes {
+		if strings.ToLower(strings.TrimSpace(mappingType)) == validType {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidEntityType checks if an entity type is valid
+func IsValidEntityType(entityType string) bool {
+	validTypes := []string{
+		string(EntityTypeDtakoRecord),
+		string(EntityTypeExpenseRecord),
+		string(EntityTypeInvoiceRecord),
+	}
+
+	for _, validType := range validTypes {
+		if strings.ToLower(strings.TrimSpace(entityType)) == validType {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidStatus checks if a status is valid
+func IsValidStatus(status string) bool {
+	validStatuses := []string{
+		string(MappingStatusActive),
+		string(MappingStatusInactive),
+		string(MappingStatusPending),
+		string(MappingStatusRejected),
+	}
+
+	for _, validStatus := range validStatuses {
+		if strings.ToLower(strings.TrimSpace(status)) == validStatus {
+			return true
+		}
+	}
+	return false
 }

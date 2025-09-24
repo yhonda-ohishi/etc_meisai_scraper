@@ -1,102 +1,102 @@
-# CLAUDE.md - ETC明細Goモジュール プロジェクトコンテキスト
+# CLAUDE.md - ETC明細Goモジュール プロジェクトコンチE��スチE
 
-## プロジェクト概要
-ETC明細データをWebスクレイピングで取得し、データベースに保存するGoモジュール。
-db-handler-serverパターンに従ったハンドラー実装への移行中。
+## プロジェクト概要E
+ETC明細チE�EタをWebスクレイピングで取得し、データベ�Eスに保存するGoモジュール、E
+db-handler-serverパターンに従ったハンドラー実裁E��の移行中、E
 
-## 技術スタック
-- **言語**: Go 1.21+
-- **フレームワーク**: gRPC + grpc-gateway (chi から移行)
-- **Protocol Buffers**: API定義とコード生成
-- **データベース**: GORM + MySQL/SQLite (db_service統合)
-- **通信**: gRPC (server_repo統合)
+## 技術スタチE��
+- **言誁E*: Go 1.21+
+- **フレームワーク**: gRPC + grpc-gateway (chi から移衁E
+- **Protocol Buffers**: API定義とコード生戁E
+- **チE�Eタベ�Eス**: db_service (Fiber実裁E via gRPC
+- **通信**: gRPC (server_repo統吁E
 - **スクレイピング**: Playwright-go
-- **依存管理**: Go Modules, buf (Protocol Buffers)
-- **アーキテクチャ**: gRPCサービス + db-handler-serverパターン
+- **チE��チE��ング**: testify/mock, table-driven tests (100%カバレチE��目樁E
+- **依存管琁E*: Go Modules, buf (Protocol Buffers)
+- **アーキチE��チャ**: etc_meisai ↁEgRPC ↁEdb_service (Fiber)
 
 ## プロジェクト構造
 ```
 etc_meisai/
 ├── src/
-│   ├── proto/           # Protocol Buffers定義
-│   ├── pb/              # 生成されたgRPCコード
-│   ├── grpc/            # gRPCサーバー実装
-│   ├── services/        # ビジネスロジック層
-│   ├── repositories/    # データアクセス層
-│   ├── models/          # GORMデータモデル
-│   └── adapters/        # 互換性レイヤー
-├── handlers/            # HTTPハンドラー（レガシー）
-├── parser/              # CSV解析
-├── config/              # 設定管理
-└── downloads/           # CSVファイル保存先
+━E  ├── proto/           # Protocol Buffers定義
+━E  ├── pb/              # 生�EされたgRPCコーチE
+━E  ├── grpc/            # gRPCサーバ�E実裁E
+━E  ├── services/        # ビジネスロジチE��層
+━E  ├── repositories/    # チE�Eタアクセス層
+━E  ├── models/          # GORMチE�EタモチE��
+━E  └── adapters/        # 互換性レイヤー
+├── handlers/            # HTTPハンドラー�E�レガシー�E�E
+├── parser/              # CSV解极E
+├── config/              # 設定管琁E
+└── downloads/           # CSVファイル保存�E
 ```
 
-## 主要機能
-1. **ETC明細ダウンロード**: 複数アカウント対応、非同期処理
-2. **データ処理**: CSV解析、データ変換、バルク保存
-3. **マッピング管理**: ETC明細とデジタコデータの関連付け（etc_num活用）
-4. **進捗追跡**: リアルタイム進捗通知（SSE対応）
-5. **自動マッチング**: dtako_row_idとの精密マッチング
+## 主要機�E
+1. **ETC明細ダウンローチE*: 褁E��アカウント対応、E��同期処琁E
+2. **チE�Eタ処琁E*: CSV解析、データ変換、バルク保孁E
+3. **マッピング管琁E*: ETC明細とチE��タコチE�Eタの関連付け�E�Etc_num活用�E�E
+4. **進捗追跡**: リアルタイム進捗通知�E�ESE対応！E
+5. **自動�EチE��ング**: dtako_row_idとの精寁E�EチE��ング
 
-## 最近の変更 (v0.0.19 - gRPC統合)
-- **gRPC移行**: go-chiからgRPC + grpc-gatewayへの移行完了
-- **Protocol Buffers**: API定義をprotoファイルで一元管理
-- **Swagger統合**: OpenAPI仕様の自動生成とSwagger UI統合
-- **server_repo統合**: 統一されたサービス登録とルーティング
+## 最近�E変更 (v0.0.19 - gRPC統吁E
+- **gRPC移衁E*: go-chiからgRPC + grpc-gatewayへの移行完亁E
+- **Protocol Buffers**: API定義をprotoファイルで一允E��琁E
+- **Swagger統吁E*: OpenAPI仕様�E自動生成とSwagger UI統吁E
+- **server_repo統吁E*: 統一されたサービス登録とルーチE��ング
 
-## 開発中の機能 (統合フェーズ)
-- **モデル統合**: db_serviceのGORMモデル + 互換性レイヤー実装
-- **Repository統合**: 統合Repository interface + gRPCクライアント実装
-- **サービス統合**: 既存services/のgRPCクライアント化
+## 開発中の機�E (統合フェーズ)
+- **モチE��統吁E*: db_serviceのGORMモチE�� + 互換性レイヤー実裁E
+- **Repository統吁E*: 統吁Eepository interface + gRPCクライアント実裁E
+- **サービス統吁E*: 既孁Eervices/のgRPCクライアント化
 
-## スコープ外の機能
-- Excel/PDF エクスポート機能
-- 統計情報生成機能
-- キャッシュ機能（ユーザー要求により除外）
+## スコープ外�E機�E
+- Excel/PDF エクスポ�Eト機�E
+- 統計情報生�E機�E
+- キャチE��ュ機�E�E�ユーザー要求により除外！E
 
-## パフォーマンス目標
-- CSVファイル1万行を5秒以内で処理
-- メモリ使用量500MB以下
-- 同時ダウンロード5アカウントまで
+## パフォーマンス目樁E
+- CSVファイル1丁E��を5秒以冁E��処琁E
+- メモリ使用釁E00MB以丁E
+- 同時ダウンローチEアカウントまで
+- チE��ト実行時閁E0秒以冁E���EチE��トスイート！E
+- チE��トカバレチE��100%維持E
 
-## SQLite最適化設定
-```sql
-PRAGMA journal_mode = WAL;
-PRAGMA synchronous = normal;
-PRAGMA cache_size = -32000;
+## 統合アーキチE��チャ (db_service via gRPC)
+```
+etc_meisai:
+  HTTP API (handlers/) ↁEService Layer (services/) ↁEgRPC Client
+                                                           ↁE
+                                                     [gRPC Protocol]
+                                                           ↁE
+db_service (Fiber):
+  gRPC Server ↁERepository (GORM) ↁEMySQL Database
 ```
 
-## 統合アーキテクチャ (database_repo)
-```
-HTTP API (handlers/) → Service Layer (services/) → gRPC Client → db_service
-                                                      ↓
-                                               Repository (GORM) → Database
-```
-
-### 統合コンポーネント
-- **統合Repository**: `src/repositories/etc_integrated_repo.go`
-- **gRPCクライアント**: `src/clients/db_service_client.go`
+### 統合コンポ�EネンチE
+- **統吁Eepository**: `src/repositories/etc_integrated_repo.go`
+- **gRPCクライアンチE*: `src/clients/db_service_client.go`
 - **互換性レイヤー**: `src/adapters/etc_compat_adapter.go`
-- **統合テスト**: `tests/contract/`, `tests/integration/`
+- **統合テスチE*: `tests/contract/`, `tests/integration/`
 
-### 統合仕様
-- **データモデル**: [data-model.md](specs/001-db-service-integration/data-model.md)
-- **API契約**: [contracts/](specs/001-db-service-integration/contracts/)
-- **開発ガイド**: [quickstart.md](specs/001-db-service-integration/quickstart.md)
+### 統合仕槁E
+- **チE�EタモチE��**: [data-model.md](specs/001-db-service-integration/data-model.md)
+- **API契紁E*: [contracts/](specs/001-db-service-integration/contracts/)
+- **開発ガイチE*: [quickstart.md](specs/001-db-service-integration/quickstart.md)
 
-## 環境変数
-- `ETC_CORPORATE_ACCOUNTS`: 法人アカウント（カンマ区切り）
-- `ETC_PERSONAL_ACCOUNTS`: 個人アカウント（カンマ区切り）
-- `DATABASE_URL`: データベース接続URL (統合後)
-- `GRPC_SERVER_PORT`: gRPCサーバーポート (統合後)
+## 環墁E��数
+- `ETC_CORPORATE_ACCOUNTS`: 法人アカウント（カンマ区刁E���E�E
+- `ETC_PERSONAL_ACCOUNTS`: 個人アカウント（カンマ区刁E���E�E
+- `DATABASE_URL`: チE�Eタベ�Eス接続URL (統合征E
+- `GRPC_SERVER_PORT`: gRPCサーバ�Eポ�EチE(統合征E
 
-## テストコマンド
+## チE��トコマンチE
 ```bash
-go test ./...                    # 単体テスト
-go test ./tests/integration -v   # 統合テスト
+go test ./...                    # 単体テスチE
+go test ./tests/integration -v   # 統合テスチE
 ```
 
-## ビルド＆実行
+## ビルド！E��衁E
 ```bash
 go build -o etc_meisai
 ./etc_meisai
