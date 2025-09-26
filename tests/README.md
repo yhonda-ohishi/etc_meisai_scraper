@@ -1,436 +1,181 @@
-# ETC Meisai Test Suite Documentation
+# Test Organization Guide
 
-## Overview
-Comprehensive test suite achieving 100% code coverage across all packages with automated validation, performance optimization, and quality assurance tools.
+## Directory Structure
 
-## Test Organization
-
-### Directory Structure
 ```
 tests/
-├── unit/           # Package-level unit tests with mocked dependencies
-├── integration/    # End-to-end workflow tests with real components
-├── contract/       # API contract validation and gRPC service tests
-├── fixtures/       # Test data factories and scenario builders
-└── helpers/        # Shared test utilities and mock generators
+├── unit/           # Unit tests for individual components
+│   ├── repositories/   # Repository layer tests
+│   ├── services/      # Service layer tests
+│   ├── models/        # Model validation tests
+│   ├── handlers/      # Handler tests
+│   └── grpc/         # gRPC server tests
+├── integration/    # Integration tests
+├── contract/       # Contract tests for APIs
+├── mocks/         # All mock files (generated)
+└── helpers/       # Test utilities and helpers
 ```
 
-## Testing Patterns
+## Constitutional Requirement
 
-### 1. Table-Driven Tests
-All tests use table-driven patterns for comprehensive scenario coverage:
+⚠️ **CRITICAL**: Per Constitution Principle I, test files MUST NEVER be placed in the `src/` directory.
+- All `*_test.go` files must be in `tests/` directory
+- All mock files must be in `tests/mocks/` directory
+- This is NON-NEGOTIABLE and enforced by pre-commit hooks
 
+## Mock Generation
+
+Generate mocks using `mockgen`:
+
+```bash
+# Repository mocks
+mockgen -source=src/repositories/etc_mapping_repository.go -destination=tests/mocks/mock_etc_mapping_repository.go -package=mocks
+
+# Service mocks
+mockgen -source=src/services/etc_mapping_service.go -destination=tests/mocks/mock_etc_mapping_service.go -package=mocks
+```
+
+**Important**: Always use `-destination=tests/mocks/` to ensure mocks go to the correct location.
+
+## Coverage Requirements
+
+- **Target**: 100% statement coverage
+- **Minimum**: 90% coverage (build will fail below this)
+- **Measurement**: Go's built-in coverage tools
+
+Run coverage:
+```bash
+go test ./tests/... -coverprofile=coverage.out
+go tool cover -html=coverage.out  # View in browser
+go tool cover -func=coverage.out  # View in terminal
+```
+
+## TDD Workflow
+
+1. **Red Phase**: Write failing test first
+   ```go
+   // tests/unit/services/example_test.go
+   func TestNewFeature(t *testing.T) {
+       // Test for non-existent feature
+       assert.Equal(t, expected, actual)
+   }
+   ```
+
+2. **Green Phase**: Write minimal code to pass
+   ```go
+   // src/services/example.go
+   func NewFeature() string {
+       return "expected"
+   }
+   ```
+
+3. **Refactor Phase**: Improve code while keeping tests green
+
+## Test Patterns
+
+### Table-Driven Tests
 ```go
-func TestETCService_GetRecords(t *testing.T) {
+func TestCalculation(t *testing.T) {
     tests := []struct {
-        name    string
-        filters Filters
-        want    []Record
-        wantErr bool
+        name     string
+        input    int
+        expected int
     }{
-        // Test cases covering all scenarios
+        {"positive", 5, 10},
+        {"zero", 0, 0},
+        {"negative", -5, -10},
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            // Test implementation
+            result := Calculate(tt.input)
+            assert.Equal(t, tt.expected, result)
         })
     }
 }
 ```
 
-### 2. Mock-Based Isolation
-External dependencies are mocked using testify/mock:
-
+### Mock Usage
 ```go
-// Create mock repository
-mockRepo := new(mocks.ETCRepository)
-mockRepo.On("GetByFilters", mock.Anything, filters).
-    Return(expectedRecords, nil)
+func TestServiceWithMock(t *testing.T) {
+    ctrl := gomock.NewController(t)
+    defer ctrl.Finish()
 
-// Inject mock into service
-service := NewETCService(mockRepo)
-```
+    mockRepo := mocks.NewMockRepository(ctrl)
+    mockRepo.EXPECT().Get(1).Return(&Model{ID: 1}, nil)
 
-### 3. Test Data Factory
-Consistent test data generation using factory patterns:
+    service := NewService(mockRepo)
+    result, err := service.Process(1)
 
-```go
-factory := fixtures.NewTestFactory(seed)
-
-// Create deterministic test data
-record := factory.CreateETCMeisaiRecord()
-batch := factory.CreateETCMeisaiRecordBatch(100)
-
-// Use scenario builders
-session, records := factory.Scenarios().SuccessfulImport()
-```
-
-### 4. Integration Testing
-Full workflow validation with real components:
-
-```go
-// Setup test database
-db := setupTestDB(t)
-defer cleanupTestDB(t, db)
-
-// Execute full import workflow
-result := ImportCSV(testFile, db)
-assert.NoError(t, result.Error)
-assert.Equal(t, 100, result.ProcessedCount)
+    assert.NoError(t, err)
+    assert.NotNil(t, result)
+}
 ```
 
 ## Running Tests
 
-### Basic Commands
 ```bash
 # Run all tests
-go test ./...
+go test ./tests/...
 
-# Run with coverage
-go test -coverprofile=coverage.out ./...
+# Run with verbose output
+go test ./tests/... -v
 
-# Run specific package tests
-go test ./src/services/...
+# Run specific package
+go test ./tests/unit/services/...
 
 # Run with race detection
-go test -race ./...
+go test ./tests/... -race
+
+# Run with coverage
+go test ./tests/... -cover
 
 # Run parallel tests
-make test-parallel
-
-# Run optimized tests (< 30s)
-make test-fast
+go test ./tests/... -parallel 4
 ```
 
-### Coverage Analysis
+## Continuous Monitoring
+
+A background watcher monitors:
+1. Constitution compliance (no tests in src/)
+2. Coverage percentage
+3. Test execution status
+
+The watcher runs every 30 seconds and reports violations immediately.
+
+## Best Practices
+
+1. **Test Naming**: Use descriptive names that explain what is being tested
+2. **Test Independence**: Each test should be independent and not rely on others
+3. **Clean State**: Always clean up resources in defer statements
+4. **Parallel Execution**: Use `t.Parallel()` where possible
+5. **Assertions**: Use testify/assert for clear, readable assertions
+6. **Mocking**: Mock external dependencies, not internal implementations
+7. **Coverage**: Aim for 100%, but focus on meaningful tests
+8. **Performance**: Keep test suite under 30 seconds total runtime
+
+## Validation Commands
+
 ```bash
+# Check for test files in src (should return nothing)
+find src -name "*_test.go"
+
+# Validate structure
+./scripts/validate-no-tests-in-src.sh
+
 # Generate coverage report
-make test-coverage
-
-# View HTML coverage report
-make test-coverage-html
-open coverage/coverage.html
-
-# Check coverage gates (95% minimum)
-make coverage-gate
-
-# Detailed coverage analysis
-make coverage-detailed
+./scripts/coverage.sh
 ```
-
-### Test Quality Tools
-
-#### Mutation Testing
-Validates test effectiveness by introducing controlled mutations:
-```bash
-go run scripts/mutation-test.go ./src/...
-```
-
-#### Flaky Test Detection
-Identifies unreliable tests through multiple runs:
-```bash
-go run scripts/flaky-test-detector.go -runs 10 ./...
-```
-
-#### Performance Profiling
-Analyzes test execution time:
-```bash
-go run scripts/test-optimizer.go . coverage
-```
-
-## Test Categories
-
-### Unit Tests
-- **Location**: `src/*/..._test.go`
-- **Coverage**: Individual functions and methods
-- **Dependencies**: All external dependencies mocked
-- **Execution**: < 1ms per test
-
-Example:
-```go
-func TestCalculateHash(t *testing.T) {
-    hash := CalculateHash("test-data")
-    assert.Equal(t, "expected-hash", hash)
-}
-```
-
-### Integration Tests
-- **Location**: `tests/integration/`
-- **Coverage**: Complete workflows
-- **Dependencies**: Real components, test database
-- **Execution**: < 100ms per test
-
-Example:
-```go
-func TestImportWorkflow(t *testing.T) {
-    // Setup
-    db := setupTestDB(t)
-
-    // Execute
-    result := ProcessImport(testCSV, db)
-
-    // Verify
-    assert.Equal(t, "completed", result.Status)
-}
-```
-
-### Contract Tests
-- **Location**: `tests/contract/`
-- **Coverage**: API boundaries, gRPC services
-- **Dependencies**: Mock servers, protocol validation
-- **Execution**: < 50ms per test
-
-Example:
-```go
-func TestGRPCContract(t *testing.T) {
-    server := setupTestGRPCServer()
-    client := pb.NewETCServiceClient(conn)
-
-    resp, err := client.GetRecords(ctx, request)
-    assert.NoError(t, err)
-    assert.Len(t, resp.Records, 10)
-}
-```
-
-## Writing Tests
-
-### Best Practices
-1. **Descriptive Names**: Use clear, intention-revealing test names
-2. **Isolated Tests**: Each test should be independent
-3. **Fast Execution**: Optimize for speed (< 30s total)
-4. **Comprehensive Coverage**: Test both success and error paths
-5. **Deterministic**: Use seeded random data for reproducibility
-
-### Test Template
-```go
-func TestPackage_Method(t *testing.T) {
-    // Arrange
-    factory := fixtures.NewTestFactory(42)
-    mockDep := new(mocks.Dependency)
-    mockDep.On("Method", mock.Anything).Return(nil)
-
-    sut := NewSystemUnderTest(mockDep)
-
-    // Act
-    result, err := sut.Method(input)
-
-    // Assert
-    assert.NoError(t, err)
-    assert.Equal(t, expected, result)
-    mockDep.AssertExpectations(t)
-}
-```
-
-### Error Testing
-```go
-func TestErrorScenarios(t *testing.T) {
-    tests := []struct {
-        name    string
-        input   interface{}
-        wantErr string
-    }{
-        {"nil input", nil, "input cannot be nil"},
-        {"invalid data", badData, "validation failed"},
-        {"timeout", slowOp, "context deadline exceeded"},
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := Process(tt.input)
-            assert.ErrorContains(t, err, tt.wantErr)
-        })
-    }
-}
-```
-
-## Coverage Requirements
-
-### Package Coverage Targets
-- **Minimum**: 95% statement coverage
-- **Goal**: 100% statement coverage
-- **Branch**: 90% branch coverage
-- **Enforcement**: CI/CD gates prevent regression
-
-### Exclusions
-- Generated code (`*.pb.go`, `*.pb.gw.go`)
-- Mock files (`*_mock.go`)
-- Test files (`*_test.go`)
-- Vendor dependencies
-
-### Coverage Reports
-Coverage reports are generated in multiple formats:
-- **Terminal**: Summary after test run
-- **HTML**: Interactive browser view
-- **JSON**: Machine-readable for CI
-- **Cobertura**: Integration with tools
 
 ## CI/CD Integration
 
-### GitHub Actions Workflow
-```yaml
-- name: Run Tests
-  run: go test -coverprofile=coverage.out ./...
+Tests are automatically run on:
+- Every commit (pre-commit hook)
+- Every push (GitHub Actions)
+- Every PR (with coverage report)
 
-- name: Check Coverage
-  run: |
-    coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-    if [ "$coverage" -lt 95 ]; then
-      echo "Coverage $coverage% is below 95%"
-      exit 1
-    fi
-```
-
-### Pre-commit Hooks
-```bash
-#!/bin/bash
-# .git/hooks/pre-commit
-go test ./... || exit 1
-make coverage-gate || exit 1
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Test Failures
-- Check test isolation (shared state)
-- Verify mock expectations
-- Review test data setup
-
-#### Coverage Gaps
-- Use coverage HTML to identify uncovered lines
-- Add edge cases and error scenarios
-- Ensure all branches are tested
-
-#### Slow Tests
-- Profile with `go test -cpuprofile`
-- Use parallel execution (`t.Parallel()`)
-- Optimize database operations
-
-#### Flaky Tests
-- Run flaky test detector
-- Fix timing dependencies
-- Use deterministic test data
-
-## Performance Benchmarks
-
-### Running Benchmarks
-```bash
-# Run all benchmarks
-go test -bench=. ./...
-
-# Run specific benchmark
-go test -bench=BenchmarkImport ./src/services
-
-# Profile memory usage
-go test -bench=. -benchmem
-
-# Compare benchmarks
-benchstat old.txt new.txt
-```
-
-### Benchmark Examples
-```go
-func BenchmarkETCService_ProcessRecord(b *testing.B) {
-    factory := fixtures.NewTestFactory(42)
-    service := setupService()
-    record := factory.CreateETCMeisaiRecord()
-
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        service.ProcessRecord(record)
-    }
-}
-```
-
-## Test Data Management
-
-### Factory Pattern
-The test factory provides consistent, deterministic test data:
-
-```go
-factory := fixtures.NewTestFactory(seed)
-
-// Single record
-record := factory.CreateETCMeisaiRecord()
-
-// Batch creation
-records := factory.CreateETCMeisaiRecordBatch(100)
-
-// Builder pattern
-record = factory.NewETCMeisaiBuilder().
-    WithAmount(1000).
-    WithRoute("Tokyo", "Osaka").
-    Build()
-
-// Scenarios
-session, records := factory.Scenarios().SuccessfulImport()
-duplicates := factory.Scenarios().DuplicateRecords()
-```
-
-### Test Fixtures
-Common test data is stored in `tests/fixtures/`:
-- Sample CSV files
-- Configuration files
-- Mock responses
-- Expected outputs
-
-## Advanced Testing
-
-### Mutation Testing
-Validates test quality by introducing mutations:
-```bash
-go run scripts/mutation-test.go ./src/services
-```
-
-Output shows mutation survival rate:
-```
-Mutation Testing Report
-=======================
-Total Mutations: 150
-Killed: 145 (96.7%)
-Survived: 5 (3.3%)
-```
-
-### Property-Based Testing
-For complex invariants:
-```go
-func TestPropertyInvariant(t *testing.T) {
-    quick.Check(func(input int) bool {
-        result := Process(input)
-        return result >= 0 // Invariant
-    }, nil)
-}
-```
-
-### Fuzz Testing
-For security-critical code:
-```go
-func FuzzParseCSV(f *testing.F) {
-    f.Add("valid,csv,data")
-    f.Fuzz(func(t *testing.T, input string) {
-        _, err := ParseCSV(input)
-        // Should not panic
-    })
-}
-```
-
-## Contributing
-
-### Adding New Tests
-1. Follow existing patterns
-2. Ensure 100% coverage for new code
-3. Run mutation testing
-4. Update documentation
-
-### Test Review Checklist
-- [ ] Tests are independent
-- [ ] Coverage is complete
-- [ ] Error cases tested
-- [ ] Performance acceptable
-- [ ] Documentation updated
-
----
-
-*Last Updated: 2025-09-23 | Test Coverage: 100%*
+Build fails if:
+- Any test fails
+- Coverage drops below 90%
+- Test files found in src/
+- Tests take longer than 30 seconds
