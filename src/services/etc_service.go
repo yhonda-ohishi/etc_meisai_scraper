@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/adapters"
 	// "github.com/yhonda-ohishi/etc_meisai/src/clients" // Commented out - clients package deleted
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
 	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
@@ -13,17 +12,15 @@ import (
 
 // ETCService handles business logic for ETC meisai with integrated repository
 type ETCService struct {
-	repo         repositories.ETCRepository
-	dbClient     interface{} // TODO: Replace with proper type when clients package is restored
-	compatAdapter *adapters.ETCMeisaiCompatAdapter
+	repo     repositories.ETCRepository
+	dbClient interface{} // TODO: Replace with proper type when clients package is restored
 }
 
 // NewETCService creates a new ETC service with integrated repository
 func NewETCService(repo repositories.ETCRepository, dbClient interface{}) *ETCService {
 	return &ETCService{
-		repo:         repo,
-		dbClient:     dbClient,
-		compatAdapter: adapters.NewETCMeisaiCompatAdapter(),
+		repo:     repo,
+		dbClient: dbClient,
 	}
 }
 

@@ -40,9 +40,90 @@
       "Bash(.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks)",
       "Bash(go clean:*)",
       "Bash(go vet:*)",
-      "Bash(gofmt:*)"
+      "Bash(gofmt:*)",
+      "Bash(mockgen:*)",
+      "Bash(time go build:*)",
+      "Bash(time go test:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[PreToolUse Hook] About to execute Bash command'",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -c \"Write-Host ''; Write-Host '🛑 CLAUDE CODE STOPPED'; Write-Host ''; Add-Type -AssemblyName System.Media; [System.Media.SystemSounds]::Beep.Play()\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c \"file='{{parameters.file_path}}'; if [[ \\\"$file\\\" == *.go ]] && [[ \\\"$file\\\" != */pb/* ]] && [[ \\\"$file\\\" != */mocks/* ]]; then echo '✅ [Hook] Formatting new Go file...'; if ! gofmt -d \\\"$file\\\" 2>&1 | grep -q '^'; then echo '✔️ Format OK'; else echo '⚠️ FORMAT ERROR DETECTED:'; gofmt -d \\\"$file\\\" 2>&1; fi; gofmt -w \\\"$file\\\" 2>/dev/null; echo '🔍 [Hook] Running package go vet...'; rel_dir=$(echo \\\"$file\\\" | sed -E 's|^[A-Za-z]:[/\\\\\\\\]go[/\\\\\\\\]etc_meisai[/\\\\\\\\]||' | xargs dirname); echo \\\"Checking package: ./$rel_dir\\\"; if ! go vet \\\"./$rel_dir\\\" 2>&1; then echo '⚠️ GO VET ERRORS DETECTED in package $rel_dir'; fi; echo '🔍 [Hook] Running project-wide go vet...'; if ! go vet ./src/... ./tests/... 2>&1 | head -30; then echo '⚠️ PROJECT-WIDE ERRORS DETECTED (src/ and tests/)'; else echo '✅ All project packages are clean'; fi; fi\"",
+            "timeout": 25
+          },
+          {
+            "type": "command",
+            "command": "bash -c \"file='{{parameters.file_path}}'; if [[ \\\"$file\\\" == src/*_test.go ]]; then echo '⚠️  [Hook] WARNING: Test file created in src/ directory!'; echo 'Constitution violation: Test files must be in tests/ directory'; fi\"",
+            "timeout": 2
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c \"file='{{parameters.file_path}}'; if [[ \\\"$file\\\" == *.go ]] && [[ \\\"$file\\\" != */pb/* ]] && [[ \\\"$file\\\" != */mocks/* ]]; then echo '✅ [Hook] Formatting Go file...'; if ! gofmt -d \\\"$file\\\" 2>&1 | grep -q '^'; then echo '✔️ Format OK'; else echo '⚠️ FORMAT ERROR DETECTED:'; gofmt -d \\\"$file\\\" 2>&1; fi; gofmt -w \\\"$file\\\" 2>/dev/null; echo '🔍 [Hook] Running package go vet...'; rel_dir=$(echo \\\"$file\\\" | sed -E 's|^[A-Za-z]:[/\\\\\\\\]go[/\\\\\\\\]etc_meisai[/\\\\\\\\]||' | xargs dirname); echo \\\"Checking package: ./$rel_dir\\\"; if ! go vet \\\"./$rel_dir\\\" 2>&1; then echo '⚠️ GO VET ERRORS DETECTED in package $rel_dir'; fi; echo '🔍 [Hook] Running project-wide go vet...'; if ! go vet ./src/... ./tests/... 2>&1 | head -30; then echo '⚠️ PROJECT-WIDE ERRORS DETECTED (src/ and tests/)'; else echo '✅ All project packages are clean'; fi; echo '📊 [Hook] Running coverage check...'; if [[ \\\"$file\\\" == tests/* ]]; then testdir=$(dirname \\\"$file\\\"); go test -cover \\\"$testdir\\\" 2>/dev/null | grep -E 'coverage:' || echo 'No coverage data'; else pkg=$(basename $(dirname \\\"$file\\\")); go test -cover ./tests/unit/$pkg ./tests/integration 2>/dev/null | grep -E 'coverage:' | grep -v '0.0%' | head -5 || echo 'No tests for this package'; fi; fi\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash -c \"file='{{parameters.file_path}}'; if [[ \\\"$file\\\" == *.proto ]]; then echo '🔄 [Hook] Regenerating Protocol Buffer code...'; cd src/proto && buf generate 2>/dev/null && echo '✅ [Hook] Proto generation completed' || echo '❌ [Hook] Proto generation failed'; fi\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c \"file='{{parameters.file_path}}'; if [[ \\\"$file\\\" == *.go ]] && [[ \\\"$file\\\" != */pb/* ]] && [[ \\\"$file\\\" != */mocks/* ]]; then echo '✅ [Hook] Formatting multi-edited Go file...'; if ! gofmt -d \\\"$file\\\" 2>&1 | grep -q '^'; then echo '✔️ Format OK'; else echo '⚠️ FORMAT ERROR DETECTED:'; gofmt -d \\\"$file\\\" 2>&1; fi; gofmt -w \\\"$file\\\" 2>/dev/null; echo '🔍 [Hook] Running package go vet...'; rel_dir=$(echo \\\"$file\\\" | sed -E 's|^[A-Za-z]:[/\\\\\\\\]go[/\\\\\\\\]etc_meisai[/\\\\\\\\]||' | xargs dirname); echo \\\"Checking package: ./$rel_dir\\\"; if ! go vet \\\"./$rel_dir\\\" 2>&1; then echo '⚠️ GO VET ERRORS DETECTED in package $rel_dir'; fi; echo '🔍 [Hook] Running project-wide go vet...'; if ! go vet ./src/... ./tests/... 2>&1 | head -20; then echo '⚠️ PROJECT-WIDE ERRORS DETECTED (src/ and tests/)'; else echo '✅ All project packages are clean'; fi; echo '📊 [Hook] Running quick coverage check...'; go test -cover -short ./tests/... 2>/dev/null | grep -E 'coverage:' | head -3 || true; fi\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c \"cmd='{{parameters.command}}'; if [[ \\\"$cmd\\\" == *'go test'* ]]; then echo '📊 [Hook] Coverage analysis for tests/:'; go test -cover ./tests/unit/... ./tests/integration/... 2>/dev/null | grep -E 'coverage:' | grep -v '0.0%' | head -10 || echo 'No coverage data available'; fi\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

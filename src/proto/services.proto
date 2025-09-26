@@ -1,0 +1,376 @@
+syntax = "proto3";
+
+package etc_meisai.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "etc_meisai.proto";
+import "models.proto";
+
+option go_package = "github.com/yhonda-ohishi/etc_meisai/src/pb;pb";
+
+// ========== Service Layer Definitions ==========
+
+// MappingBusinessService - マッピングビジネスロジックサービス
+service MappingBusinessService {
+  // CreateMapping - 新しいマッピングを作成（ビジネスルール適用）
+  rpc CreateMapping(CreateMappingServiceRequest) returns (CreateMappingServiceResponse);
+
+  // ApproveMapping - マッピングを承認
+  rpc ApproveMapping(ApproveMappingRequest) returns (ApproveMappingResponse);
+
+  // RejectMapping - マッピングを却下
+  rpc RejectMapping(RejectMappingRequest) returns (RejectMappingResponse);
+
+  // AutoMapRecords - 自動マッピング実行
+  rpc AutoMapRecords(AutoMapRequest) returns (AutoMapResponse);
+
+  // ValidateMapping - マッピングのバリデーション
+  rpc ValidateMapping(ValidateMappingRequest) returns (ValidateMappingResponse);
+
+  // GetMappingSuggestions - マッピング候補の提案
+  rpc GetMappingSuggestions(GetSuggestionsRequest) returns (GetSuggestionsResponse);
+
+  // BulkApprove - 複数マッピングの一括承認
+  rpc BulkApprove(BulkApproveRequest) returns (BulkApproveResponse);
+
+  // RecalculateConfidence - 信頼度の再計算
+  rpc RecalculateConfidence(RecalculateConfidenceRequest) returns (RecalculateConfidenceResponse);
+
+  // GetMappingHistory - マッピング履歴取得
+  rpc GetMappingHistory(GetMappingHistoryRequest) returns (GetMappingHistoryResponse);
+
+  // ExportMappings - マッピングのエクスポート
+  rpc ExportMappings(ExportMappingsRequest) returns (ExportMappingsResponse);
+}
+
+// MeisaiBusinessService - ETC明細ビジネスロジックサービス
+service MeisaiBusinessService {
+  // ImportRecords - レコードのインポート処理
+  rpc ImportRecords(ImportRecordsRequest) returns (ImportRecordsResponse);
+
+  // ValidateRecord - レコードのバリデーション
+  rpc ValidateRecord(ValidateRecordRequest) returns (ValidateRecordResponse);
+
+  // EnrichRecord - レコードのエンリッチメント
+  rpc EnrichRecord(EnrichRecordRequest) returns (EnrichRecordResponse);
+
+  // MatchDuplicates - 重複レコードのマッチング
+  rpc MatchDuplicates(MatchDuplicatesRequest) returns (MatchDuplicatesResponse);
+
+  // MergeRecords - レコードのマージ
+  rpc MergeRecords(MergeRecordsRequest) returns (MergeRecordsResponse);
+
+  // CalculateTollSummary - 通行料金サマリー計算
+  rpc CalculateTollSummary(CalculateTollRequest) returns (CalculateTollResponse);
+
+  // GenerateReport - レポート生成
+  rpc GenerateReport(GenerateReportRequest) returns (GenerateReportResponse);
+
+  // ArchiveRecords - レコードのアーカイブ
+  rpc ArchiveRecords(ArchiveRecordsRequest) returns (ArchiveRecordsResponse);
+
+  // RestoreRecords - レコードの復元
+  rpc RestoreRecords(RestoreRecordsRequest) returns (RestoreRecordsResponse);
+
+  // ExportRecords - レコードのエクスポート
+  rpc ExportRecords(ExportRecordsRequest) returns (ExportRecordsResponse);
+}
+
+// ========== Service Request/Response Messages ==========
+
+// ETCMappingService messages
+message CreateMappingServiceRequest {
+  int64 etc_record_id = 1;
+  string mapping_type = 2;
+  int64 mapped_entity_id = 3;
+  string mapped_entity_type = 4;
+  float confidence = 5;
+  map<string, string> metadata = 6;
+  bool auto_approve = 7;
+}
+
+message CreateMappingServiceResponse {
+  ETCMapping mapping = 1;
+  ValidationResult validation = 2;
+  bool auto_approved = 3;
+}
+
+message ApproveMappingRequest {
+  int64 mapping_id = 1;
+  string approved_by = 2;
+  string approval_reason = 3;
+}
+
+message ApproveMappingResponse {
+  ETCMapping mapping = 1;
+  google.protobuf.Timestamp approved_at = 2;
+}
+
+message RejectMappingRequest {
+  int64 mapping_id = 1;
+  string rejected_by = 2;
+  string rejection_reason = 3;
+}
+
+message RejectMappingResponse {
+  ETCMapping mapping = 1;
+  google.protobuf.Timestamp rejected_at = 2;
+}
+
+message AutoMapRequest {
+  repeated int64 record_ids = 1;
+  MappingConfiguration config = 2;
+  bool dry_run = 3;
+}
+
+message AutoMapResponse {
+  int32 total_processed = 1;
+  int32 successfully_mapped = 2;
+  int32 failed_mappings = 3;
+  repeated MappingResult results = 4;
+}
+
+message MappingResult {
+  int64 record_id = 1;
+  bool success = 2;
+  optional ETCMapping mapping = 3;
+  optional string error_message = 4;
+}
+
+message ValidateMappingRequest {
+  ETCMapping mapping = 1;
+  bool strict_mode = 2;
+}
+
+message ValidateMappingResponse {
+  ValidationResult result = 1;
+  repeated string suggestions = 2;
+}
+
+message GetSuggestionsRequest {
+  int64 etc_record_id = 1;
+  int32 max_suggestions = 2;
+  float min_confidence = 3;
+}
+
+message GetSuggestionsResponse {
+  repeated MappingSuggestion suggestions = 1;
+}
+
+message MappingSuggestion {
+  int64 entity_id = 1;
+  string entity_type = 2;
+  float confidence = 3;
+  string reason = 4;
+  map<string, string> matching_attributes = 5;
+}
+
+message BulkApproveRequest {
+  repeated int64 mapping_ids = 1;
+  string approved_by = 2;
+}
+
+message BulkApproveResponse {
+  int32 approved_count = 1;
+  int32 failed_count = 2;
+  repeated string errors = 3;
+}
+
+message RecalculateConfidenceRequest {
+  int64 mapping_id = 1;
+  map<string, string> additional_data = 2;
+}
+
+message RecalculateConfidenceResponse {
+  float old_confidence = 1;
+  float new_confidence = 2;
+  string calculation_method = 3;
+}
+
+message GetMappingHistoryRequest {
+  int64 mapping_id = 1;
+  bool include_changes = 2;
+}
+
+message GetMappingHistoryResponse {
+  repeated MappingHistoryEntry history = 1;
+}
+
+message MappingHistoryEntry {
+  google.protobuf.Timestamp timestamp = 1;
+  string action = 2;
+  string actor = 3;
+  map<string, string> changes = 4;
+}
+
+message ExportMappingsRequest {
+  FilterCriteria filter = 1;
+  string format = 2;  // csv, json, xlsx
+  repeated string fields = 3;
+}
+
+message ExportMappingsResponse {
+  bytes data = 1;
+  string content_type = 2;
+  string filename = 3;
+  int32 record_count = 4;
+}
+
+// ETCMeisaiService messages
+message ImportRecordsRequest {
+  bytes csv_data = 1;
+  string account_type = 2;
+  string account_id = 3;
+  ImportConfiguration config = 4;
+}
+
+message ImportRecordsResponse {
+  ImportSession session = 1;
+  BatchOperationResult result = 2;
+}
+
+message ValidateRecordRequest {
+  ETCMeisaiRecord record = 1;
+  bool strict_mode = 2;
+}
+
+message ValidateRecordResponse {
+  ValidationResult result = 1;
+  ETCMeisaiRecord sanitized_record = 2;
+}
+
+message EnrichRecordRequest {
+  ETCMeisaiRecord record = 1;
+  repeated string enrichment_types = 2;  // e.g., "geocoding", "toll_calculation"
+}
+
+message EnrichRecordResponse {
+  ETCMeisaiRecord enriched_record = 1;
+  map<string, string> added_data = 2;
+}
+
+message MatchDuplicatesRequest {
+  ETCMeisaiRecord record = 1;
+  float similarity_threshold = 2;
+}
+
+message MatchDuplicatesResponse {
+  repeated DuplicateMatch matches = 1;
+}
+
+message DuplicateMatch {
+  ETCMeisaiRecord record = 1;
+  float similarity_score = 2;
+  repeated string matching_fields = 3;
+}
+
+message MergeRecordsRequest {
+  repeated int64 record_ids = 1;
+  string merge_strategy = 2;  // "keep_newest", "keep_oldest", "manual"
+  map<string, string> field_preferences = 3;
+}
+
+message MergeRecordsResponse {
+  ETCMeisaiRecord merged_record = 1;
+  repeated int64 archived_record_ids = 2;
+}
+
+message CalculateTollRequest {
+  optional string car_number = 1;
+  optional string etc_card_number = 2;
+  DateRange period = 3;
+}
+
+message CalculateTollResponse {
+  int64 total_amount = 1;
+  int32 trip_count = 2;
+  repeated TollByRoute routes = 3;
+  repeated TollByMonth monthly = 4;
+}
+
+message TollByRoute {
+  string entrance_ic = 1;
+  string exit_ic = 2;
+  int32 count = 3;
+  int64 total_amount = 4;
+}
+
+message TollByMonth {
+  string month = 1;  // YYYY-MM
+  int64 amount = 2;
+  int32 trip_count = 3;
+}
+
+message GenerateReportRequest {
+  string report_type = 1;  // "monthly", "quarterly", "annual", "custom"
+  DateRange period = 2;
+  repeated string car_numbers = 3;
+  repeated string etc_card_numbers = 4;
+  string format = 5;  // "pdf", "excel", "csv"
+}
+
+message GenerateReportResponse {
+  bytes report_data = 1;
+  string content_type = 2;
+  string filename = 3;
+  ReportMetadata metadata = 4;
+}
+
+message ReportMetadata {
+  google.protobuf.Timestamp generated_at = 1;
+  int32 record_count = 2;
+  int64 total_amount = 3;
+  map<string, string> summary = 4;
+}
+
+message ArchiveRecordsRequest {
+  repeated int64 record_ids = 1;
+  string archive_reason = 2;
+  string archived_by = 3;
+}
+
+message ArchiveRecordsResponse {
+  int32 archived_count = 1;
+  string archive_id = 2;
+}
+
+message RestoreRecordsRequest {
+  repeated int64 record_ids = 1;
+  string restored_by = 2;
+}
+
+message RestoreRecordsResponse {
+  int32 restored_count = 1;
+  repeated int64 failed_ids = 2;
+}
+
+message ExportRecordsRequest {
+  FilterCriteria filter = 1;
+  string format = 2;  // "csv", "json", "xlsx"
+  repeated string fields = 3;
+  SortCriteria sort = 4;
+}
+
+message ExportRecordsResponse {
+  bytes data = 1;
+  string content_type = 2;
+  string filename = 3;
+  int32 record_count = 4;
+}
+
+// ========== Notification Messages ==========
+
+message NotificationRequest {
+  string type = 1;  // "email", "webhook", "sns"
+  string recipient = 2;
+  string subject = 3;
+  string message = 4;
+  map<string, string> metadata = 5;
+}
+
+message NotificationResponse {
+  bool sent = 1;
+  string notification_id = 2;
+  optional string error = 3;
+}

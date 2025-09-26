@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
-	"github.com/yhonda-ohishi/etc_meisai/src/pb"
+	pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

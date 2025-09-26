@@ -42,3 +42,14 @@ coverage.html
 coverage.txt
 *.coverprofile
 tests/helpers/mocks/*.go
+
+# Generated Protocol Buffer code
+src/pb/
+src/pb/*
+
+# Generated mock files
+tests/mocks/mock_*.go
+
+# Generated Protocol Buffer code
+src/pb/
+tests/mocks/mock_*.go

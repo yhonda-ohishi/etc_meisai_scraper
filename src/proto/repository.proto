@@ -1,0 +1,354 @@
+syntax = "proto3";
+
+package etc_meisai.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "etc_meisai.proto";
+
+option go_package = "github.com/yhonda-ohishi/etc_meisai/src/pb;pb";
+
+// ========== Repository Services ==========
+
+// ETCMappingRepository - マッピング情報のデータアクセス層
+service ETCMappingRepository {
+  // Create - 新しいマッピングを作成
+  rpc Create(ETCMapping) returns (ETCMapping);
+
+  // GetByID - IDによるマッピング取得
+  rpc GetByID(GetByIDRequest) returns (ETCMapping);
+
+  // Update - マッピングの更新
+  rpc Update(ETCMapping) returns (ETCMapping);
+
+  // Delete - マッピングの削除
+  rpc Delete(GetByIDRequest) returns (google.protobuf.Empty);
+
+  // List - マッピング一覧取得
+  rpc List(ListMappingsRequest) returns (ListMappingsResponse);
+
+  // GetByETCRecordID - ETC記録IDによるマッピング取得
+  rpc GetByETCRecordID(GetByETCRecordIDRequest) returns (GetMappingsByRecordResponse);
+
+  // GetByMappedEntity - マップされたエンティティによる取得
+  rpc GetByMappedEntity(GetByMappedEntityRequest) returns (ListMappingsResponse);
+
+  // UpdateStatus - ステータス更新
+  rpc UpdateStatus(UpdateStatusRequest) returns (ETCMapping);
+
+  // BulkCreate - 複数マッピングの一括作成
+  rpc BulkCreate(BulkCreateMappingsRequest) returns (BulkCreateMappingsResponse);
+
+  // BulkUpdateStatus - 複数マッピングのステータス一括更新
+  rpc BulkUpdateStatus(BulkUpdateStatusRequest) returns (BulkUpdateStatusResponse);
+
+  // GetPendingMappings - 保留中のマッピング取得
+  rpc GetPendingMappings(GetPendingMappingsRequest) returns (ListMappingsResponse);
+
+  // GetActiveMappings - アクティブなマッピング取得
+  rpc GetActiveMappings(GetActiveMappingsRequest) returns (ListMappingsResponse);
+
+  // CountByStatus - ステータス別カウント取得
+  rpc CountByStatus(CountByStatusRequest) returns (CountByStatusResponse);
+
+  // GetMappingStatistics - マッピング統計情報取得
+  rpc GetMappingStatistics(GetMappingStatisticsRequest) returns (MappingStatistics);
+
+  // SearchMappings - 詳細検索
+  rpc SearchMappings(SearchMappingsRequest) returns (ListMappingsResponse);
+}
+
+// ETCMeisaiRecordRepository - ETC明細記録のデータアクセス層
+service ETCMeisaiRecordRepository {
+  // Create - 新しいETC明細記録を作成
+  rpc Create(ETCMeisaiRecord) returns (ETCMeisaiRecord);
+
+  // GetByID - IDによる記録取得
+  rpc GetByID(GetByIDRequest) returns (ETCMeisaiRecord);
+
+  // GetByHash - ハッシュによる記録取得
+  rpc GetByHash(GetByHashRequest) returns (ETCMeisaiRecord);
+
+  // Update - 記録の更新
+  rpc Update(ETCMeisaiRecord) returns (ETCMeisaiRecord);
+
+  // Delete - 記録の削除
+  rpc Delete(GetByIDRequest) returns (google.protobuf.Empty);
+
+  // List - 記録一覧取得
+  rpc List(ListRecordsRequest) returns (ListRecordsResponse);
+
+  // GetByDateRange - 日付範囲による取得
+  rpc GetByDateRange(GetByDateRangeRequest) returns (ListRecordsResponse);
+
+  // GetByCarNumber - 車番による取得
+  rpc GetByCarNumber(GetByCarNumberRequest) returns (ListRecordsResponse);
+
+  // GetByETCCard - ETCカード番号による取得
+  rpc GetByETCCard(GetByETCCardRequest) returns (ListRecordsResponse);
+
+  // BulkCreate - 複数記録の一括作成
+  rpc BulkCreate(BulkCreateRecordsRequest) returns (BulkCreateRecordsResponse);
+
+  // CheckDuplicate - 重複チェック
+  rpc CheckDuplicate(CheckDuplicateRequest) returns (CheckDuplicateResponse);
+
+  // GetRecordStatistics - 記録統計情報取得
+  rpc GetRecordStatistics(GetRecordStatisticsRequest) returns (RecordStatistics);
+}
+
+// ImportRepository - インポート管理のデータアクセス層
+service ImportRepository {
+  // CreateSession - 新しいインポートセッションを作成
+  rpc CreateSession(ImportSession) returns (ImportSession);
+
+  // GetSession - セッション取得
+  rpc GetSession(GetSessionRequest) returns (ImportSession);
+
+  // UpdateSession - セッション更新
+  rpc UpdateSession(ImportSession) returns (ImportSession);
+
+  // ListSessions - セッション一覧取得
+  rpc ListSessions(ListImportSessionsRequest) returns (ListImportSessionsResponse);
+
+  // AddError - エラー追加
+  rpc AddError(AddErrorRequest) returns (google.protobuf.Empty);
+
+  // GetSessionStatistics - セッション統計取得
+  rpc GetSessionStatistics(GetSessionStatisticsRequest) returns (SessionStatistics);
+}
+
+// StatisticsRepository - 統計情報のデータアクセス層
+service StatisticsRepository {
+  // GetOverallStatistics - 全体統計取得
+  rpc GetOverallStatistics(GetStatisticsRequest) returns (GetStatisticsResponse);
+
+  // GetDailyStatistics - 日次統計取得
+  rpc GetDailyStatistics(GetDailyStatisticsRequest) returns (GetDailyStatisticsResponse);
+
+  // GetICUsageStatistics - IC利用統計取得
+  rpc GetICUsageStatistics(GetICUsageRequest) returns (GetICUsageResponse);
+
+  // GetCarUsageStatistics - 車両利用統計取得
+  rpc GetCarUsageStatistics(GetCarUsageRequest) returns (GetCarUsageResponse);
+
+  // GetImportStatistics - インポート統計取得
+  rpc GetImportStatistics(GetImportStatisticsRequest) returns (GetImportStatisticsResponse);
+
+  // GetMappingStatistics - マッピング統計取得
+  rpc GetMappingStatistics(GetMappingStatisticsRequest) returns (MappingStatistics);
+}
+
+// ========== Repository Request/Response Messages ==========
+
+// Common requests
+message GetByIDRequest {
+  int64 id = 1;
+}
+
+message GetByHashRequest {
+  string hash = 1;
+}
+
+// ETCMapping specific requests
+message GetByETCRecordIDRequest {
+  int64 etc_record_id = 1;
+}
+
+message GetMappingsByRecordResponse {
+  repeated ETCMapping mappings = 1;
+}
+
+message GetByMappedEntityRequest {
+  int64 mapped_entity_id = 1;
+  string mapped_entity_type = 2;
+}
+
+message UpdateStatusRequest {
+  int64 id = 1;
+  MappingStatus status = 2;
+}
+
+message BulkCreateMappingsRequest {
+  repeated ETCMapping mappings = 1;
+}
+
+message BulkCreateMappingsResponse {
+  repeated ETCMapping mappings = 1;
+  int32 created_count = 2;
+}
+
+message BulkUpdateStatusRequest {
+  repeated int64 ids = 1;
+  MappingStatus status = 2;
+}
+
+message BulkUpdateStatusResponse {
+  int32 updated_count = 1;
+}
+
+message GetPendingMappingsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message GetActiveMappingsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message CountByStatusRequest {
+  // Empty - counts all statuses
+}
+
+message CountByStatusResponse {
+  map<string, int32> status_counts = 1;
+}
+
+message SearchMappingsRequest {
+  string query = 1;
+  repeated MappingStatus statuses = 2;
+  repeated string mapping_types = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+// ETCMeisaiRecord specific requests
+message GetByDateRangeRequest {
+  string date_from = 1;  // YYYY-MM-DD
+  string date_to = 2;    // YYYY-MM-DD
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message GetByCarNumberRequest {
+  string car_number = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetByETCCardRequest {
+  string etc_card_number = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message BulkCreateRecordsRequest {
+  repeated ETCMeisaiRecord records = 1;
+}
+
+message BulkCreateRecordsResponse {
+  repeated ETCMeisaiRecord records = 1;
+  int32 created_count = 2;
+  int32 duplicate_count = 3;
+}
+
+message CheckDuplicateRequest {
+  string hash = 1;
+}
+
+message CheckDuplicateResponse {
+  bool is_duplicate = 1;
+  optional ETCMeisaiRecord existing_record = 2;
+}
+
+message GetRecordStatisticsRequest {
+  optional string date_from = 1;
+  optional string date_to = 2;
+}
+
+message RecordStatistics {
+  int64 total_records = 1;
+  int64 total_amount = 2;
+  int32 unique_cars = 3;
+  int32 unique_cards = 4;
+  map<string, int32> records_per_month = 5;
+}
+
+// Import specific requests
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+message AddErrorRequest {
+  string session_id = 1;
+  ImportError error = 2;
+}
+
+message GetSessionStatisticsRequest {
+  optional string account_id = 1;
+  optional string date_from = 2;
+  optional string date_to = 3;
+}
+
+message SessionStatistics {
+  int32 total_sessions = 1;
+  int32 successful_sessions = 2;
+  int32 failed_sessions = 3;
+  int32 total_records_imported = 4;
+  int32 total_duplicates = 5;
+  int32 total_errors = 6;
+}
+
+// Statistics specific requests
+message GetDailyStatisticsRequest {
+  string date_from = 1;
+  string date_to = 2;
+}
+
+message GetDailyStatisticsResponse {
+  repeated DailyStatistics daily_stats = 1;
+}
+
+message GetICUsageRequest {
+  optional string date_from = 1;
+  optional string date_to = 2;
+  int32 top_n = 3;  // Top N most used ICs
+}
+
+message GetICUsageResponse {
+  repeated ICStatistics ic_stats = 1;
+}
+
+message GetCarUsageRequest {
+  optional string date_from = 1;
+  optional string date_to = 2;
+}
+
+message GetCarUsageResponse {
+  map<string, int32> car_usage_counts = 1;
+  map<string, int64> car_toll_amounts = 2;
+}
+
+message GetImportStatisticsRequest {
+  optional string account_id = 1;
+  optional string date_from = 2;
+  optional string date_to = 3;
+}
+
+message GetImportStatisticsResponse {
+  SessionStatistics statistics = 1;
+  repeated ImportTrend trends = 2;
+}
+
+message GetMappingStatisticsRequest {
+  optional string date_from = 1;
+  optional string date_to = 2;
+  optional string mapping_type = 3;
+}
+
+message ImportTrend {
+  string date = 1;
+  int32 import_count = 2;
+  int32 record_count = 3;
+  int32 error_count = 4;
+}
+
+message MappingStatistics {
+  int32 total_mappings = 1;
+  int32 active_mappings = 2;
+  int32 pending_mappings = 3;
+  int32 rejected_mappings = 4;
+  map<string, int32> mappings_by_type = 5;
+  float average_confidence = 6;
+}

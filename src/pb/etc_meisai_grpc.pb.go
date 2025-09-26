@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: etc_meisai.proto
 
-package pb
+package etc_meisaiv1
 
 import (
 	context "context"

@@ -20,7 +20,8 @@ type BaseService struct {
 	ETCRepository     repositories.ETCRepository
 	MappingRepository repositories.MappingRepository
 	Logger            *log.Logger
-	mu                sync.RWMutex
+	mu                sync.RWMutex // protects state fields
+	logMu             sync.RWMutex // separate mutex for logging operations
 	metrics           *ServiceMetrics
 	config            *ServiceConfig
 	isHealthy         bool
@@ -112,9 +113,9 @@ func (s *BaseService) HandleError(err error, operation string) error {
 
 // LogOperation logs an operation with optional details
 func (s *BaseService) LogOperation(operation string, details interface{}) {
-	s.mu.RLock()
+	s.logMu.RLock()
 	logger := s.Logger
-	s.mu.RUnlock()
+	s.logMu.RUnlock()
 
 	if logger == nil {
 		return
@@ -129,8 +130,8 @@ func (s *BaseService) LogOperation(operation string, details interface{}) {
 
 // GetLogger returns the service logger
 func (s *BaseService) GetLogger() *log.Logger {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.logMu.RLock()
+	defer s.logMu.RUnlock()
 	return s.Logger
 }
 
@@ -175,15 +176,32 @@ func (s *BaseService) StartTransaction(ctx context.Context) (context.Context, fu
 
 // WithRetry executes an operation with retry logic
 func (s *BaseService) WithRetry(operation func() error, maxRetries int) error {
+	return s.WithRetryContext(context.Background(), operation, maxRetries)
+}
+
+// WithRetryContext executes an operation with retry logic and context support
+func (s *BaseService) WithRetryContext(ctx context.Context, operation func() error, maxRetries int) error {
 	var lastErr error
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Check context before each attempt
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("operation cancelled: %w", ctx.Err())
+		default:
+		}
+
 		if err := operation(); err != nil {
 			lastErr = err
 			if attempt < maxRetries {
-				// Simple exponential backoff
-				time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
-				continue
+				// Simple exponential backoff with context-aware sleep
+				backoff := time.Duration(attempt+1) * 100 * time.Millisecond
+				select {
+				case <-time.After(backoff):
+					continue
+				case <-ctx.Done():
+					return fmt.Errorf("operation cancelled during retry: %w", ctx.Err())
+				}
 			}
 		} else {
 			return nil
@@ -216,13 +234,14 @@ func (s *BaseService) GetStatus() *ServiceStatus {
 
 // Shutdown gracefully shuts down the service
 func (s *BaseService) Shutdown(ctx context.Context) error {
+	// Update state first
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.isHealthy = false
 	s.status.State = "shutdown"
 	s.status.ShutdownTime = time.Now()
+	s.mu.Unlock() // Release lock before logging
 
+	// Log operation without holding the state mutex
 	s.LogOperation("service_shutdown", "service shutting down gracefully")
 
 	return nil
@@ -351,9 +370,8 @@ func NewServiceRegistryWithDependencies(
 
 	// Create services with repositories
 	etcService := &ETCService{
-		repo:          etcRepo,
-		dbClient:      dbClient,
-		compatAdapter: nil, // Will be initialized in NewETCService
+		repo:     etcRepo,
+		dbClient: dbClient,
 	}
 
 	mappingService := &MappingService{

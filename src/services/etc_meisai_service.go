@@ -65,6 +65,15 @@ type ListRecordsResponse struct {
 
 // CreateRecord creates a new ETC record with hash generation
 func (s *ETCMeisaiService) CreateRecord(ctx context.Context, params *CreateRecordParams) (*models.ETCMeisaiRecord, error) {
+	if params == nil {
+		return nil, fmt.Errorf("params cannot be nil")
+	}
+
+	// Validate required fields
+	if params.Date.IsZero() {
+		return nil, fmt.Errorf("date is required")
+	}
+
 	s.logger.Printf("Creating ETC record for car: %s, date: %s", params.CarNumber, params.Date.Format("2006-01-02"))
 
 	// Create record model
@@ -146,6 +155,11 @@ func (s *ETCMeisaiService) GetRecord(ctx context.Context, id int64) (*models.ETC
 
 // ListRecords lists ETC records with filtering and pagination
 func (s *ETCMeisaiService) ListRecords(ctx context.Context, params *ListRecordsParams) (*ListRecordsResponse, error) {
+	// Initialize params if nil
+	if params == nil {
+		params = &ListRecordsParams{}
+	}
+
 	// Set defaults
 	if params.Page <= 0 {
 		params.Page = 1
@@ -203,6 +217,10 @@ func (s *ETCMeisaiService) ListRecords(ctx context.Context, params *ListRecordsP
 func (s *ETCMeisaiService) UpdateRecord(ctx context.Context, id int64, params *CreateRecordParams) (*models.ETCMeisaiRecord, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("invalid record ID: %d", id)
+	}
+
+	if params == nil {
+		return nil, fmt.Errorf("params cannot be nil")
 	}
 
 	s.logger.Printf("Updating ETC record with ID: %d", id)
@@ -334,6 +352,10 @@ func (s *ETCMeisaiService) GetRecordByHash(ctx context.Context, hash string) (*m
 
 // ValidateRecord validates an ETC record without saving it
 func (s *ETCMeisaiService) ValidateRecord(ctx context.Context, params *CreateRecordParams) error {
+	if params == nil {
+		return fmt.Errorf("params cannot be nil")
+	}
+
 	// Create temporary record for validation
 	record := &models.ETCMeisaiRecord{
 		Date:          params.Date,

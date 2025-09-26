@@ -223,7 +223,7 @@ func (fc *FieldConverter) convertFullWidthToHalfWidth(s string) string {
 
 // MapLegacyFields maps legacy field names to standard field names
 func (fc *FieldConverter) MapLegacyFields(data map[string]interface{}) map[string]interface{} {
-	// Field mapping from legacy names to standard names
+	// Field mapping from legacy names to standard names (all keys in lowercase)
 	fieldMap := map[string]string{
 		// Date fields
 		"date":        "use_date",
@@ -266,18 +266,123 @@ func (fc *FieldConverter) MapLegacyFields(data map[string]interface{}) map[strin
 		"card_no":         "etc_number",
 		"card_number":     "etc_number",
 		"etc_num":         "etc_number",
-		"ETCカード番号":       "etc_number",
+		"etcカード番号":       "etc_number",
 	}
 
 	result := make(map[string]interface{})
 
-	// Copy all fields, mapping legacy names to standard names
+	// Priority for fields (higher priority overwrites lower)
+	// Priority order: Japanese fields > specific fields > generic fields
+	priority := map[string]int{
+		// Date fields - Japanese has highest priority
+		"date":       1,
+		"usage_date": 2,
+		"利用日":       3,
+		"使用日":       3,
+
+		// Time fields
+		"time":       1,
+		"usage_time": 2,
+		"利用時間":      3,
+		"使用時間":      3,
+
+		// IC fields
+		"ic_entry": 1,
+		"entry":    2,
+		"入口":      3,
+		"入口IC":    3,
+		"ic_exit":  1,
+		"exit":     2,
+		"出口":      3,
+		"出口IC":    3,
+
+		// Amount fields
+		"toll_amount":  1,
+		"total_amount": 2,
+		"料金":          3,
+		"通行料金":       3,
+
+		// Vehicle fields
+		"vehicle_num":    1,
+		"vehicle_number": 2,
+		"vehicle_no":     1,
+		"車両番号":         3,
+		"車番":           3,
+
+		// ETC number fields
+		"etc_card_num":    1,
+		"etc_card_number": 2,
+		"card_no":         2,
+		"card_number":     2,
+		"etc_num":         1,
+		"etcカード番号":      3,
+	}
+
+	// Track which standard fields have been set and their priority
+	fieldPriority := make(map[string]int)
+
+	// First pass: copy non-mapped fields as-is
 	for key, value := range data {
-		standardKey := key
-		if mapped, ok := fieldMap[strings.ToLower(key)]; ok {
-			standardKey = mapped
+		lowerKey := strings.ToLower(key)
+		if _, isMapped := fieldMap[lowerKey]; !isMapped {
+			// Check if this key is a standard field that might be overwritten
+			standardFields := map[string]bool{
+				"use_date":   true,
+				"use_time":   true,
+				"entry_ic":   true,
+				"exit_ic":    true,
+				"amount":     true,
+				"car_number": true,
+				"etc_number": true,
+			}
+
+			if !standardFields[key] {
+				// Not a standard field that could be mapped, keep as-is
+				result[key] = value
+			}
 		}
-		result[standardKey] = value
+	}
+
+	// Second pass: apply mapped fields with priority
+	for key, value := range data {
+		lowerKey := strings.ToLower(key)
+
+		// Check if this is a field we need to map OR if it's a standard field
+		if mapped, ok := fieldMap[lowerKey]; ok {
+			// Get priority of this field
+			currentPriority := priority[key]
+			if currentPriority == 0 {
+				currentPriority = priority[lowerKey]
+			}
+			if currentPriority == 0 {
+				currentPriority = 1 // default priority
+			}
+
+			// Check if we should update this field
+			if existingPriority, exists := fieldPriority[mapped]; !exists || currentPriority > existingPriority {
+				result[mapped] = value
+				fieldPriority[mapped] = currentPriority
+			}
+		} else {
+			// Check if this is already a standard field name
+			standardFields := map[string]bool{
+				"use_date":   true,
+				"use_time":   true,
+				"entry_ic":   true,
+				"exit_ic":    true,
+				"amount":     true,
+				"car_number": true,
+				"etc_number": true,
+			}
+
+			if standardFields[key] {
+				// It's already a standard field, use priority 0 (lowest)
+				if existingPriority, exists := fieldPriority[key]; !exists || 0 > existingPriority {
+					result[key] = value
+					fieldPriority[key] = 0
+				}
+			}
+		}
 	}
 
 	return result
@@ -425,5 +530,8 @@ func isValidTimeFormat(timeStr string) bool {
 			return false
 		}
 	}
-	return true
+
+	// Also validate that it's a valid time by parsing it
+	_, err := time.Parse("15:04", timeStr)
+	return err == nil
 }

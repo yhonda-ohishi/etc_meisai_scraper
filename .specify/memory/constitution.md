@@ -1,50 +1,108 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+Version: 0.0.0 → 1.0.0 (Initial ratification with test separation principle)
+New Principles Added:
+- Test File Separation: Tests must be in tests/ directory, never in src/
+- Test-First Development: TDD approach mandatory
+- Coverage Requirements: 100% coverage target per project
+- Clean Architecture: Clear separation of concerns
+- Observable Systems: Comprehensive logging and monitoring
+
+Templates Requiring Updates:
+✅ Constitution created
+⚠ plan-template.md - May need update for test directory structure
+⚠ spec-template.md - May need update for test requirements
+⚠ tasks-template.md - May need update for test task locations
+
+Follow-up TODOs:
+- Confirm exact ratification date with project team
+-->
+
+# ETC明細システム Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Test File Separation (NON-NEGOTIABLE)
+Test files MUST be placed in the `tests/` directory structure, NEVER in the `src/` directory.
+Tests are organized as `tests/unit/`, `tests/integration/`, and `tests/contract/`.
+This ensures clean separation between production code and test code, prevents accidental
+inclusion of test dependencies in production builds, and maintains clear project structure.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Test-First Development
+TDD (Test-Driven Development) approach is mandatory for all new features.
+Tests must be written first, fail initially, then implementation follows.
+Red-Green-Refactor cycle must be strictly enforced.
+This ensures comprehensive test coverage and drives better design decisions.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Coverage Requirements
+Project MUST maintain 100% test coverage target as per project requirements.
+Coverage is measured at statement level using Go's built-in coverage tools.
+Any code that cannot be tested must be explicitly documented with justification.
+Coverage reports must be generated for all CI/CD pipelines.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Clean Architecture
+Clear separation of concerns MUST be maintained across all layers:
+- `src/models/` - Data models and entities only
+- `src/services/` - Business logic layer
+- `src/repositories/` - Data access layer
+- `src/grpc/` - gRPC server and handlers
+- `src/adapters/` - External system adapters
+No cross-layer dependencies allowed except through defined interfaces.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Observable Systems
+All services MUST implement comprehensive logging and monitoring.
+Structured logging is required for all operations.
+Performance metrics must be tracked for critical operations.
+Timeout protection (2-minute max) for all long-running operations.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### VI. Dependency Injection
+All services MUST use constructor injection pattern.
+Dependencies are passed as interfaces, not concrete types.
+No global state or singleton patterns allowed.
+This enables proper mocking and testing.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### VII. Simplicity First
+Start with the simplest solution that works.
+YAGNI (You Aren't Gonna Need It) principles apply.
+Complexity must be explicitly justified and documented.
+Prefer Go standard library over external dependencies when possible.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Standards
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Code Organization
+- Production code in `src/` directory only
+- Test code in `tests/` directory only
+- Mock files in `src/mocks/` for generated mocks
+- Documentation in `docs/` directory
+- Scripts and tools in `scripts/` directory
+
+### Testing Requirements
+- Unit tests for all business logic
+- Integration tests for service interactions
+- Contract tests for all API endpoints
+- Table-driven tests preferred for comprehensive coverage
+- Parallel test execution where possible
+
+### Quality Gates
+- All tests must pass before merge
+- Coverage must meet or exceed 100% target
+- No build warnings allowed
+- Code must pass linting checks
+- Documentation must be updated for API changes
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+The Constitution supersedes all other project practices and guidelines.
+Any amendments require:
+1. Documentation of proposed change with rationale
+2. Team review and approval
+3. Migration plan for existing code if needed
+4. Update to all affected documentation
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+All pull requests must verify constitutional compliance.
+Violations must be fixed before merge is allowed.
+Complexity additions require explicit justification in PR description.
+
+Runtime development guidance is maintained in CLAUDE.md for agent-specific instructions.
+
+**Version**: 1.0.0 | **Ratified**: 2025-09-26 | **Last Amended**: 2025-09-26

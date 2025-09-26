@@ -136,9 +136,26 @@ func main() {
 	// Create gRPC-Gateway mux
 	mux := runtime.NewServeMux()
 
-	// Register gRPC-Gateway handlers
-	if err := pb.RegisterETCMeisaiServiceHandler(ctx, mux, conn); err != nil {
-		log.Fatalf("Failed to register gateway handlers: %v", err)
+	// Register gRPC-Gateway handlers for repository services
+	if err := pb.RegisterETCMappingRepositoryHandler(ctx, mux, conn); err != nil {
+		log.Fatalf("Failed to register ETCMappingRepository handler: %v", err)
+	}
+	if err := pb.RegisterETCMeisaiRecordRepositoryHandler(ctx, mux, conn); err != nil {
+		log.Fatalf("Failed to register ETCMeisaiRecordRepository handler: %v", err)
+	}
+	if err := pb.RegisterImportRepositoryHandler(ctx, mux, conn); err != nil {
+		log.Fatalf("Failed to register ImportRepository handler: %v", err)
+	}
+	if err := pb.RegisterStatisticsRepositoryHandler(ctx, mux, conn); err != nil {
+		log.Fatalf("Failed to register StatisticsRepository handler: %v", err)
+	}
+
+	// Register gRPC-Gateway handlers for business services
+	if err := pb.RegisterMappingBusinessServiceHandler(ctx, mux, conn); err != nil {
+		log.Fatalf("Failed to register MappingBusinessService handler: %v", err)
+	}
+	if err := pb.RegisterMeisaiBusinessServiceHandler(ctx, mux, conn); err != nil {
+		log.Fatalf("Failed to register MeisaiBusinessService handler: %v", err)
 	}
 
 	// Create HTTP mux and apply middleware
@@ -151,8 +168,8 @@ func main() {
 		w.Write([]byte(`{"status":"healthy","service":"etc-meisai-gateway"}`))
 	})
 
-	// Add Swagger UI endpoints
-	setupSwaggerRoutes(httpMux)
+	// Add Swagger UI endpoints (if available)
+	// setupSwaggerRoutes(httpMux)
 
 	// gRPC-Gateway routes
 	httpMux.Handle("/", mux)

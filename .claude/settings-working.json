@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[Hook] Tool was used' >> .claude/hook.log",
+            "timeout": 1
+          }
+        ]
+      }
+    ]
+  }
+}

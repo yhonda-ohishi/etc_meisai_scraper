@@ -247,7 +247,15 @@ func (s *LoggingService) GetMetrics() LogMetrics {
 	s.metrics.mu.RLock()
 	defer s.metrics.mu.RUnlock()
 
-	return *s.metrics
+	// Return a copy without the mutex
+	return LogMetrics{
+		TotalLogs:   s.metrics.TotalLogs,
+		ErrorCount:  s.metrics.ErrorCount,
+		WarnCount:   s.metrics.WarnCount,
+		InfoCount:   s.metrics.InfoCount,
+		DebugCount:  s.metrics.DebugCount,
+		LastLogTime: s.metrics.LastLogTime,
+	}
 }
 
 // SetLevel changes the logging level

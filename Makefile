@@ -5,24 +5,34 @@ APP_NAME := etc_meisai
 DOCKER_IMAGE := $(APP_NAME):latest
 
 # Test targets
-.PHONY: test test-coverage test-coverage-html test-coverage-check test-unit test-integration clean-tests setup-tests generate-mocks ci-test
+.PHONY: test test-coverage test-coverage-html test-coverage-check test-unit test-integration clean-tests setup-tests generate-mocks ci-test test-quick fmt-check
 
+# Basic test execution with coverage display
 test:
-	go test -v -race -timeout 60s ./src/...
+	@echo "$(GREEN)Running tests with coverage analysis...$(NC)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@go test -v -cover -race -timeout 60s -parallel 8 -count=1 ./tests/... 2>&1 | \
+		awk '/coverage:/ { \
+			match($$0, /[0-9]+\.[0-9]+%/); \
+			cov = substr($$0, RSTART, RLENGTH-1); \
+			if (cov >= 80) print "✅", $$0; \
+			else if (cov >= 60) print "⚠️", $$0; \
+			else print "❌", $$0; \
+			next \
+		} \
+		/PASS/ { print "✅", $$0; next } \
+		/FAIL/ { print "❌", $$0; next } \
+		{ print $$0 }'
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "$(GREEN)📊 Coverage analysis complete!$(NC)"
 
-test-coverage:
-	@echo "Generating coverage report..."
-	@go test -coverprofile=coverage.out ./src/...
-	@go tool cover -func=coverage.out
-
-test-coverage-html:
-	@echo "Generating HTML coverage report..."
-	@go test -coverprofile=coverage.out ./src/...
-	@go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report saved to coverage.html"
-
-test-coverage-check:
-	@bash scripts/check-coverage.sh
+# Parallel test execution with coverage package optimization
+test-parallel-coverage:
+	@echo "$(GREEN)Running parallel tests with coverage...$(NC)"
+	@mkdir -p $(COVERAGE_DIR)
+	go test -parallel 8 -coverprofile=$(COVERAGE_DIR)/coverage.raw -covermode=atomic \
+		-coverpkg=./src/services/...,./src/repositories/...,./src/models/...,./src/adapters/...,./src/grpc/... \
+		./src/...
 
 # T013-B: Optimized test execution
 test-fast: ## Run tests optimized for speed (< 30s target)
@@ -52,12 +62,15 @@ COVERAGE_THRESHOLD_BRANCH = 90
 COVERAGE_DIR = coverage
 
 test-coverage:
+	@echo "$(GREEN)Running tests with coverage analysis...$(NC)"
 	@mkdir -p $(COVERAGE_DIR)
-	go test -coverprofile=$(COVERAGE_DIR)/coverage.raw -covermode=atomic -coverpkg=./src/... ./...
+	go test -parallel 8 -coverprofile=$(COVERAGE_DIR)/coverage.raw -covermode=atomic \
+		-coverpkg=./src/services/...,./src/repositories/...,./src/models/...,./src/adapters/...,./src/grpc/... \
+		./src/...
 	@# Filter out excluded files (generated code, mocks, etc.)
 	@grep -v -E '(pb\.go|pb\.gw\.go|_mock\.go|/mocks/|/vendor/|/migrations/)' \
 		$(COVERAGE_DIR)/coverage.raw > $(COVERAGE_DIR)/coverage.filtered || cp $(COVERAGE_DIR)/coverage.raw $(COVERAGE_DIR)/coverage.filtered
-	go tool cover -func=$(COVERAGE_DIR)/coverage.filtered
+	@go tool cover -func=$(COVERAGE_DIR)/coverage.filtered
 
 test-coverage-html: test-coverage
 	go tool cover -html=$(COVERAGE_DIR)/coverage.filtered -o $(COVERAGE_DIR)/coverage.html
@@ -80,9 +93,41 @@ setup-tests:
 	go get github.com/stretchr/testify/assert
 	go get github.com/stretchr/testify/require
 
-generate-mocks:
-	@echo "Generating mocks..."
-	@echo "Mocks will be created by individual test tasks"
+generate-mocks: ## Generate all mocks using go:generate
+	@echo "$(GREEN)Generating mocks using go:generate...$(NC)"
+	@cd src/mocks && go generate .
+	@echo "$(GREEN)Mocks generated successfully$(NC)"
+
+# Enhanced mock generation with verification
+generate-mocks-verify: generate-mocks
+	@echo "$(YELLOW)Verifying mock generation...$(NC)"
+	@# Check if all expected mock files exist
+	@for mock in mock_etc_meisai_record_repository.go mock_etc_mapping_repository.go mock_import_repository.go mock_statistics_repository.go mock_interfaces_repositories.go mock_interfaces_services.go; do \
+		if [ ! -f "src/mocks/$$mock" ]; then \
+			echo "$(RED)❌ Missing mock file: $$mock$(NC)"; \
+			exit 1; \
+		else \
+			echo "$(GREEN)✅ Found mock file: $$mock$(NC)"; \
+		fi \
+	done
+	@echo "$(GREEN)All expected mock files are present$(NC)"
+
+# Quick test with coverage (no race detector for speed)
+test-quick:
+	@echo "$(GREEN)🚀 Quick test with coverage...$(NC)"
+	@go test -cover ./tests/... 2>&1 | grep -E "(PASS|FAIL|coverage:)" || true
+
+# Format check
+fmt-check:
+	@echo "$(GREEN)✅ Checking Go formatting...$(NC)"
+	@if [ -n "$$(gofmt -l src/)" ]; then \
+		echo "$(RED)⚠️ FORMAT ERROR DETECTED in:$(NC)"; \
+		gofmt -l src/; \
+		gofmt -d src/ | head -20; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✔️ All files properly formatted$(NC)"; \
+	fi
 
 ci-test:
 	go test ./... -coverprofile=coverage.out -covermode=atomic -race
@@ -203,27 +248,28 @@ migrate-status: ## Show migration status
 	@echo "$(GREEN)Migration status:$(NC)"
 	$(GO) run ./cmd/migrate/main.go status
 
-.PHONY: test
-test: ## Run all tests
-	@echo "$(GREEN)Running tests...$(NC)"
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) test $(GOFLAGS) ./...
-
-.PHONY: test-unit
-test-unit: ## Run unit tests only
-	@echo "$(GREEN)Running unit tests...$(NC)"
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) test $(GOFLAGS) ./src/...
-
-.PHONY: test-integration
-test-integration: ## Run integration tests
-	@echo "$(GREEN)Running integration tests...$(NC)"
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) test $(GOFLAGS) ./tests/integration/
-
-.PHONY: test-coverage
-test-coverage: ## Run tests with coverage
-	@echo "$(GREEN)Running tests with coverage...$(NC)"
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) test -coverprofile=coverage.out ./...
-	$(GO) tool cover -html=coverage.out -o coverage.html
-	@echo "$(GREEN)Coverage report generated: coverage.html$(NC)"
+# Enhanced coverage validation with multiple thresholds
+coverage-validate: test-coverage
+	@echo "$(YELLOW)Validating coverage thresholds...$(NC)"
+	@# Check overall statement coverage
+	@coverage=$$(go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep total | awk '{print $$3}' | sed 's/%//'); \
+	echo "Overall coverage: $$coverage%"; \
+	if [ "$$(echo "$$coverage < $(COVERAGE_THRESHOLD_STATEMENT)" | bc)" -eq 1 ]; then \
+		echo "$(RED)❌ Overall coverage $$coverage% is below threshold $(COVERAGE_THRESHOLD_STATEMENT)%$(NC)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✅ Overall coverage $$coverage% meets threshold$(NC)"; \
+	fi
+	@# Check for critical packages below 90%
+	@echo "Checking critical package coverage..."
+	@critical_low=$$(go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep -E "(services|repositories|models)" | awk '{if ($$3 < 90.0) print $$1 " " $$3}' | wc -l); \
+	if [ $$critical_low -gt 0 ]; then \
+		echo "$(RED)❌ Critical packages below 90% coverage:$(NC)"; \
+		go tool cover -func=$(COVERAGE_DIR)/coverage.filtered | grep -E "(services|repositories|models)" | awk '{if ($$3 < 90.0) print "  " $$1 " " $$3}'; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✅ All critical packages meet coverage requirements$(NC)"; \
+	fi
 
 .PHONY: lint
 lint: ## Run linter

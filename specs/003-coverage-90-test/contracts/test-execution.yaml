@@ -1,0 +1,301 @@
+openapi: 3.0.3
+info:
+  title: Test Coverage API
+  description: API contracts for test execution and coverage collection
+  version: 1.0.0
+
+paths:
+  /test/suite/{package}:
+    get:
+      summary: Get test suite status
+      parameters:
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Package path (e.g., src/services)
+      responses:
+        '200':
+          description: Test suite information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestSuite'
+        '404':
+          description: Package not found
+
+    post:
+      summary: Execute test suite
+      parameters:
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestConfiguration'
+      responses:
+        '200':
+          description: Test execution started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestExecution'
+        '400':
+          description: Invalid configuration
+        '409':
+          description: Tests already running
+
+  /test/coverage/{package}:
+    get:
+      summary: Get coverage profile
+      parameters:
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, html, text]
+            default: json
+      responses:
+        '200':
+          description: Coverage data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverageProfile'
+            text/html:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: No coverage data available
+
+  /test/resources:
+    get:
+      summary: List test resources
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [ACQUIRED, RELEASED, LEAKED]
+        - name: owner
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of test resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TestResource'
+
+    delete:
+      summary: Clean up leaked resources
+      responses:
+        '200':
+          description: Resources cleaned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleaned:
+                    type: integer
+                  errors:
+                    type: array
+                    items:
+                      type: string
+
+  /test/diagnostics:
+    post:
+      summary: Run diagnostic checks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                checks:
+                  type: array
+                  items:
+                    type: string
+                    enum: [deadlock, timeout, memory, coverage]
+      responses:
+        '200':
+          description: Diagnostic results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticResult'
+
+components:
+  schemas:
+    TestSuite:
+      type: object
+      properties:
+        packagePath:
+          type: string
+          example: "src/services"
+        testFiles:
+          type: array
+          items:
+            type: string
+          example: ["base_service_test.go", "import_service_test.go"]
+        status:
+          type: string
+          enum: [PENDING, RUNNING, PASSED, FAILED, TIMEOUT]
+        coverage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        executionTime:
+          type: string
+          format: duration
+          example: "2.5s"
+        lastRun:
+          type: string
+          format: date-time
+
+    TestExecution:
+      type: object
+      properties:
+        testName:
+          type: string
+          example: "TestBaseService_Shutdown"
+        package:
+          type: string
+          example: "src/services"
+        result:
+          type: string
+          enum: [PASS, FAIL, SKIP, TIMEOUT]
+        duration:
+          type: string
+          format: duration
+        error:
+          type: string
+        stackTrace:
+          type: string
+        retries:
+          type: integer
+          minimum: 0
+          maximum: 3
+
+    CoverageProfile:
+      type: object
+      properties:
+        package:
+          type: string
+        file:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineRange'
+        statements:
+          type: integer
+        coveredStatements:
+          type: integer
+        branches:
+          type: integer
+        coveredBranches:
+          type: integer
+
+    LineRange:
+      type: object
+      properties:
+        start:
+          type: integer
+        end:
+          type: integer
+        covered:
+          type: boolean
+
+    TestResource:
+      type: object
+      properties:
+        resourceID:
+          type: string
+        type:
+          type: string
+          enum: [MUTEX, GOROUTINE, CONNECTION, FILE, MOCK]
+        owner:
+          type: string
+        state:
+          type: string
+          enum: [ACQUIRED, RELEASED, LEAKED]
+        acquiredAt:
+          type: string
+          format: date-time
+        releasedAt:
+          type: string
+          format: date-time
+        leakDetected:
+          type: boolean
+
+    TestConfiguration:
+      type: object
+      properties:
+        timeout:
+          type: string
+          format: duration
+          default: "10s"
+        parallel:
+          type: boolean
+          default: false
+        maxParallel:
+          type: integer
+          minimum: 1
+          default: 4
+        retryCount:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 0
+        coverageThreshold:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          default: 90
+        failFast:
+          type: boolean
+          default: false
+        verbose:
+          type: boolean
+          default: false
+
+    DiagnosticResult:
+      type: object
+      properties:
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [PASS, FAIL, WARNING]
+              details:
+                type: string
+              suggestions:
+                type: array
+                items:
+                  type: string

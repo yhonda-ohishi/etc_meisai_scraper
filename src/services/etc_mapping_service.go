@@ -82,6 +82,18 @@ func NewETCMappingService(
 
 // CreateMapping creates a new ETC mapping with validation
 func (s *ETCMappingService) CreateMapping(ctx context.Context, params *CreateMappingParams) (*models.ETCMapping, error) {
+	if params == nil {
+		return nil, fmt.Errorf("params cannot be nil")
+	}
+
+	// Validate required fields
+	if params.ETCRecordID <= 0 {
+		return nil, fmt.Errorf("validation failed: ETCRecordID must be positive")
+	}
+	if params.MappedEntityID <= 0 {
+		return nil, fmt.Errorf("validation failed: MappedEntityID must be positive")
+	}
+
 	if s.logger != nil {
 		s.logger.Printf("Creating ETC mapping for record ID: %d, entity ID: %d", params.ETCRecordID, params.MappedEntityID)
 	}

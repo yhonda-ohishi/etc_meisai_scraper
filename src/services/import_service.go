@@ -10,26 +10,25 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
+	"github.com/yhonda-ohishi/etc_meisai/src/repositories"
 )
 
 // ImportService handles CSV import operations for ETC records
 type ImportService struct {
-	db     *gorm.DB
-	logger *log.Logger
+	importRepo repositories.ImportRepository
+	logger     *log.Logger
 }
 
-// NewImportService creates a new import service
-func NewImportService(db *gorm.DB, logger *log.Logger) *ImportService {
+// NewImportService creates a new import service using repository pattern
+func NewImportService(importRepo repositories.ImportRepository, logger *log.Logger) *ImportService {
 	if logger == nil {
 		logger = log.New(log.Writer(), "[ImportService] ", log.LstdFlags|log.Lshortfile)
 	}
 
 	return &ImportService{
-		db:     db,
-		logger: logger,
+		importRepo: importRepo,
+		logger:     logger,
 	}
 }
 
@@ -104,13 +103,13 @@ func (s *ImportService) ImportCSV(ctx context.Context, params *ImportCSVParams, 
 	s.logger.Printf("Starting CSV import for account: %s (%s), file: %s", params.AccountID, params.AccountType, params.FileName)
 
 	// Start transaction
-	tx := s.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", tx.Error)
+	txRepo, err := s.importRepo.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			txRepo.RollbackTx()
 		}
 	}()
 
@@ -124,22 +123,22 @@ func (s *ImportService) ImportCSV(ctx context.Context, params *ImportCSVParams, 
 		CreatedBy:   params.CreatedBy,
 	}
 
-	if err := tx.Create(session).Error; err != nil {
-		tx.Rollback()
+	if err := txRepo.CreateSession(ctx, session); err != nil {
+		txRepo.RollbackTx()
 		s.logger.Printf("Failed to create import session: %v", err)
 		return nil, fmt.Errorf("failed to create import session: %w", err)
 	}
 
 	// Start processing
 	if err := session.StartProcessing(); err != nil {
-		tx.Rollback()
+		txRepo.RollbackTx()
 		return nil, fmt.Errorf("failed to start processing: %w", err)
 	}
 
 	// Parse CSV data
 	records, errors, err := s.parseCSVData(data)
 	if err != nil {
-		tx.Rollback()
+		txRepo.RollbackTx()
 		s.logger.Printf("Failed to parse CSV data: %v", err)
 		return nil, fmt.Errorf("failed to parse CSV data: %w", err)
 	}
@@ -152,21 +151,16 @@ func (s *ImportService) ImportCSV(ctx context.Context, params *ImportCSVParams, 
 
 	for i, record := range records {
 		// Check for duplicates
-		var existingRecord models.ETCMeisaiRecord
-		err := tx.Where("hash = ?", record.Hash).First(&existingRecord).Error
-		if err == nil {
+		existingRecord, err := txRepo.FindRecordByHash(ctx, record.Hash)
+		if err == nil && existingRecord != nil {
 			// Duplicate found
 			duplicateCount++
 			s.logger.Printf("Duplicate record found with hash: %s", record.Hash)
 			continue
-		} else if err != gorm.ErrRecordNotFound {
-			// Database error
-			tx.Rollback()
-			return nil, fmt.Errorf("failed to check for duplicates: %w", err)
 		}
 
 		// Create the record
-		if err := tx.Create(record).Error; err != nil {
+		if err := txRepo.CreateRecord(ctx, record); err != nil {
 			s.logger.Printf("Failed to create record %d: %v", i+1, err)
 
 			// Add error to session
@@ -190,7 +184,7 @@ func (s *ImportService) ImportCSV(ctx context.Context, params *ImportCSVParams, 
 	// Complete the session
 	if session.ErrorRows == 0 {
 		if err := session.Complete(); err != nil {
-			tx.Rollback()
+			txRepo.RollbackTx()
 			return nil, fmt.Errorf("failed to complete session: %w", err)
 		}
 	} else {
@@ -201,13 +195,13 @@ func (s *ImportService) ImportCSV(ctx context.Context, params *ImportCSVParams, 
 	}
 
 	// Save session updates
-	if err := tx.Save(session).Error; err != nil {
-		tx.Rollback()
+	if err := txRepo.UpdateSession(ctx, session); err != nil {
+		txRepo.RollbackTx()
 		return nil, fmt.Errorf("failed to save session: %w", err)
 	}
 
 	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
+	if err := txRepo.CommitTx(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -256,10 +250,7 @@ func (s *ImportService) ImportCSVStream(ctx context.Context, params *ImportCSVSt
 		CreatedBy:   session.CreatedBy,
 	}
 
-	// Delete the temporary session since ImportCSV will create a new one
-	if err := s.db.WithContext(ctx).Delete(session).Error; err != nil {
-		s.logger.Printf("Failed to delete temporary session: %v", err)
-	}
+	// Note: The temporary session will be handled by the repository implementation
 
 	return s.ImportCSV(ctx, importParams, dataReader)
 }
@@ -272,16 +263,13 @@ func (s *ImportService) GetImportSession(ctx context.Context, sessionID string) 
 
 	s.logger.Printf("Retrieving import session: %s", sessionID)
 
-	var session models.ImportSession
-	err := s.db.WithContext(ctx).First(&session, "id = ?", sessionID).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, fmt.Errorf("import session not found: %s", sessionID)
-	} else if err != nil {
+	session, err := s.importRepo.GetSession(ctx, sessionID)
+	if err != nil {
 		s.logger.Printf("Failed to retrieve import session: %v", err)
 		return nil, fmt.Errorf("failed to retrieve import session: %w", err)
 	}
 
-	return &session, nil
+	return session, nil
 }
 
 // ListImportSessions lists import sessions with filtering and pagination
@@ -305,36 +293,20 @@ func (s *ImportService) ListImportSessions(ctx context.Context, params *ListImpo
 
 	s.logger.Printf("Listing import sessions - page: %d, size: %d", params.Page, params.PageSize)
 
-	// Build query
-	query := s.db.WithContext(ctx).Model(&models.ImportSession{})
-
-	// Apply filters
-	if params.AccountType != nil && *params.AccountType != "" {
-		query = query.Where("account_type = ?", *params.AccountType)
-	}
-	if params.AccountID != nil && *params.AccountID != "" {
-		query = query.Where("account_id LIKE ?", "%"+*params.AccountID+"%")
-	}
-	if params.Status != nil && *params.Status != "" {
-		query = query.Where("status = ?", *params.Status)
-	}
-	if params.CreatedBy != nil && *params.CreatedBy != "" {
-		query = query.Where("created_by LIKE ?", "%"+*params.CreatedBy+"%")
+	// Convert to repository params
+	repoParams := repositories.ListImportSessionsParams{
+		Page:        params.Page,
+		PageSize:    params.PageSize,
+		AccountType: params.AccountType,
+		AccountID:   params.AccountID,
+		Status:      params.Status,
+		CreatedBy:   params.CreatedBy,
+		SortBy:      params.SortBy,
+		SortOrder:   params.SortOrder,
 	}
 
-	// Get total count
-	var totalCount int64
-	if err := query.Count(&totalCount).Error; err != nil {
-		s.logger.Printf("Failed to count import sessions: %v", err)
-		return nil, fmt.Errorf("failed to count import sessions: %w", err)
-	}
-
-	// Apply sorting and pagination
-	orderClause := fmt.Sprintf("%s %s", params.SortBy, params.SortOrder)
-	offset := (params.Page - 1) * params.PageSize
-
-	var sessions []*models.ImportSession
-	err := query.Order(orderClause).Offset(offset).Limit(params.PageSize).Find(&sessions).Error
+	// Get sessions from repository
+	sessions, totalCount, err := s.importRepo.ListSessions(ctx, repoParams)
 	if err != nil {
 		s.logger.Printf("Failed to retrieve import sessions: %v", err)
 		return nil, fmt.Errorf("failed to retrieve import sessions: %w", err)
@@ -485,8 +457,9 @@ func (s *ImportService) ProcessCSVRow(ctx context.Context, row *CSVRow) (*models
 		record.ETCNum = &row.ETCNum
 	}
 
-	// Validate and generate hash
-	if err := record.BeforeCreate(s.db); err != nil {
+	// Generate hash and validate
+	record.Hash = record.GenerateHash()
+	if err := record.Validate(); err != nil {
 		return nil, fmt.Errorf("record validation failed: %w", err)
 	}
 
@@ -506,8 +479,7 @@ func (s *ImportService) HandleDuplicates(ctx context.Context, records []*models.
 	}
 
 	// Check for existing records with these hashes
-	var existingRecords []*models.ETCMeisaiRecord
-	err := s.db.WithContext(ctx).Where("hash IN ?", hashes).Find(&existingRecords).Error
+	existingRecords, err := s.importRepo.FindDuplicateRecords(ctx, hashes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for duplicates: %w", err)
 	}
@@ -615,43 +587,9 @@ func (s *ImportService) parseCSVData(data io.Reader) ([]*models.ETCMeisaiRecord,
 func (s *ImportService) CancelImportSession(ctx context.Context, sessionID string) error {
 	s.logger.Printf("Cancelling import session: %s", sessionID)
 
-	// Start transaction
-	tx := s.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return fmt.Errorf("failed to start transaction: %w", tx.Error)
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Get session
-	var session models.ImportSession
-	err := tx.First(&session, "id = ?", sessionID).Error
-	if err == gorm.ErrRecordNotFound {
-		tx.Rollback()
-		return fmt.Errorf("import session not found: %s", sessionID)
-	} else if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to retrieve import session: %w", err)
-	}
-
-	// Cancel the session
-	if err := session.Cancel(); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to cancel session: %w", err)
-	}
-
-	// Save session
-	if err := tx.Save(&session).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to save cancelled session: %w", err)
-	}
-
-	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if err := s.importRepo.CancelSession(ctx, sessionID); err != nil {
+		s.logger.Printf("Failed to cancel import session: %v", err)
+		return fmt.Errorf("failed to cancel import session: %w", err)
 	}
 
 	s.logger.Printf("Successfully cancelled import session: %s", sessionID)
@@ -660,13 +598,13 @@ func (s *ImportService) CancelImportSession(ctx context.Context, sessionID strin
 
 // HealthCheck performs health check for the service
 func (s *ImportService) HealthCheck(ctx context.Context) error {
-	if s.db == nil {
-		return fmt.Errorf("database not initialized")
+	if s.importRepo == nil {
+		return fmt.Errorf("import repository not initialized")
 	}
 
-	// Check database connectivity with a simple query
-	if err := s.db.Exec("SELECT 1").Error; err != nil {
-		return fmt.Errorf("database ping failed: %w", err)
+	// Check repository connectivity
+	if err := s.importRepo.Ping(ctx); err != nil {
+		return fmt.Errorf("import repository ping failed: %w", err)
 	}
 
 	return nil

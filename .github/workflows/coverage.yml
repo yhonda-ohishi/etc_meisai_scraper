@@ -1,0 +1,202 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.21'
+  COVERAGE_THRESHOLD: 95
+
+jobs:
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+
+    - name: Run tests with coverage
+      run: |
+        go test ./... -race -coverprofile=coverage.out -covermode=atomic -timeout=5m
+
+    - name: Generate coverage report
+      run: |
+        go tool cover -func=coverage.out | tee coverage-summary.txt
+        COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+        echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+        echo "Coverage: $COVERAGE%"
+
+    - name: Check coverage threshold
+      run: |
+        COVERAGE_FLOAT=$(echo $COVERAGE | sed 's/%//')
+        if (( $(echo "$COVERAGE_FLOAT < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+          echo "❌ Coverage $COVERAGE% is below threshold ${{ env.COVERAGE_THRESHOLD }}%"
+          exit 1
+        else
+          echo "✅ Coverage $COVERAGE% meets threshold ${{ env.COVERAGE_THRESHOLD }}%"
+        fi
+
+    - name: Upload coverage to Codecov
+      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Generate HTML coverage report
+      run: go tool cover -html=coverage.out -o coverage.html
+
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: |
+          coverage.out
+          coverage.html
+          coverage-summary.txt
+
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const coverage = process.env.COVERAGE;
+          const threshold = process.env.COVERAGE_THRESHOLD;
+          const status = parseFloat(coverage) >= parseFloat(threshold) ? '✅' : '❌';
+
+          const body = `## Coverage Report ${status}
+
+          **Current Coverage**: ${coverage}%
+          **Required Threshold**: ${threshold}%
+
+          <details>
+          <summary>Package Coverage</summary>
+
+          \`\`\`
+          Run go tool cover -func=coverage.out for detailed package coverage
+          \`\`\`
+
+          </details>
+
+          ${parseFloat(coverage) < parseFloat(threshold) ?
+            '⚠️ **Warning**: Coverage is below the required threshold. Please add more tests.' :
+            '✅ Coverage threshold met. Good job!'}`;
+
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' && comment.body.includes('## Coverage Report')
+          );
+
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }
+
+    - name: Generate coverage badge
+      if: github.ref == 'refs/heads/main'
+      run: |
+        COLOR="red"
+        if (( $(echo "$COVERAGE >= 90" | bc -l) )); then
+          COLOR="green"
+        elif (( $(echo "$COVERAGE >= 75" | bc -l) )); then
+          COLOR="yellow"
+        elif (( $(echo "$COVERAGE >= 50" | bc -l) )); then
+          COLOR="orange"
+        fi
+
+        echo "Coverage: $COVERAGE% - Color: $COLOR"
+        # Badge can be generated using shields.io or similar service
+
+  coverage-by-package:
+    name: Package Coverage Analysis
+    runs-on: ubuntu-latest
+    needs: coverage
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Run package coverage analysis
+      run: |
+        echo "Running detailed package coverage analysis..."
+        go run scripts/coverage.go ${{ env.COVERAGE_THRESHOLD }} || true
+
+    - name: Upload coverage reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: package-coverage-reports
+        path: coverage_reports/
+
+    - name: Check critical packages
+      run: |
+        # Define critical packages and their minimum coverage
+        declare -A CRITICAL_PACKAGES=(
+          ["services"]=90
+          ["handlers"]=85
+          ["models"]=90
+          ["repositories"]=85
+        )
+
+        FAILED=false
+        for package in "${!CRITICAL_PACKAGES[@]}"; do
+          COVERAGE=$(go test ./src/$package -cover 2>/dev/null | grep -oP '\d+\.\d+(?=%)')
+          MIN_COVERAGE=${CRITICAL_PACKAGES[$package]}
+
+          if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+            echo "❌ Package $package: $COVERAGE% (minimum: $MIN_COVERAGE%)"
+            FAILED=true
+          else
+            echo "✅ Package $package: $COVERAGE% (minimum: $MIN_COVERAGE%)"
+          fi
+        done
+
+        if [ "$FAILED" = true ]; then
+          echo "Critical packages below minimum coverage"
+          exit 1
+        fi

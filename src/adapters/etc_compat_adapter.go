@@ -6,16 +6,33 @@ import (
 	"time"
 
 	"github.com/yhonda-ohishi/etc_meisai/src/models"
-	"github.com/yhonda-ohishi/etc_meisai/src/pb"
+	pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
+	"github.com/yhonda-ohishi/etc_meisai/src/services"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ETCMeisaiCompatAdapter provides compatibility between new GORM model and legacy 38-field API
-type ETCMeisaiCompatAdapter struct{}
+type ETCMeisaiCompatAdapter struct {
+	hooksMigrator *services.HooksMigratorService
+}
 
 // NewETCMeisaiCompatAdapter creates a new compatibility adapter
 func NewETCMeisaiCompatAdapter() *ETCMeisaiCompatAdapter {
-	return &ETCMeisaiCompatAdapter{}
+	// Initialize the services for hook migration
+	validationService := services.NewValidationService()
+	auditService := services.NewAuditService(nil) // Use default logger
+	hooksMigrator := services.NewHooksMigratorService(validationService, auditService)
+
+	return &ETCMeisaiCompatAdapter{
+		hooksMigrator: hooksMigrator,
+	}
+}
+
+// NewETCMeisaiCompatAdapterWithServices creates a new compatibility adapter with injected services
+func NewETCMeisaiCompatAdapterWithServices(hooksMigrator *services.HooksMigratorService) *ETCMeisaiCompatAdapter {
+	return &ETCMeisaiCompatAdapter{
+		hooksMigrator: hooksMigrator,
+	}
 }
 
 // ToCompat converts GORM ETCMeisai to compatibility format
@@ -373,6 +390,19 @@ func (a *ETCMeisaiCompatAdapter) ConvertToProto(compat *ETCMeisaiCompat) (*pb.ET
 		proto.UpdatedAt = timestamppb.New(normalized.UpdatedAt)
 	}
 
+	// Apply hook logic based on whether this is a new record or update
+	if proto.Id == 0 {
+		// New record - apply BeforeCreate hook logic
+		if err := a.hooksMigrator.ETCMeisaiRecordBeforeCreate(proto); err != nil {
+			return nil, fmt.Errorf("BeforeCreate hook failed: %w", err)
+		}
+	} else {
+		// Existing record - apply BeforeSave hook logic
+		if err := a.hooksMigrator.ETCMeisaiRecordBeforeSave(proto); err != nil {
+			return nil, fmt.Errorf("BeforeSave hook failed: %w", err)
+		}
+	}
+
 	return proto, nil
 }
 
@@ -638,8 +668,10 @@ func (a *ETCMeisaiCompatAdapter) NormalizeFieldNames(input map[string]interface{
 		// IC fields
 		"entry":       "entry_ic",
 		"入口":         "entry_ic",
+		"入口IC":       "entry_ic",
 		"exit":        "exit_ic",
 		"出口":         "exit_ic",
+		"出口IC":       "exit_ic",
 
 		// Amount fields
 		"toll_amount": "amount",
@@ -663,6 +695,133 @@ func (a *ETCMeisaiCompatAdapter) NormalizeFieldNames(input map[string]interface{
 	}
 
 	return result
+}
+
+// ConvertImportSessionToProto converts import session data and applies hook logic
+func (a *ETCMeisaiCompatAdapter) ConvertImportSessionToProto(sessionData map[string]interface{}) (*pb.ImportSession, error) {
+	if sessionData == nil {
+		return nil, fmt.Errorf("session data cannot be nil")
+	}
+
+	// Create basic import session
+	session := &pb.ImportSession{}
+
+	// Map fields from data
+	if id, ok := sessionData["id"].(string); ok {
+		session.Id = id
+	}
+	if accountType, ok := sessionData["account_type"].(string); ok {
+		session.AccountType = accountType
+	}
+	if accountId, ok := sessionData["account_id"].(string); ok {
+		session.AccountId = accountId
+	}
+	if fileName, ok := sessionData["file_name"].(string); ok {
+		session.FileName = fileName
+	}
+	if fileSize, ok := sessionData["file_size"].(int64); ok {
+		session.FileSize = fileSize
+	}
+	if createdBy, ok := sessionData["created_by"].(string); ok {
+		session.CreatedBy = createdBy
+	}
+
+	// Handle counts
+	if totalRows, ok := sessionData["total_rows"].(int64); ok {
+		session.TotalRows = int32(totalRows)
+	}
+	if processedRows, ok := sessionData["processed_rows"].(int64); ok {
+		session.ProcessedRows = int32(processedRows)
+	}
+	if successRows, ok := sessionData["success_rows"].(int64); ok {
+		session.SuccessRows = int32(successRows)
+	}
+	if errorRows, ok := sessionData["error_rows"].(int64); ok {
+		session.ErrorRows = int32(errorRows)
+	}
+	if duplicateRows, ok := sessionData["duplicate_rows"].(int64); ok {
+		session.DuplicateRows = int32(duplicateRows)
+	}
+
+	// Apply hook logic for new session
+	if session.Id == "" {
+		// New session - apply BeforeCreate hook logic
+		if err := a.hooksMigrator.ImportSessionBeforeCreate(session); err != nil {
+			return nil, fmt.Errorf("ImportSession BeforeCreate hook failed: %w", err)
+		}
+	} else {
+		// Existing session - apply BeforeSave hook logic
+		if err := a.hooksMigrator.ImportSessionBeforeSave(session); err != nil {
+			return nil, fmt.Errorf("ImportSession BeforeSave hook failed: %w", err)
+		}
+	}
+
+	return session, nil
+}
+
+// ConvertETCMappingToProto converts ETC mapping data and applies hook logic
+func (a *ETCMeisaiCompatAdapter) ConvertETCMappingToProto(mappingData map[string]interface{}) (*pb.ETCMapping, error) {
+	if mappingData == nil {
+		return nil, fmt.Errorf("mapping data cannot be nil")
+	}
+
+	// Create basic ETC mapping
+	mapping := &pb.ETCMapping{}
+
+	// Map fields from data
+	if id, ok := mappingData["id"].(int64); ok {
+		mapping.Id = id
+	}
+	if etcRecordId, ok := mappingData["etc_record_id"].(int64); ok {
+		mapping.EtcRecordId = etcRecordId
+	}
+	if mappingType, ok := mappingData["mapping_type"].(string); ok {
+		mapping.MappingType = mappingType
+	}
+	if mappedEntityId, ok := mappingData["mapped_entity_id"].(int64); ok {
+		mapping.MappedEntityId = mappedEntityId
+	}
+	if mappedEntityType, ok := mappingData["mapped_entity_type"].(string); ok {
+		mapping.MappedEntityType = mappedEntityType
+	}
+	if confidence, ok := mappingData["confidence"].(float64); ok {
+		mapping.Confidence = float32(confidence)
+	} else if confidenceFloat32, ok := mappingData["confidence"].(float32); ok {
+		mapping.Confidence = confidenceFloat32
+	}
+	if createdBy, ok := mappingData["created_by"].(string); ok {
+		mapping.CreatedBy = createdBy
+	}
+
+	// Apply hook logic for new mapping
+	if mapping.Id == 0 {
+		// New mapping - apply BeforeCreate hook logic
+		if err := a.hooksMigrator.ETCMappingBeforeCreate(mapping); err != nil {
+			return nil, fmt.Errorf("ETCMapping BeforeCreate hook failed: %w", err)
+		}
+	} else {
+		// Existing mapping - apply BeforeSave hook logic
+		if err := a.hooksMigrator.ETCMappingBeforeSave(mapping); err != nil {
+			return nil, fmt.Errorf("ETCMapping BeforeSave hook failed: %w", err)
+		}
+	}
+
+	return mapping, nil
+}
+
+// ApplyHooksToEntity applies the appropriate hooks based on entity type and operation
+func (a *ETCMeisaiCompatAdapter) ApplyHooksToEntity(entityType string, entity interface{}, isCreate bool) error {
+	if isCreate {
+		return a.hooksMigrator.BeforeCreateHooks(entityType, entity)
+	} else {
+		return a.hooksMigrator.BeforeSaveHooks(entityType, entity)
+	}
+}
+
+// ValidateEntity validates an entity using the hooks migrator's validation service
+func (a *ETCMeisaiCompatAdapter) ValidateEntity(entityType string, entity interface{}) error {
+	// Execute appropriate hook which includes validation
+	return a.hooksMigrator.BeforeSaveHooks(entityType, entity)
 }
 
 // Helper function to get string value from multiple possible keys

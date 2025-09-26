@@ -2,11 +2,11 @@
 // source: etc_meisai.proto
 
 /*
-Package pb is a reverse proxy.
+Package etc_meisaiv1 is a reverse proxy.
 
 It translates gRPC into RESTful JSON APIs.
 */
-package pb
+package etc_meisaiv1
 
 import (
 	"context"

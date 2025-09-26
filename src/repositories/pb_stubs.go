@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"github.com/yhonda-ohishi/etc_meisai/src/pb"
+	pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
 )
 
 // Stub types for missing protobuf messages that are used in tests

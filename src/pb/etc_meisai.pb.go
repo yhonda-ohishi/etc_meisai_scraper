@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: etc_meisai.proto
 
-package pb
+package etc_meisaiv1
 
 import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
@@ -2744,7 +2744,8 @@ const file_etc_meisai_proto_rawDesc = "" +
 	"\fListMappings\x12\".etc_meisai.v1.ListMappingsRequest\x1a#.etc_meisai.v1.ListMappingsResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/etc-meisai/mappings\x12\x8d\x01\n" +
 	"\rUpdateMapping\x12#.etc_meisai.v1.UpdateMappingRequest\x1a$.etc_meisai.v1.UpdateMappingResponse\"1\x82\xd3\xe4\x93\x02+:\amapping\x1a /api/v1/etc-meisai/mappings/{id}\x12v\n" +
 	"\rDeleteMapping\x12#.etc_meisai.v1.DeleteMappingRequest\x1a\x16.google.protobuf.Empty\"(\x82\xd3\xe4\x93\x02\"* /api/v1/etc-meisai/mappings/{id}\x12\x81\x01\n" +
-	"\rGetStatistics\x12#.etc_meisai.v1.GetStatisticsRequest\x1a$.etc_meisai.v1.GetStatisticsResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/etc-meisai/statisticsB/Z-github.com/yhonda-ohishi/etc_meisai/src/pb;pbb\x06proto3"
+	"\rGetStatistics\x12#.etc_meisai.v1.GetStatisticsRequest\x1a$.etc_meisai.v1.GetStatisticsResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/etc-meisai/statisticsB\xad\x01\n" +
+	"\x11com.etc_meisai.v1B\x0eEtcMeisaiProtoP\x01Z7github.com/yhonda-ohishi/etc_meisai/src/pb;etc_meisaiv1\xa2\x02\x03EXX\xaa\x02\fEtcMeisai.V1\xca\x02\fEtcMeisai\\V1\xe2\x02\x18EtcMeisai\\V1\\GPBMetadata\xea\x02\rEtcMeisai::V1b\x06proto3"
 
 var (
 	file_etc_meisai_proto_rawDescOnce sync.Once

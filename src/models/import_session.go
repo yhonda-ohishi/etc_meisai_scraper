@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 // ImportStatus represents the status of an import session
@@ -58,7 +56,7 @@ type ImportSession struct {
 	ErrorMessage    *string        `gorm:"size:1000" json:"error_message,omitempty"`
 	StartedAt       time.Time      `gorm:"not null" json:"started_at"`
 	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
-	ErrorLog        datatypes.JSON `gorm:"type:json" json:"error_log,omitempty"`
+	ErrorLog        json.RawMessage `gorm:"type:json" json:"error_log,omitempty"`
 	CreatedBy       string         `gorm:"size:100" json:"created_by,omitempty"`
 	CreatedAt       time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
@@ -69,8 +67,8 @@ func (ImportSession) TableName() string {
 	return "import_sessions"
 }
 
-// BeforeCreate hook to generate UUID and validate data before creating
-func (s *ImportSession) BeforeCreate(tx *gorm.DB) error {
+// BeforeCreate generates UUID and validates data before creating
+func (s *ImportSession) BeforeCreate() error {
 	// Generate UUID if not provided
 	if s.ID == "" {
 		s.ID = uuid.New().String()
@@ -89,8 +87,8 @@ func (s *ImportSession) BeforeCreate(tx *gorm.DB) error {
 	return s.validate()
 }
 
-// BeforeSave hook to validate data before saving
-func (s *ImportSession) BeforeSave(tx *gorm.DB) error {
+// BeforeSave validates data before saving
+func (s *ImportSession) BeforeSave() error {
 	return s.validate()
 }
 
@@ -401,7 +399,7 @@ func (s *ImportSession) AddError(rowNumber int, errorType, errorMessage, rawData
 	if err != nil {
 		return fmt.Errorf("failed to marshal errors: %w", err)
 	}
-	s.ErrorLog = datatypes.JSON(jsonData)
+	s.ErrorLog = json.RawMessage(jsonData)
 	return nil
 }
 

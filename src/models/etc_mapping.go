@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 // MappingStatus represents the status of a mapping
@@ -39,6 +37,7 @@ const (
 )
 
 // ETCMapping represents the mapping between ETC records and other entities
+// Test edit to trigger post-edit hook
 type ETCMapping struct {
 	ID               int64            `gorm:"primaryKey;autoIncrement" json:"id"`
 	ETCRecordID      int64            `gorm:"not null;index" json:"etc_record_id"`
@@ -48,7 +47,7 @@ type ETCMapping struct {
 	MappedEntityType string           `gorm:"size:50;not null;index" json:"mapped_entity_type"`
 	Confidence       float32          `gorm:"default:1.0" json:"confidence"`
 	Status           string           `gorm:"size:20;default:'active';index" json:"status"`
-	Metadata         datatypes.JSON   `gorm:"type:json" json:"metadata,omitempty"`
+	Metadata         json.RawMessage  `json:"metadata,omitempty"`
 	CreatedBy        string           `gorm:"size:100" json:"created_by,omitempty"`
 	CreatedAt        time.Time        `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt        time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
@@ -59,8 +58,8 @@ func (ETCMapping) TableName() string {
 	return "etc_mappings"
 }
 
-// BeforeCreate hook to validate data before creating
-func (m *ETCMapping) BeforeCreate(tx *gorm.DB) error {
+// BeforeCreate validates data before creating
+func (m *ETCMapping) BeforeCreate() error {
 	// Set timestamps manually if not using GORM auto-timestamps
 	now := time.Now()
 	if m.CreatedAt.IsZero() {
@@ -78,8 +77,8 @@ func (m *ETCMapping) BeforeCreate(tx *gorm.DB) error {
 	return m.validate()
 }
 
-// BeforeSave hook to validate data before saving
-func (m *ETCMapping) BeforeSave(tx *gorm.DB) error {
+// BeforeSave validates data before saving
+func (m *ETCMapping) BeforeSave() error {
 	// Update timestamp manually if not using GORM auto-timestamps
 	m.UpdatedAt = time.Now()
 
@@ -283,7 +282,7 @@ func (m *ETCMapping) SetMetadata(metadata map[string]interface{}) error {
 		return fmt.Errorf("metadata too large (max 64KB)")
 	}
 
-	m.Metadata = datatypes.JSON(jsonData)
+	m.Metadata = json.RawMessage(jsonData)
 	return nil
 }
 

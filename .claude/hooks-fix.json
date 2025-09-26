@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c \"cat | jq -r '.tool_name as $tool | .tool_input.file_path as $file | if ($tool == \\\"Write\\\" or $tool == \\\"Edit\\\" or $tool == \\\"MultiEdit\\\") and $file and ($file | test(\\\".go$\\\")) then \\\"✅ [Hook] Checking Go file: \\\" + $file else empty end' 2>/dev/null || true\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}

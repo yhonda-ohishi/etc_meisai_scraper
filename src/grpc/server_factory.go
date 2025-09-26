@@ -47,19 +47,8 @@ func NewETCMeisaiServerWithConcreteServices(
 	importService *services.ImportService,
 	statisticsService *services.StatisticsService,
 	logger *log.Logger,
-) *ETCMeisaiServer {
-	// Convert concrete logger to interface
-	var loggerInterface LoggerInterface
-	if logger != nil {
-		loggerInterface = &defaultLogger{logger: logger}
-	}
-
-	// Cast concrete services to interfaces (Go's implicit interface implementation)
-	return NewETCMeisaiServer(
-		etcMeisaiService,  // implements ETCMeisaiServiceInterface
-		etcMappingService, // implements ETCMappingServiceInterface
-		importService,     // implements ImportServiceInterface
-		statisticsService, // implements StatisticsServiceInterface
-		loggerInterface,
-	)
+) *ETCMeisaiServerStubs {
+	// TODO: Create proper business service instances
+	// For now, return a stub server with nil services (will return "not implemented" errors)
+	return NewETCMeisaiServerStubs(nil, nil, logger)
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
 )
 
 // ETCMeisaiRecord represents an ETC toll record with comprehensive validation
@@ -26,7 +25,7 @@ type ETCMeisaiRecord struct {
 	DtakoRowID      *int64             `gorm:"index" json:"dtako_row_id,omitempty"`
 	CreatedAt       time.Time          `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time          `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt       gorm.DeletedAt     `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt       *time.Time         `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 // TableName returns the table name for GORM
@@ -34,8 +33,8 @@ func (ETCMeisaiRecord) TableName() string {
 	return "etc_meisai_records"
 }
 
-// BeforeCreate hook to generate hash before creating record
-func (r *ETCMeisaiRecord) BeforeCreate(tx *gorm.DB) error {
+// BeforeCreate generates hash before creating record
+func (r *ETCMeisaiRecord) BeforeCreate() error {
 	if err := r.validate(); err != nil {
 		return err
 	}
@@ -47,16 +46,26 @@ func (r *ETCMeisaiRecord) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// BeforeSave hook to validate data before saving
-func (r *ETCMeisaiRecord) BeforeSave(tx *gorm.DB) error {
+// BeforeSave validates data before saving
+func (r *ETCMeisaiRecord) BeforeSave() error {
 	return r.validate()
 }
 
 // validate performs comprehensive validation of the record
 func (r *ETCMeisaiRecord) validate() error {
+	// Validate date is not zero value
+	if r.Date.IsZero() {
+		return fmt.Errorf("date is required")
+	}
+
 	// Validate date (not in future)
 	if r.Date.After(time.Now()) {
 		return fmt.Errorf("date cannot be in the future")
+	}
+
+	// Validate time is not empty
+	if len(strings.TrimSpace(r.Time)) == 0 {
+		return fmt.Errorf("time is required")
 	}
 
 	// Validate time format (HH:MM:SS)

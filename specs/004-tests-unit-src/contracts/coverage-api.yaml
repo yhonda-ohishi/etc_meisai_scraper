@@ -1,0 +1,240 @@
+openapi: 3.0.3
+info:
+  title: Coverage Visualization API
+  description: API for test coverage analysis and visualization in ETC Meisai system
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+
+paths:
+  /coverage/analyze:
+    post:
+      summary: Run coverage analysis
+      description: Execute test suite with coverage measurement and return results
+      operationId: analyzeCoverage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoverageAnalysisRequest'
+      responses:
+        '200':
+          description: Coverage analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverageReport'
+        '408':
+          description: Analysis timeout (exceeded 2 minutes)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /coverage/report/{id}:
+    get:
+      summary: Get coverage report by ID
+      description: Retrieve a previously generated coverage report
+      operationId: getCoverageReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Report ID (timestamp-based)
+      responses:
+        '200':
+          description: Coverage report found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverageReport'
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /coverage/recommendations:
+    get:
+      summary: Get coverage improvement recommendations
+      description: Get actionable recommendations for improving test coverage
+      operationId: getRecommendations
+      parameters:
+        - name: threshold
+          in: query
+          schema:
+            type: number
+            format: float
+            default: 90
+            description: Coverage threshold percentage
+      responses:
+        '200':
+          description: Recommendations generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CoverageRecommendation'
+
+  /interfaces/validate:
+    post:
+      summary: Validate interface consistency
+      description: Check for interface mismatches and unification issues
+      operationId: validateInterfaces
+      responses:
+        '200':
+          description: Interface validation complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterfaceValidationReport'
+
+components:
+  schemas:
+    CoverageAnalysisRequest:
+      type: object
+      required:
+        - packages
+        - threshold
+      properties:
+        packages:
+          type: array
+          items:
+            type: string
+          description: Package patterns to analyze (e.g., "./src/...")
+          example: ["./src/..."]
+        threshold:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          default: 90
+          description: Coverage threshold percentage
+        timeout:
+          type: integer
+          default: 120
+          maximum: 120
+          description: Timeout in seconds (max 2 minutes)
+        output_format:
+          type: string
+          enum: [console]
+          default: console
+          description: Output format (console only)
+
+    CoverageReport:
+      type: object
+      required:
+        - id
+        - timestamp
+        - total_packages
+        - overall_coverage
+        - meets_threshold
+        - execution_time
+        - packages
+        - categories
+      properties:
+        id:
+          type: string
+          description: Unique report identifier
+          example: "20250925_143022"
+        timestamp:
+          type: string
+          format: date-time
+          description: When analysis was performed
+        total_packages:
+          type: integer
+          description: Number of packages analyzed
+        overall_coverage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Overall coverage percentage
+          example: 85.5
+        meets_threshold:
+          type: boolean
+          description: Whether 90% threshold is met
+        execution_time:
+          type: string
+          description: Analysis execution duration
+          example: "45s"
+        packages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageCoverage'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryCoverage'
+
+    PackageCoverage:
+      type: object
+      required:
+        - name
+        - short_name
+        - category
+        - coverage_percent
+        - total_statements
+        - covered_statements
+        - status
+      properties:
+        name:
+          type: string
+          description: Full package path
+          example: "github.com/project/src/services"
+        short_name:
+          type: string
+          description: Display name
+          example: "services"
+        category:
+          type: string
+          enum: [models, services, handlers, repositories, utils]
+          description: Package category
+        coverage_percent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Package coverage percentage
+        total_statements:
+          type: integer
+          description: Total executable statements
+        covered_statements:
+          type: integer
+          description: Number of covered statements
+        status:
+          type: string
+          enum: [excellent, good, warning, critical]
+          description: Visual status indicator
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileCoverage'
+
+    FileCoverage:
+      type: object
+      required:
+        - path
+        - coverage_percent
+        - total_lines
+        - covered_lines
+      properties:
+        path:
+          type: string
+          description:
