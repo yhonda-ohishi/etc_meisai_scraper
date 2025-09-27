@@ -1,21 +1,18 @@
 <!--
 Sync Impact Report:
-Version: 0.0.0 → 1.0.0 (Initial ratification with test separation principle)
-New Principles Added:
-- Test File Separation: Tests must be in tests/ directory, never in src/
-- Test-First Development: TDD approach mandatory
-- Coverage Requirements: 100% coverage target per project
-- Clean Architecture: Clear separation of concerns
-- Observable Systems: Comprehensive logging and monitoring
+Version: 1.0.0 → 1.1.0 (Added Code Quality Validation principle for immediate go vet error correction)
+Modified Principles:
+- Added Principle VIII: Code Quality Validation
 
 Templates Requiring Updates:
-✅ Constitution created
-⚠ plan-template.md - May need update for test directory structure
-⚠ spec-template.md - May need update for test requirements
-⚠ tasks-template.md - May need update for test task locations
+✅ Constitution updated with new principle
+⚠ CLAUDE.md - May need update to include go vet instructions
+⚠ plan-template.md - May need update for quality validation tasks
+⚠ tasks-template.md - May need update for validation checkpoints
 
 Follow-up TODOs:
-- Confirm exact ratification date with project team
+- Update CLAUDE.md with specific go vet handling instructions
+- Consider adding pre-commit hooks for go vet validation
 -->
 
 # ETC明細システム Constitution
@@ -67,6 +64,14 @@ YAGNI (You Aren't Gonna Need It) principles apply.
 Complexity must be explicitly justified and documented.
 Prefer Go standard library over external dependencies when possible.
 
+### VIII. Code Quality Validation
+All code modifications MUST pass `go vet` without any errors or warnings.
+When hooks report `go vet` errors, they MUST be corrected immediately before proceeding.
+After every edit operation, `go vet` validation MUST be performed to ensure code quality.
+This prevents accumulation of technical debt and maintains consistent code standards.
+Common `go vet` issues include unreachable code, malformed build tags, incorrect printf formats,
+and suspicious constructs that must be fixed immediately upon detection.
+
 ## Development Standards
 
 ### Code Organization
@@ -88,7 +93,16 @@ Prefer Go standard library over external dependencies when possible.
 - Coverage must meet or exceed 100% target
 - No build warnings allowed
 - Code must pass linting checks
+- `go vet` must report zero issues
 - Documentation must be updated for API changes
+
+### Validation Workflow
+1. Make code changes
+2. Run `go vet` immediately after edits
+3. Fix any reported issues before continuing
+4. Run tests to verify functionality
+5. Check coverage metrics
+6. Commit only clean, validated code
 
 ## Governance
 
@@ -102,7 +116,8 @@ Any amendments require:
 All pull requests must verify constitutional compliance.
 Violations must be fixed before merge is allowed.
 Complexity additions require explicit justification in PR description.
+`go vet` errors block merge until resolved.
 
 Runtime development guidance is maintained in CLAUDE.md for agent-specific instructions.
 
-**Version**: 1.0.0 | **Ratified**: 2025-09-26 | **Last Amended**: 2025-09-26
+**Version**: 1.1.0 | **Ratified**: 2025-09-26 | **Last Amended**: 2025-09-27

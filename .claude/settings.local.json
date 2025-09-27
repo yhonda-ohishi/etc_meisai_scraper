@@ -44,7 +44,10 @@
       "Bash(mockgen:*)",
       "Bash(time go build:*)",
       "Bash(time go test:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(go generate:*)"
     ],
     "deny": [],
     "ask": []

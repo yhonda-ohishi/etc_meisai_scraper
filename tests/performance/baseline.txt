@@ -1,1 +1,0 @@
-?   	github.com/yhonda-ohishi/etc_meisai/src/services	[no test files]
