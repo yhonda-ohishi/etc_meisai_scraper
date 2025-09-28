@@ -91,6 +91,23 @@ gRPCサービスとして利用する場合：
 
 ## 📝 Swagger/OpenAPI ドキュメント生成
 
+### 初期セットアップ
+
+初回のみ、proto依存関係をダウンロードする必要があります：
+
+```bash
+# googleapis と grpc-gateway の proto ファイルを取得
+mkdir -p third_party
+git clone --depth=1 https://github.com/googleapis/googleapis.git third_party/googleapis
+git clone --depth=1 https://github.com/grpc-ecosystem/grpc-gateway.git third_party/grpc-gateway
+
+# protoc プラグインのインストール
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
+```
+
 ### コード生成とSwagger更新
 
 ```bash
