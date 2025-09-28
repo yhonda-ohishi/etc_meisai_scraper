@@ -144,7 +144,7 @@ The coverage report (T034) must follow this schema for CI/CD integration:
   },
   "packages": [
     {
-      "name": "github.com/yhonda-ohishi/etc_meisai/src/services",
+      "name": "github.com/yhonda-ohishi/etc_meisai_scraper/src/services",
       "coverage_percent": 98.5,
       "statements_covered": 512,
       "statements_total": 520,

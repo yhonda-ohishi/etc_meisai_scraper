@@ -3,7 +3,7 @@ package services
 import (
 	"log"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 // ScraperFactory creates scraper instances

@@ -117,7 +117,7 @@ Task: "Test Mockable error paths in buffer_mockable_test.go"
 ### Check current coverage:
 ```bash
 cd tests/unit/scraper
-go test -coverprofile=coverage.out -coverpkg=github.com/yhonda-ohishi/etc_meisai/src/scraper .
+go test -coverprofile=coverage.out -coverpkg=github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper .
 go tool cover -func=coverage.out | grep buffer_scraper.go
 ```
 

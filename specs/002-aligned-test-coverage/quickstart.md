@@ -46,7 +46,7 @@ package [package_name]_test
 import (
     "testing"
     "github.com/stretchr/testify/assert"
-    "github.com/yhonda-ohishi/etc_meisai/src/[package_name]"
+    "github.com/yhonda-ohishi/etc_meisai_scraper/src/[package_name]"
 )
 
 func Test[FunctionName](t *testing.T) {

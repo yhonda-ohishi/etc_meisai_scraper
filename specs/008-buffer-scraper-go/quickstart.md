@@ -9,7 +9,7 @@
 ```bash
 # Run tests and generate coverage
 cd tests/unit/scraper
-go test -coverprofile=coverage.out -coverpkg=github.com/yhonda-ohishi/etc_meisai/src/scraper .
+go test -coverprofile=coverage.out -coverpkg=github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper .
 
 # View coverage for buffer_scraper.go
 go tool cover -func=coverage.out | grep buffer_scraper.go
@@ -47,7 +47,7 @@ package scraper_test
 import (
     "errors"
     "testing"
-    "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+    "github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 func TestDownloadMeisaiToBuffer_Errors(t *testing.T) {
@@ -88,7 +88,7 @@ package scraper_test
 import (
     "os"
     "testing"
-    "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+    "github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 func TestDownloadMeisaiToBuffer_ProductionPath(t *testing.T) {
@@ -278,7 +278,7 @@ scraper.SetMockDownloader(mockDownloader)
 **Problem**: Added tests but coverage stays same
 **Solution**: Check you're testing the right package:
 ```bash
-go test -coverpkg=github.com/yhonda-ohishi/etc_meisai/src/scraper
+go test -coverpkg=github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper
 ```
 
 #### 4. Deferred Functions Not Covered

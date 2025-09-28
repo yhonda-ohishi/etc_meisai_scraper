@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 // MockPlaywrightFactory implements scraper.PlaywrightFactory

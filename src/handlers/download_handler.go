@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yhonda-ohishi/etc_meisai/src/services"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/services"
 )
 
 // DownloadHandler はダウンロード関連のハンドラー

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/grpc"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/grpc"
 )
 
 func TestNewServer(t *testing.T) {

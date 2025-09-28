@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/handlers"
-	"github.com/yhonda-ohishi/etc_meisai/src/services"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/handlers"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/services"
 )
 
 // CompleteMockDownloadService provides complete mock implementation

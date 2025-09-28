@@ -29,7 +29,7 @@ go get github.com/yhonda-ohishi/etc_meisai
 package main
 
 import (
-    "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+    "github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
     "log"
 )
 
@@ -175,7 +175,7 @@ etc_meisai/
 
 ## 📧 お問い合わせ
 
-問題や質問がある場合は、[Issues](https://github.com/yhonda-ohishi/etc_meisai/issues)でお知らせください。
+問題や質問がある場合は、[Issues](https://github.com/yhonda-ohishi/etc_meisai_scraper/issues)でお知らせください。
 
 ---
 

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
-	"github.com/yhonda-ohishi/etc_meisai/tests/mocks"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/tests/mocks"
 )
 
 func TestNewETCScraper(t *testing.T) {

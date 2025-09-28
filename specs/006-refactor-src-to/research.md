@@ -35,7 +35,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/yhonda-ohishi/etc_meisai/src/pb
+    default: github.com/yhonda-ohishi/etc_meisai_scraper/src/pb
 plugins:
   - name: go
   - name: go-grpc
@@ -68,7 +68,7 @@ mockgen -source=src/pb/repository_grpc.pb.go \
 # Or generate from reflection
 mockgen -destination=tests/mocks/mock_repository.go \
         -package=mocks \
-        github.com/yhonda-ohishi/etc_meisai/src/pb ETCMappingRepositoryClient
+        github.com/yhonda-ohishi/etc_meisai_scraper/src/pb ETCMappingRepositoryClient
 ```
 
 **Alternatives Considered**:

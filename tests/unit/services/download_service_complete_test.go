@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/services"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/services"
 )
 
 func TestNewDownloadService(t *testing.T) {

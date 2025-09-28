@@ -7,7 +7,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 func main() {

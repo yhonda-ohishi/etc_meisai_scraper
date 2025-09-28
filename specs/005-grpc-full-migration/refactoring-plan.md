@@ -92,7 +92,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/yhonda-ohishi/etc_meisai/src/pb
+    default: github.com/yhonda-ohishi/etc_meisai_scraper/src/pb
 plugins:
   - name: go
     out: ../pb
@@ -178,7 +178,7 @@ Create adapter layer for database operations:
 package adapters
 
 import (
-    "github.com/yhonda-ohishi/etc_meisai/src/pb"
+    "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb"
     "gorm.io/gorm"
 )
 

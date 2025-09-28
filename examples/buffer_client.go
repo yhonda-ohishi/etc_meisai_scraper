@@ -6,7 +6,7 @@ import (
 	"io"
 	"log"
 
-	pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
+	pb "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb"
 	"google.golang.org/grpc"
 )
 

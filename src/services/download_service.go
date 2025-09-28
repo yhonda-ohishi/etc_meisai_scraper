@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 // DownloadService はダウンロード処理を管理

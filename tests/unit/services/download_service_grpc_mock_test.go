@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
-	"github.com/yhonda-ohishi/etc_meisai/src/services"
+	pb "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/services"
 )
 
 // MockDownloadService implements DownloadServiceInterface for testing

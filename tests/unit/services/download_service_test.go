@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/yhonda-ohishi/etc_meisai/src/services"
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/services"
 )
 
 func TestDownloadService_GetAllAccountIDs(t *testing.T) {
