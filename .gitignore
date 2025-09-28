@@ -60,3 +60,4 @@ tests/mocks/mock_*.go
 # Generated Protocol Buffer code
 src/pb/
 tests/mocks/mock_*.go
+third_party/

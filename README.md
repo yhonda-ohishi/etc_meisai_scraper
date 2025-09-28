@@ -68,29 +68,64 @@ func main() {
 
 ### サービスとして実行
 
-#### HTTPサーバーモード（デフォルト）
-```bash
-go run main.go
-# または
-go run main.go -http-port=8080
-```
+このモジュールは主に他のサービスから呼び出されるライブラリとして設計されています。
 
-HTTPサーバーがポート8080で起動し、以下のエンドポイントが利用可能です：
-- `POST /api/download/sync` - 同期ダウンロード
-- `POST /api/download/async` - 非同期ダウンロード
-- `GET /api/download/status?job_id={id}` - ジョブステータス確認
+## 🌐 API エンドポイント
 
-#### gRPCサーバーモード
-```bash
-go run main.go -grpc
-# または
-go run main.go -grpc -grpc-port=50051
-```
+### gRPC-Gateway REST API
 
-gRPCサーバーがポート50051で起動し、以下のサービスが利用可能です：
+gRPC-Gatewayを使用してREST APIとして公開する場合、以下のエンドポイントが利用可能です：
+
+- `POST /etc_meisai_scraper/v1/download/sync` - 同期ダウンロード
+- `POST /etc_meisai_scraper/v1/download/async` - 非同期ダウンロード
+- `GET /etc_meisai_scraper/v1/download/jobs/{job_id}` - ジョブステータス取得
+- `GET /etc_meisai_scraper/v1/accounts` - 全アカウントID取得
+
+### gRPC サービス
+
+gRPCサービスとして利用する場合：
 - `DownloadService.DownloadSync` - 同期ダウンロード
 - `DownloadService.DownloadAsync` - 非同期ダウンロード
 - `DownloadService.GetJobStatus` - ジョブステータス確認
+- `DownloadService.GetAllAccountIDs` - 全アカウントID取得
+
+## 📝 Swagger/OpenAPI ドキュメント生成
+
+### コード生成とSwagger更新
+
+```bash
+# buf を使用してコード生成（gRPC-Gateway と Swagger を含む）
+buf generate src/proto
+
+# または protoc を直接使用
+protoc -I src/proto \
+  -I third_party/googleapis \
+  -I third_party/grpc-gateway \
+  --go_out=src/pb --go_opt=paths=source_relative \
+  --go-grpc_out=src/pb --go-grpc_opt=paths=source_relative \
+  --grpc-gateway_out=src/pb --grpc-gateway_opt=paths=source_relative,grpc_api_configuration=src/proto/download_api.yaml \
+  --openapiv2_out=swagger --openapiv2_opt=grpc_api_configuration=src/proto/download_api.yaml \
+  src/proto/download.proto
+```
+
+### 生成されるファイル
+
+- `src/pb/download.pb.go` - Protocol Buffers のGoコード
+- `src/pb/download_grpc.pb.go` - gRPC サーバー/クライアントコード
+- `src/pb/download.pb.gw.go` - gRPC-Gateway コード
+- `swagger/etc_meisai.swagger.json` - OpenAPI/Swagger 定義
+
+### HTTPマッピングの変更
+
+REST APIのパスを変更する場合は、`src/proto/download_api.yaml` を編集してから再生成：
+
+```yaml
+http:
+  rules:
+    - selector: etc_meisai.download.v1.DownloadService.DownloadSync
+      post: /etc_meisai_scraper/v1/download/sync
+      body: "*"
+```
 
 ## 📊 テストカバレッジ
 

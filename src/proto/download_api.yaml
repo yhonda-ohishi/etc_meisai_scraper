@@ -1,0 +1,28 @@
+type: google.api.Service
+config_version: 3
+
+name: etc_meisai.download.v1
+
+title: ETC Meisai Download API
+apis:
+  - name: etc_meisai.download.v1.DownloadService
+
+http:
+  rules:
+    # 同期ダウンロード
+    - selector: etc_meisai.download.v1.DownloadService.DownloadSync
+      post: /etc_meisai_scraper/v1/download/sync
+      body: "*"
+
+    # 非同期ダウンロード開始
+    - selector: etc_meisai.download.v1.DownloadService.DownloadAsync
+      post: /etc_meisai_scraper/v1/download/async
+      body: "*"
+
+    # ジョブステータス取得
+    - selector: etc_meisai.download.v1.DownloadService.GetJobStatus
+      get: /etc_meisai_scraper/v1/download/jobs/{job_id}
+
+    # 全アカウントID取得
+    - selector: etc_meisai.download.v1.DownloadService.GetAllAccountIDs
+      get: /etc_meisai_scraper/v1/accounts

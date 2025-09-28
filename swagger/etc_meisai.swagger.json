@@ -18,7 +18,236 @@
   "produces": [
     "application/json"
   ],
-  "paths": {},
+  "paths": {
+    "/etc_meisai.download.v2.DownloadBufferService/DownloadAsBuffer": {
+      "post": {
+        "summary": "CSVデータをバイナリで直接返す",
+        "operationId": "DownloadBufferService_DownloadAsBuffer",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v2BufferResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v2BufferDownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadBufferService"
+        ]
+      }
+    },
+    "/etc_meisai.download.v2.DownloadBufferService/DownloadAsProto": {
+      "post": {
+        "summary": "Protocol Buffersメッセージとして返す",
+        "operationId": "DownloadBufferService_DownloadAsProto",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v2ProtoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v2BufferDownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadBufferService"
+        ]
+      }
+    },
+    "/etc_meisai.download.v2.DownloadBufferService/DownloadStream": {
+      "post": {
+        "summary": "ストリーミングでチャンク送信",
+        "operationId": "DownloadBufferService_DownloadStream",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/v2ChunkResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of v2ChunkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v2BufferDownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadBufferService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/accounts": {
+      "get": {
+        "summary": "全アカウントID取得",
+        "operationId": "DownloadService_GetAllAccountIDs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetAllAccountIDsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/download/async": {
+      "post": {
+        "summary": "非同期ダウンロード開始",
+        "operationId": "DownloadService_DownloadAsync",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DownloadJobResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1DownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/download/jobs/{job_id}": {
+      "get": {
+        "summary": "ジョブステータス取得",
+        "operationId": "DownloadService_GetJobStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1JobStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/download/sync": {
+      "post": {
+        "summary": "同期ダウンロード",
+        "operationId": "DownloadService_DownloadSync",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DownloadResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1DownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    }
+  },
   "definitions": {
     "protobufAny": {
       "type": "object",
@@ -62,6 +291,27 @@
         }
       },
       "title": "ダウンロードジョブレスポンス"
+    },
+    "v1DownloadRequest": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "from_date": {
+          "type": "string"
+        },
+        "to_date": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        }
+      },
+      "title": "ダウンロードリクエスト"
     },
     "v1DownloadResponse": {
       "type": "object",
@@ -179,6 +429,24 @@
         }
       },
       "title": "ジョブステータス"
+    },
+    "v2BufferDownloadRequest": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "from_date": {
+          "type": "string"
+        },
+        "to_date": {
+          "type": "string"
+        }
+      },
+      "title": "リクエスト"
     },
     "v2BufferResponse": {
       "type": "object",

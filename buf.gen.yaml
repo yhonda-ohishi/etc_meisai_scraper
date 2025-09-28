@@ -19,11 +19,16 @@ plugins:
     opt:
       - paths=source_relative
       - generate_unbound_methods=true
+      - allow_repeated_fields_in_body=true
+      - grpc_api_configuration=src/proto/download_api.yaml
 
   # OpenAPI v2 generation for Swagger
   - plugin: openapiv2
     out: swagger
     opt:
+      - allow_repeated_fields_in_body=true
+      - generate_unbound_methods=true
       - allow_merge=true
       - merge_file_name=etc_meisai
       - json_names_for_fields=false
+      - grpc_api_configuration=src/proto/download_api.yaml
