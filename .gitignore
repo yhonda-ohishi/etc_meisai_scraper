@@ -13,6 +13,9 @@
 
 # Dependency directories
 vendor/
+github.com/
+golang.org/
+google.golang.org/
 
 # Go workspace file
 go.work
@@ -33,6 +36,10 @@ Thumbs.db
 
 # Log files
 *.log
+
+# Downloads and CSV files
+downloads/
+*.csv
 
 # Build directories
 /bin/

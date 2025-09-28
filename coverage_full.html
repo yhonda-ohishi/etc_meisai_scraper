@@ -1,0 +1,3238 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>etc_meisai: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/yhonda-ohishi/etc_meisai/main.go (0.0%)</option>
+				
+				<option value="file1">github.com/yhonda-ohishi/etc_meisai/src/grpc/server.go (100.0%)</option>
+				
+				<option value="file2">github.com/yhonda-ohishi/etc_meisai/src/handlers/download_handler.go (100.0%)</option>
+				
+				<option value="file3">github.com/yhonda-ohishi/etc_meisai/src/pb/download.pb.go (31.3%)</option>
+				
+				<option value="file4">github.com/yhonda-ohishi/etc_meisai/src/pb/download_grpc.pb.go (45.6%)</option>
+				
+				<option value="file5">github.com/yhonda-ohishi/etc_meisai/src/scraper/etc_scraper.go (38.0%)</option>
+				
+				<option value="file6">github.com/yhonda-ohishi/etc_meisai/src/scraper/etc_scraper_testable.go (97.9%)</option>
+				
+				<option value="file7">github.com/yhonda-ohishi/etc_meisai/src/scraper/playwright_adapters.go (0.0%)</option>
+				
+				<option value="file8">github.com/yhonda-ohishi/etc_meisai/src/services/download_service.go (100.0%)</option>
+				
+				<option value="file9">github.com/yhonda-ohishi/etc_meisai/src/services/download_service_grpc.go (100.0%)</option>
+				
+				<option value="file10">github.com/yhonda-ohishi/etc_meisai/src/services/scraper_factory.go (100.0%)</option>
+				
+				<option value="file11">github.com/yhonda-ohishi/etc_meisai/tests/examples/test_download_example.go (0.0%)</option>
+				
+				<option value="file12">github.com/yhonda-ohishi/etc_meisai/tests/mocks/playwright_mocks.go (68.2%)</option>
+				
+				<option value="file13">github.com/yhonda-ohishi/etc_meisai/tests/mocks/scraper_mock.go (65.8%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "database/sql"
+        "flag"
+        "log"
+        "net/http"
+        "os"
+        "os/signal"
+        "syscall"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/grpc"
+        "github.com/yhonda-ohishi/etc_meisai/src/handlers"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+func main() <span class="cov0" title="0">{
+        // コマンドラインフラグ
+        var (
+                useGRPC    = flag.Bool("grpc", false, "Use gRPC server instead of HTTP")
+                grpcPort   = flag.String("grpc-port", "50051", "gRPC server port")
+                httpPort   = flag.String("http-port", "8080", "HTTP server port")
+        )
+        flag.Parse()
+
+        // ロガー設定
+        logger := log.New(os.Stdout, "[ETC-MEISAI] ", log.LstdFlags|log.Lshortfile)
+
+        // DB接続（TODO: 実装）
+        var db *sql.DB
+
+        if *useGRPC </span><span class="cov0" title="0">{
+                // gRPCサーバーモード
+                runGRPCServer(db, logger, *grpcPort)
+        }</span> else<span class="cov0" title="0"> {
+                // HTTPサーバーモード
+                runHTTPServer(db, logger, *httpPort)
+        }</span>
+}
+
+func runGRPCServer(db *sql.DB, logger *log.Logger, port string) <span class="cov0" title="0">{
+        server := grpc.NewServer(db, logger)
+
+        // シグナルハンドリング
+        sigCh := make(chan os.Signal, 1)
+        signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+        go func() </span><span class="cov0" title="0">{
+                &lt;-sigCh
+                server.Stop()
+                os.Exit(0)
+        }</span>()
+
+        <span class="cov0" title="0">if err := server.Start(port); err != nil </span><span class="cov0" title="0">{
+                logger.Fatalf("Failed to start gRPC server: %v", err)
+        }</span>
+}
+
+func runHTTPServer(db *sql.DB, logger *log.Logger, port string) <span class="cov0" title="0">{
+        // ダウンロードサービス初期化
+        downloadService := services.NewDownloadService(db, logger)
+
+        // ハンドラー初期化
+        downloadHandler := handlers.NewDownloadHandler(downloadService)
+
+        // ルーティング設定
+        http.HandleFunc("/api/download/sync", downloadHandler.DownloadSync)
+        http.HandleFunc("/api/download/async", downloadHandler.DownloadAsync)
+        http.HandleFunc("/api/download/status", downloadHandler.GetDownloadStatus)
+
+        logger.Printf("Starting HTTP server on port %s", port)
+        logger.Printf("GitHub repository: https://github.com/yhonda-ohishi/etc_meisai")
+        logger.Printf("Download endpoints:")
+        logger.Printf("  POST /api/download/sync  - 同期ダウンロード")
+        logger.Printf("  POST /api/download/async - 非同期ダウンロード")
+        logger.Printf("  GET  /api/download/status?job_id={id} - ステータス確認")
+
+        if err := http.ListenAndServe(":"+port, nil); err != nil </span><span class="cov0" title="0">{
+                logger.Fatalf("HTTP server failed to start: %v", err)
+        }</span>
+}</pre>
+		
+		<pre class="file" id="file1" style="display: none">package grpc
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net"
+        "os"
+
+        pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+        "google.golang.org/grpc"
+        "google.golang.org/grpc/reflection"
+)
+
+// Server はgRPCサーバー
+type Server struct {
+        grpcServer      *grpc.Server
+        downloadService *services.DownloadServiceGRPC
+        logger          *log.Logger
+}
+
+// NewServer creates a new gRPC server
+func NewServer(db *sql.DB, logger *log.Logger) *Server <span class="cov8" title="1">{
+        if logger == nil </span><span class="cov8" title="1">{
+                logger = log.New(os.Stdout, "[GRPC-SERVER] ", log.LstdFlags|log.Lshortfile)
+        }</span>
+
+        <span class="cov8" title="1">grpcServer := grpc.NewServer()
+        downloadService := services.NewDownloadServiceGRPC(db, logger)
+
+        // サービスを登録
+        pb.RegisterDownloadServiceServer(grpcServer, downloadService)
+
+        // リフレクションを有効化（開発用）
+        reflection.Register(grpcServer)
+
+        return &amp;Server{
+                grpcServer:      grpcServer,
+                downloadService: downloadService,
+                logger:          logger,
+        }</span>
+}
+
+// Start はgRPCサーバーを起動
+func (s *Server) Start(port string) error <span class="cov8" title="1">{
+        if port == "" </span><span class="cov8" title="1">{
+                port = "50051"
+        }</span>
+
+        <span class="cov8" title="1">lis, err := net.Listen("tcp", ":"+port)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to listen: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Printf("Starting gRPC server on port %s", port)
+        s.logger.Printf("GitHub repository: https://github.com/yhonda-ohishi/etc_meisai")
+        s.logger.Printf("Available gRPC services:")
+        s.logger.Printf("  - DownloadService")
+        s.logger.Printf("    * DownloadSync")
+        s.logger.Printf("    * DownloadAsync")
+        s.logger.Printf("    * GetJobStatus")
+        s.logger.Printf("    * GetAllAccountIDs")
+
+        return s.grpcServer.Serve(lis)</span>
+}
+
+// Stop はgRPCサーバーを停止
+func (s *Server) Stop() <span class="cov8" title="1">{
+        s.logger.Println("Stopping gRPC server...")
+        s.grpcServer.GracefulStop()
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">package handlers
+
+import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "strings"
+        "time"
+
+        "github.com/google/uuid"
+        "github.com/yhonda-ohishi/etc_meisai/src/services"
+)
+
+// DownloadHandler はダウンロード関連のハンドラー
+type DownloadHandler struct {
+        DownloadService services.DownloadServiceInterface
+}
+
+// DownloadRequest はダウンロードリクエスト
+type DownloadRequest struct {
+        Accounts []string `json:"accounts"`
+        FromDate string   `json:"from_date"`
+        ToDate   string   `json:"to_date"`
+        Mode     string   `json:"mode"`
+}
+
+// JobStatus はジョブステータス
+type JobStatus struct {
+        JobID        string     `json:"job_id"`
+        Status       string     `json:"status"`
+        Progress     int        `json:"progress"`
+        TotalRecords int        `json:"total_records"`
+        ErrorMessage *string    `json:"error_message,omitempty"`
+        CompletedAt  *time.Time `json:"completed_at,omitempty"`
+}
+
+// NewDownloadHandler creates a new download handler
+func NewDownloadHandler(downloadService services.DownloadServiceInterface) *DownloadHandler <span class="cov8" title="1">{
+        return &amp;DownloadHandler{
+                DownloadService: downloadService,
+        }
+}</span>
+
+// DownloadSync は同期ダウンロードを実行
+func (h *DownloadHandler) DownloadSync(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        var req DownloadRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.respondError(w, http.StatusBadRequest, "Invalid request body")
+                return
+        }</span>
+
+        // パラメータのデフォルト値設定
+        <span class="cov8" title="1">if req.FromDate == "" || req.ToDate == "" </span><span class="cov8" title="1">{
+                now := time.Now()
+                if req.ToDate == "" </span><span class="cov8" title="1">{
+                        req.ToDate = now.Format("2006-01-02")
+                }</span>
+                <span class="cov8" title="1">if req.FromDate == "" </span><span class="cov8" title="1">{
+                        lastMonth := now.AddDate(0, -1, 0)
+                        req.FromDate = lastMonth.Format("2006-01-02")
+                }</span>
+        }
+
+        <span class="cov8" title="1">if len(req.Accounts) == 0 </span><span class="cov8" title="1">{
+                h.respondError(w, http.StatusBadRequest, "At least one account is required")
+                return
+        }</span>
+
+        // TODO: 実際のダウンロード処理を実装
+        <span class="cov8" title="1">response := map[string]interface{}{
+                "success":      true,
+                "record_count": 0,
+                "csv_path":     "",
+                "records":      []interface{}{},
+                "message":      "Download completed successfully",
+        }
+
+        h.respondJSON(w, http.StatusOK, response)</span>
+}
+
+// DownloadAsync は非同期ダウンロードを開始
+func (h *DownloadHandler) DownloadAsync(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        var req DownloadRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov8" title="1">{
+                h.respondError(w, http.StatusBadRequest, "Invalid request body")
+                return
+        }</span>
+
+        // パラメータのデフォルト値設定
+        <span class="cov8" title="1">if req.FromDate == "" || req.ToDate == "" </span><span class="cov8" title="1">{
+                now := time.Now()
+                if req.ToDate == "" </span><span class="cov8" title="1">{
+                        req.ToDate = now.Format("2006-01-02")
+                }</span>
+                <span class="cov8" title="1">if req.FromDate == "" </span><span class="cov8" title="1">{
+                        lastMonth := now.AddDate(0, -1, 0)
+                        req.FromDate = lastMonth.Format("2006-01-02")
+                }</span>
+        }
+
+        <span class="cov8" title="1">if len(req.Accounts) == 0 </span><span class="cov8" title="1">{
+                // デフォルトで全アカウントを使用
+                req.Accounts = h.DownloadService.GetAllAccountIDs()
+                if len(req.Accounts) == 0 </span><span class="cov8" title="1">{
+                        h.respondError(w, http.StatusBadRequest, "No accounts configured")
+                        return
+                }</span>
+        }
+
+        // ジョブIDを生成
+        <span class="cov8" title="1">jobID := uuid.New().String()
+
+        // 非同期でダウンロード開始
+        h.DownloadService.ProcessAsync(jobID, req.Accounts, req.FromDate, req.ToDate)
+
+        response := map[string]interface{}{
+                "job_id":  jobID,
+                "status":  "pending",
+                "message": "Download job started",
+        }
+
+        h.respondJSON(w, http.StatusAccepted, response)</span>
+}
+
+// GetDownloadStatus はダウンロードステータスを取得
+func (h *DownloadHandler) GetDownloadStatus(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        jobID := r.URL.Query().Get("job_id")
+        if jobID == "" </span><span class="cov8" title="1">{
+                // URLパスから取得を試みる
+                // 例: /api/download/status/{jobId}
+                parts := strings.Split(r.URL.Path, "/")
+                if len(parts) &gt; 0 </span><span class="cov8" title="1">{
+                        jobID = parts[len(parts)-1]
+                }</span>
+        }
+
+        <span class="cov8" title="1">if jobID == "" || jobID == "status" </span><span class="cov8" title="1">{
+                h.respondError(w, http.StatusBadRequest, "Job ID is required")
+                return
+        }</span>
+
+        // ジョブステータスを取得
+        <span class="cov8" title="1">job, exists := h.DownloadService.GetJobStatus(jobID)
+        if !exists </span><span class="cov8" title="1">{
+                h.respondError(w, http.StatusNotFound, fmt.Sprintf("Job %s not found", jobID))
+                return
+        }</span>
+
+        <span class="cov8" title="1">status := JobStatus{
+                JobID:        job.ID,
+                Status:       job.Status,
+                Progress:     job.Progress,
+                TotalRecords: job.TotalRecords,
+                CompletedAt:  job.CompletedAt,
+        }
+
+        if job.ErrorMessage != "" </span><span class="cov8" title="1">{
+                status.ErrorMessage = &amp;job.ErrorMessage
+        }</span>
+
+        <span class="cov8" title="1">h.respondJSON(w, http.StatusOK, status)</span>
+}
+
+// Helper methods
+func (h *DownloadHandler) respondJSON(w http.ResponseWriter, code int, payload interface{}) <span class="cov8" title="1">{
+        response, _ := json.Marshal(payload)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(code)
+        w.Write(response)
+}</span>
+
+func (h *DownloadHandler) respondError(w http.ResponseWriter, code int, message string) <span class="cov8" title="1">{
+        h.respondJSON(w, code, map[string]string{"error": message})
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
+// versions:
+//         protoc-gen-go v1.36.9
+//         protoc        v6.32.1
+// source: download.proto
+
+package pb
+
+import (
+        protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+        protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+        timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+        reflect "reflect"
+        sync "sync"
+        unsafe "unsafe"
+)
+
+const (
+        // Verify that this generated code is sufficiently up-to-date.
+        _ = protoimpl.EnforceVersion(20 - protoimpl.MinVersion)
+        // Verify that runtime/protoimpl is sufficiently up-to-date.
+        _ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
+)
+
+// ダウンロードリクエスト
+type DownloadRequest struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        Accounts      []string               `protobuf:"bytes,1,rep,name=accounts,proto3" json:"accounts,omitempty"`
+        FromDate      string                 `protobuf:"bytes,2,opt,name=from_date,json=fromDate,proto3" json:"from_date,omitempty"`
+        ToDate        string                 `protobuf:"bytes,3,opt,name=to_date,json=toDate,proto3" json:"to_date,omitempty"`
+        Mode          string                 `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadRequest) Reset() <span class="cov8" title="1">{
+        *x = DownloadRequest{}
+        mi := &amp;file_download_proto_msgTypes[0]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *DownloadRequest) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*DownloadRequest) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *DownloadRequest) ProtoReflect() protoreflect.Message <span class="cov8" title="1">{
+        mi := &amp;file_download_proto_msgTypes[0]
+        if x != nil </span><span class="cov8" title="1">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov8" title="1">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov8" title="1">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use DownloadRequest.ProtoReflect.Descriptor instead.
+func (*DownloadRequest) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{0}
+}</span>
+
+func (x *DownloadRequest) GetAccounts() []string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Accounts
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (x *DownloadRequest) GetFromDate() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.FromDate
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *DownloadRequest) GetToDate() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.ToDate
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *DownloadRequest) GetMode() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Mode
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+// ダウンロードレスポンス
+type DownloadResponse struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+        RecordCount   int32                  `protobuf:"varint,2,opt,name=record_count,json=recordCount,proto3" json:"record_count,omitempty"`
+        CsvPath       string                 `protobuf:"bytes,3,opt,name=csv_path,json=csvPath,proto3" json:"csv_path,omitempty"`
+        Records       []*ETCMeisaiRecord     `protobuf:"bytes,4,rep,name=records,proto3" json:"records,omitempty"`
+        Error         string                 `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadResponse) Reset() <span class="cov0" title="0">{
+        *x = DownloadResponse{}
+        mi := &amp;file_download_proto_msgTypes[1]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *DownloadResponse) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*DownloadResponse) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *DownloadResponse) ProtoReflect() protoreflect.Message <span class="cov0" title="0">{
+        mi := &amp;file_download_proto_msgTypes[1]
+        if x != nil </span><span class="cov0" title="0">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov0" title="0">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov0" title="0">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use DownloadResponse.ProtoReflect.Descriptor instead.
+func (*DownloadResponse) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{1}
+}</span>
+
+func (x *DownloadResponse) GetSuccess() bool <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Success
+        }</span>
+        <span class="cov0" title="0">return false</span>
+}
+
+func (x *DownloadResponse) GetRecordCount() int32 <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.RecordCount
+        }</span>
+        <span class="cov0" title="0">return 0</span>
+}
+
+func (x *DownloadResponse) GetCsvPath() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.CsvPath
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *DownloadResponse) GetRecords() []*ETCMeisaiRecord <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Records
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (x *DownloadResponse) GetError() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Error
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+// ダウンロードジョブレスポンス
+type DownloadJobResponse struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+        Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+        Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadJobResponse) Reset() <span class="cov8" title="1">{
+        *x = DownloadJobResponse{}
+        mi := &amp;file_download_proto_msgTypes[2]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *DownloadJobResponse) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*DownloadJobResponse) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *DownloadJobResponse) ProtoReflect() protoreflect.Message <span class="cov8" title="1">{
+        mi := &amp;file_download_proto_msgTypes[2]
+        if x != nil </span><span class="cov8" title="1">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov8" title="1">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov8" title="1">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use DownloadJobResponse.ProtoReflect.Descriptor instead.
+func (*DownloadJobResponse) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{2}
+}</span>
+
+func (x *DownloadJobResponse) GetJobId() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.JobId
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *DownloadJobResponse) GetStatus() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Status
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *DownloadJobResponse) GetMessage() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Message
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+// ジョブステータス取得リクエスト
+type GetJobStatusRequest struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetJobStatusRequest) Reset() <span class="cov8" title="1">{
+        *x = GetJobStatusRequest{}
+        mi := &amp;file_download_proto_msgTypes[3]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *GetJobStatusRequest) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*GetJobStatusRequest) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *GetJobStatusRequest) ProtoReflect() protoreflect.Message <span class="cov8" title="1">{
+        mi := &amp;file_download_proto_msgTypes[3]
+        if x != nil </span><span class="cov8" title="1">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov8" title="1">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov8" title="1">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use GetJobStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetJobStatusRequest) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{3}
+}</span>
+
+func (x *GetJobStatusRequest) GetJobId() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.JobId
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+// ジョブステータス
+type JobStatus struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+        Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+        Progress      int32                  `protobuf:"varint,3,opt,name=progress,proto3" json:"progress,omitempty"`
+        TotalRecords  int32                  `protobuf:"varint,4,opt,name=total_records,json=totalRecords,proto3" json:"total_records,omitempty"`
+        ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+        StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+        CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *JobStatus) Reset() <span class="cov8" title="1">{
+        *x = JobStatus{}
+        mi := &amp;file_download_proto_msgTypes[4]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *JobStatus) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*JobStatus) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *JobStatus) ProtoReflect() protoreflect.Message <span class="cov8" title="1">{
+        mi := &amp;file_download_proto_msgTypes[4]
+        if x != nil </span><span class="cov8" title="1">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov8" title="1">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov8" title="1">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use JobStatus.ProtoReflect.Descriptor instead.
+func (*JobStatus) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{4}
+}</span>
+
+func (x *JobStatus) GetJobId() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.JobId
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *JobStatus) GetStatus() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Status
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *JobStatus) GetProgress() int32 <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Progress
+        }</span>
+        <span class="cov0" title="0">return 0</span>
+}
+
+func (x *JobStatus) GetTotalRecords() int32 <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.TotalRecords
+        }</span>
+        <span class="cov0" title="0">return 0</span>
+}
+
+func (x *JobStatus) GetErrorMessage() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.ErrorMessage
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *JobStatus) GetStartedAt() *timestamppb.Timestamp <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.StartedAt
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (x *JobStatus) GetCompletedAt() *timestamppb.Timestamp <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.CompletedAt
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// アカウントID取得リクエスト
+type GetAllAccountIDsRequest struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAllAccountIDsRequest) Reset() <span class="cov8" title="1">{
+        *x = GetAllAccountIDsRequest{}
+        mi := &amp;file_download_proto_msgTypes[5]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *GetAllAccountIDsRequest) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*GetAllAccountIDsRequest) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *GetAllAccountIDsRequest) ProtoReflect() protoreflect.Message <span class="cov8" title="1">{
+        mi := &amp;file_download_proto_msgTypes[5]
+        if x != nil </span><span class="cov8" title="1">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov8" title="1">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov8" title="1">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use GetAllAccountIDsRequest.ProtoReflect.Descriptor instead.
+func (*GetAllAccountIDsRequest) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{5}
+}</span>
+
+// アカウントID取得レスポンス
+type GetAllAccountIDsResponse struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        AccountIds    []string               `protobuf:"bytes,1,rep,name=account_ids,json=accountIds,proto3" json:"account_ids,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAllAccountIDsResponse) Reset() <span class="cov8" title="1">{
+        *x = GetAllAccountIDsResponse{}
+        mi := &amp;file_download_proto_msgTypes[6]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *GetAllAccountIDsResponse) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*GetAllAccountIDsResponse) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *GetAllAccountIDsResponse) ProtoReflect() protoreflect.Message <span class="cov8" title="1">{
+        mi := &amp;file_download_proto_msgTypes[6]
+        if x != nil </span><span class="cov8" title="1">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov8" title="1">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov8" title="1">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use GetAllAccountIDsResponse.ProtoReflect.Descriptor instead.
+func (*GetAllAccountIDsResponse) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{6}
+}</span>
+
+func (x *GetAllAccountIDsResponse) GetAccountIds() []string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.AccountIds
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// ETC明細レコード
+type ETCMeisaiRecord struct {
+        state         protoimpl.MessageState `protogen:"open.v1"`
+        Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+        AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+        UsageDate     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=usage_date,json=usageDate,proto3" json:"usage_date,omitempty"`
+        EntryIc       string                 `protobuf:"bytes,4,opt,name=entry_ic,json=entryIc,proto3" json:"entry_ic,omitempty"`
+        ExitIc        string                 `protobuf:"bytes,5,opt,name=exit_ic,json=exitIc,proto3" json:"exit_ic,omitempty"`
+        VehicleNumber string                 `protobuf:"bytes,6,opt,name=vehicle_number,json=vehicleNumber,proto3" json:"vehicle_number,omitempty"`
+        EtcCardNumber string                 `protobuf:"bytes,7,opt,name=etc_card_number,json=etcCardNumber,proto3" json:"etc_card_number,omitempty"`
+        Amount        int32                  `protobuf:"varint,8,opt,name=amount,proto3" json:"amount,omitempty"`
+        CsvFileName   string                 `protobuf:"bytes,9,opt,name=csv_file_name,json=csvFileName,proto3" json:"csv_file_name,omitempty"`
+        DownloadedAt  *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=downloaded_at,json=downloadedAt,proto3" json:"downloaded_at,omitempty"`
+        CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+        UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+        unknownFields protoimpl.UnknownFields
+        sizeCache     protoimpl.SizeCache
+}
+
+func (x *ETCMeisaiRecord) Reset() <span class="cov0" title="0">{
+        *x = ETCMeisaiRecord{}
+        mi := &amp;file_download_proto_msgTypes[7]
+        ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+        ms.StoreMessageInfo(mi)
+}</span>
+
+func (x *ETCMeisaiRecord) String() string <span class="cov0" title="0">{
+        return protoimpl.X.MessageStringOf(x)
+}</span>
+
+func (*ETCMeisaiRecord) ProtoMessage() {<span class="cov0" title="0">}</span>
+
+func (x *ETCMeisaiRecord) ProtoReflect() protoreflect.Message <span class="cov0" title="0">{
+        mi := &amp;file_download_proto_msgTypes[7]
+        if x != nil </span><span class="cov0" title="0">{
+                ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+                if ms.LoadMessageInfo() == nil </span><span class="cov0" title="0">{
+                        ms.StoreMessageInfo(mi)
+                }</span>
+                <span class="cov0" title="0">return ms</span>
+        }
+        <span class="cov0" title="0">return mi.MessageOf(x)</span>
+}
+
+// Deprecated: Use ETCMeisaiRecord.ProtoReflect.Descriptor instead.
+func (*ETCMeisaiRecord) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
+        return file_download_proto_rawDescGZIP(), []int{7}
+}</span>
+
+func (x *ETCMeisaiRecord) GetId() int64 <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Id
+        }</span>
+        <span class="cov0" title="0">return 0</span>
+}
+
+func (x *ETCMeisaiRecord) GetAccountId() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.AccountId
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *ETCMeisaiRecord) GetUsageDate() *timestamppb.Timestamp <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.UsageDate
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (x *ETCMeisaiRecord) GetEntryIc() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.EntryIc
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *ETCMeisaiRecord) GetExitIc() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.ExitIc
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *ETCMeisaiRecord) GetVehicleNumber() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.VehicleNumber
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *ETCMeisaiRecord) GetEtcCardNumber() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.EtcCardNumber
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *ETCMeisaiRecord) GetAmount() int32 <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.Amount
+        }</span>
+        <span class="cov0" title="0">return 0</span>
+}
+
+func (x *ETCMeisaiRecord) GetCsvFileName() string <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.CsvFileName
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+func (x *ETCMeisaiRecord) GetDownloadedAt() *timestamppb.Timestamp <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.DownloadedAt
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (x *ETCMeisaiRecord) GetCreatedAt() *timestamppb.Timestamp <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.CreatedAt
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (x *ETCMeisaiRecord) GetUpdatedAt() *timestamppb.Timestamp <span class="cov0" title="0">{
+        if x != nil </span><span class="cov0" title="0">{
+                return x.UpdatedAt
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+var File_download_proto protoreflect.FileDescriptor
+
+const file_download_proto_rawDesc = "" +
+        "\n" +
+        "\x0edownload.proto\x12\x16etc_meisai.download.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"w\n" +
+        "\x0fDownloadRequest\x12\x1a\n" +
+        "\baccounts\x18\x01 \x03(\tR\baccounts\x12\x1b\n" +
+        "\tfrom_date\x18\x02 \x01(\tR\bfromDate\x12\x17\n" +
+        "\ato_date\x18\x03 \x01(\tR\x06toDate\x12\x12\n" +
+        "\x04mode\x18\x04 \x01(\tR\x04mode\"\xc3\x01\n" +
+        "\x10DownloadResponse\x12\x18\n" +
+        "\asuccess\x18\x01 \x01(\bR\asuccess\x12!\n" +
+        "\frecord_count\x18\x02 \x01(\x05R\vrecordCount\x12\x19\n" +
+        "\bcsv_path\x18\x03 \x01(\tR\acsvPath\x12A\n" +
+        "\arecords\x18\x04 \x03(\v2'.etc_meisai.download.v1.ETCMeisaiRecordR\arecords\x12\x14\n" +
+        "\x05error\x18\x05 \x01(\tR\x05error\"^\n" +
+        "\x13DownloadJobResponse\x12\x15\n" +
+        "\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
+        "\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
+        "\amessage\x18\x03 \x01(\tR\amessage\",\n" +
+        "\x13GetJobStatusRequest\x12\x15\n" +
+        "\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x9a\x02\n" +
+        "\tJobStatus\x12\x15\n" +
+        "\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
+        "\x06status\x18\x02 \x01(\tR\x06status\x12\x1a\n" +
+        "\bprogress\x18\x03 \x01(\x05R\bprogress\x12#\n" +
+        "\rtotal_records\x18\x04 \x01(\x05R\ftotalRecords\x12#\n" +
+        "\rerror_message\x18\x05 \x01(\tR\ferrorMessage\x129\n" +
+        "\n" +
+        "started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
+        "\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\"\x19\n" +
+        "\x17GetAllAccountIDsRequest\";\n" +
+        "\x18GetAllAccountIDsResponse\x12\x1f\n" +
+        "\vaccount_ids\x18\x01 \x03(\tR\n" +
+        "accountIds\"\xf1\x03\n" +
+        "\x0fETCMeisaiRecord\x12\x0e\n" +
+        "\x02id\x18\x01 \x01(\x03R\x02id\x12\x1d\n" +
+        "\n" +
+        "account_id\x18\x02 \x01(\tR\taccountId\x129\n" +
+        "\n" +
+        "usage_date\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tusageDate\x12\x19\n" +
+        "\bentry_ic\x18\x04 \x01(\tR\aentryIc\x12\x17\n" +
+        "\aexit_ic\x18\x05 \x01(\tR\x06exitIc\x12%\n" +
+        "\x0evehicle_number\x18\x06 \x01(\tR\rvehicleNumber\x12&amp;\n" +
+        "\x0fetc_card_number\x18\a \x01(\tR\retcCardNumber\x12\x16\n" +
+        "\x06amount\x18\b \x01(\x05R\x06amount\x12\"\n" +
+        "\rcsv_file_name\x18\t \x01(\tR\vcsvFileName\x12?\n" +
+        "\rdownloaded_at\x18\n" +
+        " \x01(\v2\x1a.google.protobuf.TimestampR\fdownloadedAt\x129\n" +
+        "\n" +
+        "created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+        "\n" +
+        "updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xb2\x03\n" +
+        "\x0fDownloadService\x12a\n" +
+        "\fDownloadSync\x12'.etc_meisai.download.v1.DownloadRequest\x1a(.etc_meisai.download.v1.DownloadResponse\x12e\n" +
+        "\rDownloadAsync\x12'.etc_meisai.download.v1.DownloadRequest\x1a+.etc_meisai.download.v1.DownloadJobResponse\x12^\n" +
+        "\fGetJobStatus\x12+.etc_meisai.download.v1.GetJobStatusRequest\x1a!.etc_meisai.download.v1.JobStatus\x12u\n" +
+        "\x10GetAllAccountIDs\x12/.etc_meisai.download.v1.GetAllAccountIDsRequest\x1a0.etc_meisai.download.v1.GetAllAccountIDsResponseB,Z*github.com/yhonda-ohishi/etc_meisai/src/pbb\x06proto3"
+
+var (
+        file_download_proto_rawDescOnce sync.Once
+        file_download_proto_rawDescData []byte
+)
+
+func file_download_proto_rawDescGZIP() []byte <span class="cov0" title="0">{
+        file_download_proto_rawDescOnce.Do(func() </span><span class="cov0" title="0">{
+                file_download_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_download_proto_rawDesc), len(file_download_proto_rawDesc)))
+        }</span>)
+        <span class="cov0" title="0">return file_download_proto_rawDescData</span>
+}
+
+var file_download_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_download_proto_goTypes = []any{
+        (*DownloadRequest)(nil),          // 0: etc_meisai.download.v1.DownloadRequest
+        (*DownloadResponse)(nil),         // 1: etc_meisai.download.v1.DownloadResponse
+        (*DownloadJobResponse)(nil),      // 2: etc_meisai.download.v1.DownloadJobResponse
+        (*GetJobStatusRequest)(nil),      // 3: etc_meisai.download.v1.GetJobStatusRequest
+        (*JobStatus)(nil),                // 4: etc_meisai.download.v1.JobStatus
+        (*GetAllAccountIDsRequest)(nil),  // 5: etc_meisai.download.v1.GetAllAccountIDsRequest
+        (*GetAllAccountIDsResponse)(nil), // 6: etc_meisai.download.v1.GetAllAccountIDsResponse
+        (*ETCMeisaiRecord)(nil),          // 7: etc_meisai.download.v1.ETCMeisaiRecord
+        (*timestamppb.Timestamp)(nil),    // 8: google.protobuf.Timestamp
+}
+var file_download_proto_depIdxs = []int32{
+        7,  // 0: etc_meisai.download.v1.DownloadResponse.records:type_name -&gt; etc_meisai.download.v1.ETCMeisaiRecord
+        8,  // 1: etc_meisai.download.v1.JobStatus.started_at:type_name -&gt; google.protobuf.Timestamp
+        8,  // 2: etc_meisai.download.v1.JobStatus.completed_at:type_name -&gt; google.protobuf.Timestamp
+        8,  // 3: etc_meisai.download.v1.ETCMeisaiRecord.usage_date:type_name -&gt; google.protobuf.Timestamp
+        8,  // 4: etc_meisai.download.v1.ETCMeisaiRecord.downloaded_at:type_name -&gt; google.protobuf.Timestamp
+        8,  // 5: etc_meisai.download.v1.ETCMeisaiRecord.created_at:type_name -&gt; google.protobuf.Timestamp
+        8,  // 6: etc_meisai.download.v1.ETCMeisaiRecord.updated_at:type_name -&gt; google.protobuf.Timestamp
+        0,  // 7: etc_meisai.download.v1.DownloadService.DownloadSync:input_type -&gt; etc_meisai.download.v1.DownloadRequest
+        0,  // 8: etc_meisai.download.v1.DownloadService.DownloadAsync:input_type -&gt; etc_meisai.download.v1.DownloadRequest
+        3,  // 9: etc_meisai.download.v1.DownloadService.GetJobStatus:input_type -&gt; etc_meisai.download.v1.GetJobStatusRequest
+        5,  // 10: etc_meisai.download.v1.DownloadService.GetAllAccountIDs:input_type -&gt; etc_meisai.download.v1.GetAllAccountIDsRequest
+        1,  // 11: etc_meisai.download.v1.DownloadService.DownloadSync:output_type -&gt; etc_meisai.download.v1.DownloadResponse
+        2,  // 12: etc_meisai.download.v1.DownloadService.DownloadAsync:output_type -&gt; etc_meisai.download.v1.DownloadJobResponse
+        4,  // 13: etc_meisai.download.v1.DownloadService.GetJobStatus:output_type -&gt; etc_meisai.download.v1.JobStatus
+        6,  // 14: etc_meisai.download.v1.DownloadService.GetAllAccountIDs:output_type -&gt; etc_meisai.download.v1.GetAllAccountIDsResponse
+        11, // [11:15] is the sub-list for method output_type
+        7,  // [7:11] is the sub-list for method input_type
+        7,  // [7:7] is the sub-list for extension type_name
+        7,  // [7:7] is the sub-list for extension extendee
+        0,  // [0:7] is the sub-list for field type_name
+}
+
+func init() <span class="cov8" title="1">{ file_download_proto_init() }</span>
+func file_download_proto_init() <span class="cov8" title="1">{
+        if File_download_proto != nil </span><span class="cov0" title="0">{
+                return
+        }</span>
+        <span class="cov8" title="1">type x struct{}
+        out := protoimpl.TypeBuilder{
+                File: protoimpl.DescBuilder{
+                        GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+                        RawDescriptor: unsafe.Slice(unsafe.StringData(file_download_proto_rawDesc), len(file_download_proto_rawDesc)),
+                        NumEnums:      0,
+                        NumMessages:   8,
+                        NumExtensions: 0,
+                        NumServices:   1,
+                },
+                GoTypes:           file_download_proto_goTypes,
+                DependencyIndexes: file_download_proto_depIdxs,
+                MessageInfos:      file_download_proto_msgTypes,
+        }.Build()
+        File_download_proto = out.File
+        file_download_proto_goTypes = nil
+        file_download_proto_depIdxs = nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
+// versions:
+// - protoc-gen-go-grpc v1.5.1
+// - protoc             v6.32.1
+// source: download.proto
+
+package pb
+
+import (
+        context "context"
+        grpc "google.golang.org/grpc"
+        codes "google.golang.org/grpc/codes"
+        status "google.golang.org/grpc/status"
+)
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+// Requires gRPC-Go v1.64.0 or later.
+const _ = grpc.SupportPackageIsVersion9
+
+const (
+        DownloadService_DownloadSync_FullMethodName     = "/etc_meisai.download.v1.DownloadService/DownloadSync"
+        DownloadService_DownloadAsync_FullMethodName    = "/etc_meisai.download.v1.DownloadService/DownloadAsync"
+        DownloadService_GetJobStatus_FullMethodName     = "/etc_meisai.download.v1.DownloadService/GetJobStatus"
+        DownloadService_GetAllAccountIDs_FullMethodName = "/etc_meisai.download.v1.DownloadService/GetAllAccountIDs"
+)
+
+// DownloadServiceClient is the client API for DownloadService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// ダウンロードサービス
+type DownloadServiceClient interface {
+        // 同期ダウンロード
+        DownloadSync(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DownloadResponse, error)
+        // 非同期ダウンロード開始
+        DownloadAsync(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DownloadJobResponse, error)
+        // ジョブステータス取得
+        GetJobStatus(ctx context.Context, in *GetJobStatusRequest, opts ...grpc.CallOption) (*JobStatus, error)
+        // 全アカウントID取得
+        GetAllAccountIDs(ctx context.Context, in *GetAllAccountIDsRequest, opts ...grpc.CallOption) (*GetAllAccountIDsResponse, error)
+}
+
+type downloadServiceClient struct {
+        cc grpc.ClientConnInterface
+}
+
+func NewDownloadServiceClient(cc grpc.ClientConnInterface) DownloadServiceClient <span class="cov8" title="1">{
+        return &amp;downloadServiceClient{cc}
+}</span>
+
+func (c *downloadServiceClient) DownloadSync(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DownloadResponse, error) <span class="cov0" title="0">{
+        cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+        out := new(DownloadResponse)
+        err := c.cc.Invoke(ctx, DownloadService_DownloadSync_FullMethodName, in, out, cOpts...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return out, nil</span>
+}
+
+func (c *downloadServiceClient) DownloadAsync(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DownloadJobResponse, error) <span class="cov8" title="1">{
+        cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+        out := new(DownloadJobResponse)
+        err := c.cc.Invoke(ctx, DownloadService_DownloadAsync_FullMethodName, in, out, cOpts...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return out, nil</span>
+}
+
+func (c *downloadServiceClient) GetJobStatus(ctx context.Context, in *GetJobStatusRequest, opts ...grpc.CallOption) (*JobStatus, error) <span class="cov8" title="1">{
+        cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+        out := new(JobStatus)
+        err := c.cc.Invoke(ctx, DownloadService_GetJobStatus_FullMethodName, in, out, cOpts...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return out, nil</span>
+}
+
+func (c *downloadServiceClient) GetAllAccountIDs(ctx context.Context, in *GetAllAccountIDsRequest, opts ...grpc.CallOption) (*GetAllAccountIDsResponse, error) <span class="cov8" title="1">{
+        cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+        out := new(GetAllAccountIDsResponse)
+        err := c.cc.Invoke(ctx, DownloadService_GetAllAccountIDs_FullMethodName, in, out, cOpts...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return out, nil</span>
+}
+
+// DownloadServiceServer is the server API for DownloadService service.
+// All implementations must embed UnimplementedDownloadServiceServer
+// for forward compatibility.
+//
+// ダウンロードサービス
+type DownloadServiceServer interface {
+        // 同期ダウンロード
+        DownloadSync(context.Context, *DownloadRequest) (*DownloadResponse, error)
+        // 非同期ダウンロード開始
+        DownloadAsync(context.Context, *DownloadRequest) (*DownloadJobResponse, error)
+        // ジョブステータス取得
+        GetJobStatus(context.Context, *GetJobStatusRequest) (*JobStatus, error)
+        // 全アカウントID取得
+        GetAllAccountIDs(context.Context, *GetAllAccountIDsRequest) (*GetAllAccountIDsResponse, error)
+        mustEmbedUnimplementedDownloadServiceServer()
+}
+
+// UnimplementedDownloadServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedDownloadServiceServer struct{}
+
+func (UnimplementedDownloadServiceServer) DownloadSync(context.Context, *DownloadRequest) (*DownloadResponse, error) <span class="cov0" title="0">{
+        return nil, status.Errorf(codes.Unimplemented, "method DownloadSync not implemented")
+}</span>
+func (UnimplementedDownloadServiceServer) DownloadAsync(context.Context, *DownloadRequest) (*DownloadJobResponse, error) <span class="cov0" title="0">{
+        return nil, status.Errorf(codes.Unimplemented, "method DownloadAsync not implemented")
+}</span>
+func (UnimplementedDownloadServiceServer) GetJobStatus(context.Context, *GetJobStatusRequest) (*JobStatus, error) <span class="cov0" title="0">{
+        return nil, status.Errorf(codes.Unimplemented, "method GetJobStatus not implemented")
+}</span>
+func (UnimplementedDownloadServiceServer) GetAllAccountIDs(context.Context, *GetAllAccountIDsRequest) (*GetAllAccountIDsResponse, error) <span class="cov0" title="0">{
+        return nil, status.Errorf(codes.Unimplemented, "method GetAllAccountIDs not implemented")
+}</span>
+func (UnimplementedDownloadServiceServer) mustEmbedUnimplementedDownloadServiceServer() {<span class="cov0" title="0">}</span>
+func (UnimplementedDownloadServiceServer) testEmbeddedByValue()                         {<span class="cov8" title="1">}</span>
+
+// UnsafeDownloadServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to DownloadServiceServer will
+// result in compilation errors.
+type UnsafeDownloadServiceServer interface {
+        mustEmbedUnimplementedDownloadServiceServer()
+}
+
+func RegisterDownloadServiceServer(s grpc.ServiceRegistrar, srv DownloadServiceServer) <span class="cov8" title="1">{
+        // If the following call pancis, it indicates UnimplementedDownloadServiceServer was
+        // embedded by pointer and is nil.  This will cause panics if an
+        // unimplemented method is ever invoked, so we test this at initialization
+        // time to prevent it from happening at runtime later due to I/O.
+        if t, ok := srv.(interface{ testEmbeddedByValue() }); ok </span><span class="cov8" title="1">{
+                t.testEmbeddedByValue()
+        }</span>
+        <span class="cov8" title="1">s.RegisterService(&amp;DownloadService_ServiceDesc, srv)</span>
+}
+
+func _DownloadService_DownloadSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) <span class="cov0" title="0">{
+        in := new(DownloadRequest)
+        if err := dec(in); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">if interceptor == nil </span><span class="cov0" title="0">{
+                return srv.(DownloadServiceServer).DownloadSync(ctx, in)
+        }</span>
+        <span class="cov0" title="0">info := &amp;grpc.UnaryServerInfo{
+                Server:     srv,
+                FullMethod: DownloadService_DownloadSync_FullMethodName,
+        }
+        handler := func(ctx context.Context, req interface{}) (interface{}, error) </span><span class="cov0" title="0">{
+                return srv.(DownloadServiceServer).DownloadSync(ctx, req.(*DownloadRequest))
+        }</span>
+        <span class="cov0" title="0">return interceptor(ctx, in, info, handler)</span>
+}
+
+func _DownloadService_DownloadAsync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) <span class="cov8" title="1">{
+        in := new(DownloadRequest)
+        if err := dec(in); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">if interceptor == nil </span><span class="cov8" title="1">{
+                return srv.(DownloadServiceServer).DownloadAsync(ctx, in)
+        }</span>
+        <span class="cov0" title="0">info := &amp;grpc.UnaryServerInfo{
+                Server:     srv,
+                FullMethod: DownloadService_DownloadAsync_FullMethodName,
+        }
+        handler := func(ctx context.Context, req interface{}) (interface{}, error) </span><span class="cov0" title="0">{
+                return srv.(DownloadServiceServer).DownloadAsync(ctx, req.(*DownloadRequest))
+        }</span>
+        <span class="cov0" title="0">return interceptor(ctx, in, info, handler)</span>
+}
+
+func _DownloadService_GetJobStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) <span class="cov8" title="1">{
+        in := new(GetJobStatusRequest)
+        if err := dec(in); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">if interceptor == nil </span><span class="cov8" title="1">{
+                return srv.(DownloadServiceServer).GetJobStatus(ctx, in)
+        }</span>
+        <span class="cov0" title="0">info := &amp;grpc.UnaryServerInfo{
+                Server:     srv,
+                FullMethod: DownloadService_GetJobStatus_FullMethodName,
+        }
+        handler := func(ctx context.Context, req interface{}) (interface{}, error) </span><span class="cov0" title="0">{
+                return srv.(DownloadServiceServer).GetJobStatus(ctx, req.(*GetJobStatusRequest))
+        }</span>
+        <span class="cov0" title="0">return interceptor(ctx, in, info, handler)</span>
+}
+
+func _DownloadService_GetAllAccountIDs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) <span class="cov8" title="1">{
+        in := new(GetAllAccountIDsRequest)
+        if err := dec(in); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">if interceptor == nil </span><span class="cov8" title="1">{
+                return srv.(DownloadServiceServer).GetAllAccountIDs(ctx, in)
+        }</span>
+        <span class="cov0" title="0">info := &amp;grpc.UnaryServerInfo{
+                Server:     srv,
+                FullMethod: DownloadService_GetAllAccountIDs_FullMethodName,
+        }
+        handler := func(ctx context.Context, req interface{}) (interface{}, error) </span><span class="cov0" title="0">{
+                return srv.(DownloadServiceServer).GetAllAccountIDs(ctx, req.(*GetAllAccountIDsRequest))
+        }</span>
+        <span class="cov0" title="0">return interceptor(ctx, in, info, handler)</span>
+}
+
+// DownloadService_ServiceDesc is the grpc.ServiceDesc for DownloadService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var DownloadService_ServiceDesc = grpc.ServiceDesc{
+        ServiceName: "etc_meisai.download.v1.DownloadService",
+        HandlerType: (*DownloadServiceServer)(nil),
+        Methods: []grpc.MethodDesc{
+                {
+                        MethodName: "DownloadSync",
+                        Handler:    _DownloadService_DownloadSync_Handler,
+                },
+                {
+                        MethodName: "DownloadAsync",
+                        Handler:    _DownloadService_DownloadAsync_Handler,
+                },
+                {
+                        MethodName: "GetJobStatus",
+                        Handler:    _DownloadService_GetJobStatus_Handler,
+                },
+                {
+                        MethodName: "GetAllAccountIDs",
+                        Handler:    _DownloadService_GetAllAccountIDs_Handler,
+                },
+        },
+        Streams:  []grpc.StreamDesc{},
+        Metadata: "download.proto",
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package scraper
+
+import (
+        "fmt"
+        "log"
+        "os"
+        "path/filepath"
+        "time"
+
+        "github.com/playwright-community/playwright-go"
+)
+
+// ETCScraper handles web scraping for ETC meisai service
+type ETCScraper struct {
+        pw      *playwright.Playwright
+        browser playwright.Browser
+        context playwright.BrowserContext
+        page    playwright.Page
+        config  *ScraperConfig
+        logger  *log.Logger
+}
+
+// ScraperConfig holds configuration for the scraper
+type ScraperConfig struct {
+        UserID       string
+        Password     string
+        DownloadPath string
+        Headless     bool
+        Timeout      float64
+        RetryCount   int
+        UserAgent    string
+        SlowMo       float64
+}
+
+// NewETCScraper creates a new ETC scraper instance
+func NewETCScraper(config *ScraperConfig, logger *log.Logger) (*ETCScraper, error) <span class="cov8" title="1">{
+        // Set default values
+        if config.DownloadPath == "" </span><span class="cov8" title="1">{
+                config.DownloadPath = "./downloads"
+        }</span>
+        <span class="cov8" title="1">if config.Timeout == 0 </span><span class="cov8" title="1">{
+                config.Timeout = 30000 // 30 seconds default
+        }</span>
+        <span class="cov8" title="1">if config.RetryCount == 0 </span><span class="cov8" title="1">{
+                config.RetryCount = 3
+        }</span>
+        <span class="cov8" title="1">if config.UserAgent == "" </span><span class="cov8" title="1">{
+                config.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }</span>
+
+        // Skip directory creation for better testability
+
+        <span class="cov8" title="1">if logger == nil </span><span class="cov8" title="1">{
+                logger = log.New(os.Stdout, "[SCRAPER] ", log.LstdFlags)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;ETCScraper{
+                config: config,
+                logger: logger,
+        }, nil</span>
+}
+
+// Initialize sets up Playwright and browser
+func (s *ETCScraper) Initialize() error <span class="cov8" title="1">{
+        var err error
+
+        // Install playwright browsers if needed
+        err = playwright.Install()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("could not install playwright: %w", err)
+        }</span>
+
+        // Start Playwright
+        <span class="cov8" title="1">s.pw, err = playwright.Run()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("could not start playwright: %w", err)
+        }</span>
+
+        // Launch browser
+        <span class="cov8" title="1">launchOptions := playwright.BrowserTypeLaunchOptions{
+                Headless: playwright.Bool(s.config.Headless),
+        }
+
+        if s.config.SlowMo &gt; 0 </span><span class="cov0" title="0">{
+                launchOptions.SlowMo = playwright.Float(s.config.SlowMo)
+        }</span>
+
+        <span class="cov8" title="1">s.browser, err = s.pw.Chromium.Launch(launchOptions)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("could not launch browser: %w", err)
+        }</span>
+
+        // Create browser context with download settings
+        <span class="cov8" title="1">absPath, _ := filepath.Abs(s.config.DownloadPath)
+        contextOptions := playwright.BrowserNewContextOptions{
+                AcceptDownloads: playwright.Bool(true),
+                Viewport: &amp;playwright.Size{
+                        Width:  1920,
+                        Height: 1080,
+                },
+                UserAgent: playwright.String(s.config.UserAgent),
+        }
+
+        s.context, err = s.browser.NewContext(contextOptions)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("could not create browser context: %w", err)
+        }</span>
+
+        // Set default timeout
+        <span class="cov8" title="1">s.context.SetDefaultTimeout(s.config.Timeout)
+
+        // Create page
+        s.page, err = s.context.NewPage()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("could not create page: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Printf("Scraper initialized with download path: %s", absPath)
+        return nil</span>
+}
+
+// Login performs login to ETC meisai service
+func (s *ETCScraper) Login() error <span class="cov8" title="1">{
+        if s.page == nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("scraper not initialized")
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Println("Navigating to https://www.etc-meisai.jp/")
+
+        // Navigate to login page
+        _, err := s.page.Goto("https://www.etc-meisai.jp/", playwright.PageGotoOptions{
+                WaitUntil: playwright.WaitUntilStateNetworkidle,
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to navigate to login page: %w", err)
+        }</span>
+
+        // Skip screenshot for debugging
+
+        // Wait for login form
+        <span class="cov8" title="1">s.logger.Println("Waiting for login form...")
+
+        // Try multiple selectors for user ID field
+        userIDSelectors := []string{
+                "input[name='userId']",
+                "#userId",
+                "input[type='text'][placeholder*='ID']",
+                "input[name='username']",
+        }
+
+        userIDField := s.findElement(userIDSelectors)
+        if userIDField == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("login form user ID field not found")
+        }</span>
+
+        // Fill user ID
+        <span class="cov0" title="0">s.logger.Println("Filling login credentials...")
+        if err := userIDField.Fill(s.config.UserID); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to fill user ID: %w", err)
+        }</span>
+
+        // Try multiple selectors for password field
+        <span class="cov0" title="0">passwordSelectors := []string{
+                "input[name='password']",
+                "#password",
+                "input[type='password']",
+                "input[name='passwd']",
+        }
+
+        passwordField := s.findElement(passwordSelectors)
+        if passwordField == nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("password field not found")
+        }</span>
+
+        // Fill password
+        <span class="cov0" title="0">if err := passwordField.Fill(s.config.Password); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to fill password: %w", err)
+        }</span>
+
+        // Skip screenshot
+
+        // Click login button
+        <span class="cov0" title="0">s.logger.Println("Clicking login button...")
+        loginButtonSelectors := []string{
+                "button[type='submit']",
+                "input[type='submit']",
+                ".login-button",
+                "button:has-text('ログイン')",
+                "input[value='ログイン']",
+        }
+
+        loginButton := s.findElement(loginButtonSelectors)
+        if loginButton == nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login button not found")
+        }</span>
+
+        <span class="cov0" title="0">if err := loginButton.Click(); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to click login button: %w", err)
+        }</span>
+
+        // Wait for navigation after login
+        <span class="cov0" title="0">time.Sleep(3 * time.Second)
+        err = s.page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
+                State: playwright.LoadStateNetworkidle,
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to wait for login completion: %w", err)
+        }</span>
+
+        // Skip screenshot
+
+        // Check if login was successful
+        <span class="cov0" title="0">logoutExists, _ := s.page.Locator("a:has-text('ログアウト')").Count()
+        if logoutExists &gt; 0 </span><span class="cov0" title="0">{
+                s.logger.Println("Login successful!")
+                return nil
+        }</span>
+
+        // Check for error messages
+        <span class="cov0" title="0">errorMsg, _ := s.page.Locator(".error-message, .alert-danger, .error").First().TextContent()
+        if errorMsg != "" </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %s", errorMsg)
+        }</span>
+
+        <span class="cov0" title="0">s.logger.Println("Login completed")
+        return nil</span>
+}
+
+// DownloadMeisai downloads ETC meisai data for specified date range
+func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) <span class="cov0" title="0">{
+        if s.page == nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("scraper not initialized")
+        }</span>
+
+        <span class="cov0" title="0">s.logger.Printf("Downloading meisai from %s to %s", fromDate, toDate)
+
+        // Navigate to search/download page
+        // URL might vary, need to check actual site structure
+        searchURLs := []string{
+                "https://www.etc-meisai.jp/search",
+                "https://www.etc-meisai.jp/meisai",
+                "https://www.etc-meisai.jp/download",
+        }
+
+        navigated := false
+        for _, url := range searchURLs </span><span class="cov0" title="0">{
+                if _, err := s.page.Goto(url, playwright.PageGotoOptions{
+                        WaitUntil: playwright.WaitUntilStateNetworkidle,
+                }); err == nil </span><span class="cov0" title="0">{
+                        s.logger.Printf("Navigated to %s", url)
+                        navigated = true
+                        break</span>
+                }
+        }
+
+        <span class="cov0" title="0">if !navigated </span><span class="cov0" title="0">{
+                s.logger.Println("Could not navigate to search page, trying to find search form on current page")
+        }</span>
+
+        // Skip screenshot
+
+        // Fill date range
+        // Try multiple date input selectors
+        <span class="cov0" title="0">fromDateSelectors := []string{
+                "input[name='fromDate']",
+                "input[name='startDate']",
+                "#fromDate",
+                "input[placeholder*='開始']",
+                "input[placeholder*='から']",
+        }
+
+        fromDateField := s.findElement(fromDateSelectors)
+        if fromDateField != nil </span><span class="cov0" title="0">{
+                fromDateField.Fill(fromDate)
+                s.logger.Printf("Filled from date: %s", fromDate)
+        }</span>
+
+        <span class="cov0" title="0">toDateSelectors := []string{
+                "input[name='toDate']",
+                "input[name='endDate']",
+                "#toDate",
+                "input[placeholder*='終了']",
+                "input[placeholder*='まで']",
+        }
+
+        toDateField := s.findElement(toDateSelectors)
+        if toDateField != nil </span><span class="cov0" title="0">{
+                toDateField.Fill(toDate)
+                s.logger.Printf("Filled to date: %s", toDate)
+        }</span>
+
+        // Skip screenshot
+
+        // Click search button
+        <span class="cov0" title="0">searchButtonSelectors := []string{
+                "button:has-text('検索')",
+                "button:has-text('照会')",
+                "input[value='検索']",
+                "input[value='照会']",
+                "button[type='submit']",
+                ".search-button",
+        }
+
+        searchButton := s.findElement(searchButtonSelectors)
+        if searchButton != nil </span><span class="cov0" title="0">{
+                searchButton.Click()
+                s.logger.Println("Clicked search button")
+                time.Sleep(3 * time.Second)
+        }</span>
+
+        // Skip screenshot
+
+        // Setup download handler
+        <span class="cov0" title="0">downloadComplete := make(chan string, 1)
+        s.page.On("download", func(download playwright.Download) </span><span class="cov0" title="0">{
+                suggestedFilename := download.SuggestedFilename()
+                downloadPath := filepath.Join(s.config.DownloadPath, suggestedFilename)
+
+                s.logger.Printf("Downloading file: %s", suggestedFilename)
+                if err := download.SaveAs(downloadPath); err != nil </span><span class="cov0" title="0">{
+                        s.logger.Printf("Failed to save download: %v", err)
+                }</span> else<span class="cov0" title="0"> {
+                        downloadComplete &lt;- downloadPath
+                }</span>
+        })
+
+        // Click CSV download button
+        <span class="cov0" title="0">downloadButtonSelectors := []string{
+                "button:has-text('CSV')",
+                "button:has-text('ダウンロード')",
+                "a:has-text('CSV')",
+                "a:has-text('ダウンロード')",
+                "input[value*='CSV']",
+                ".download-csv",
+        }
+
+        downloadButton := s.findElement(downloadButtonSelectors)
+        if downloadButton != nil </span><span class="cov0" title="0">{
+                downloadButton.Click()
+                s.logger.Println("Clicked download button")
+
+                // Wait for download with timeout
+                select </span>{
+                case path := &lt;-downloadComplete:<span class="cov0" title="0">
+                        s.logger.Printf("Download completed: %s", path)
+                        return path, nil</span>
+                case &lt;-time.After(30 * time.Second):<span class="cov0" title="0">
+                        return "", fmt.Errorf("download timeout")</span>
+                }
+        }
+
+        <span class="cov0" title="0">return "", fmt.Errorf("could not find download button")</span>
+}
+
+// findElement tries multiple selectors and returns the first match
+func (s *ETCScraper) findElement(selectors []string) playwright.Locator <span class="cov8" title="1">{
+        for _, selector := range selectors </span><span class="cov8" title="1">{
+                locator := s.page.Locator(selector)
+                count, err := locator.Count()
+                if err == nil &amp;&amp; count &gt; 0 </span><span class="cov0" title="0">{
+                        s.logger.Printf("Found element with selector: %s", selector)
+                        return locator.First()
+                }</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// Removed takeScreenshot method - no longer needed
+
+// Close cleans up resources
+func (s *ETCScraper) Close() error <span class="cov8" title="1">{
+        if s.page != nil </span><span class="cov8" title="1">{
+                s.page.Close()
+        }</span>
+        <span class="cov8" title="1">if s.context != nil </span><span class="cov8" title="1">{
+                s.context.Close()
+        }</span>
+        <span class="cov8" title="1">if s.browser != nil </span><span class="cov8" title="1">{
+                s.browser.Close()
+        }</span>
+        <span class="cov8" title="1">if s.pw != nil </span><span class="cov8" title="1">{
+                s.pw.Stop()
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}</pre>
+		
+		<pre class="file" id="file6" style="display: none">package scraper
+
+import (
+        "fmt"
+        "log"
+        "os"
+        "path/filepath"
+        "time"
+
+        "github.com/playwright-community/playwright-go"
+)
+
+// ETCScraperTestable is a testable version of ETCScraper
+type ETCScraperTestable struct {
+        pw      PlaywrightInterface
+        browser BrowserInterface
+        context BrowserContextInterface
+        page    PageInterface
+        config  *ScraperConfig
+        logger  *log.Logger
+        factory PlaywrightFactory
+}
+
+// NewETCScraperWithFactory creates a new ETC scraper instance with custom factory
+func NewETCScraperWithFactory(config *ScraperConfig, logger *log.Logger, factory PlaywrightFactory) (*ETCScraperTestable, error) <span class="cov8" title="1">{
+        // Set default values
+        if config.DownloadPath == "" </span><span class="cov8" title="1">{
+                config.DownloadPath = "./downloads"
+        }</span>
+        <span class="cov8" title="1">if config.Timeout == 0 </span><span class="cov8" title="1">{
+                config.Timeout = 30000 // 30 seconds default
+        }</span>
+        <span class="cov8" title="1">if config.RetryCount == 0 </span><span class="cov8" title="1">{
+                config.RetryCount = 3
+        }</span>
+        <span class="cov8" title="1">if config.UserAgent == "" </span><span class="cov8" title="1">{
+                config.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }</span>
+
+        // Skip directory creation for better testability
+
+        <span class="cov8" title="1">if logger == nil </span><span class="cov0" title="0">{
+                logger = log.New(os.Stdout, "[SCRAPER] ", log.LstdFlags)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;ETCScraperTestable{
+                config:  config,
+                logger:  logger,
+                factory: factory,
+        }, nil</span>
+}
+
+// Initialize sets up Playwright and browser
+func (s *ETCScraperTestable) Initialize() error <span class="cov8" title="1">{
+        var err error
+
+        // Check factory is provided
+        if s.factory == nil </span><span class="cov0" title="0">{
+                // In test mode, factory must be provided
+                return fmt.Errorf("factory is required for testable scraper")
+        }</span>
+
+        // Install playwright browsers if needed
+        <span class="cov8" title="1">err = s.factory.Install()
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("could not install playwright: %w", err)
+        }</span>
+
+        // Start Playwright
+        <span class="cov8" title="1">s.pw, err = s.factory.Run()
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("could not start playwright: %w", err)
+        }</span>
+
+        // Launch browser
+        <span class="cov8" title="1">launchOptions := playwright.BrowserTypeLaunchOptions{
+                Headless: playwright.Bool(s.config.Headless),
+        }
+
+        if s.config.SlowMo &gt; 0 </span><span class="cov8" title="1">{
+                launchOptions.SlowMo = playwright.Float(s.config.SlowMo)
+        }</span>
+
+        <span class="cov8" title="1">chromium := s.pw.GetChromium()
+        s.browser, err = chromium.Launch(launchOptions)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("could not launch browser: %w", err)
+        }</span>
+
+        // Create browser context with download settings
+        <span class="cov8" title="1">absPath, _ := filepath.Abs(s.config.DownloadPath)
+        contextOptions := playwright.BrowserNewContextOptions{
+                AcceptDownloads: playwright.Bool(true),
+                Viewport: &amp;playwright.Size{
+                        Width:  1920,
+                        Height: 1080,
+                },
+                UserAgent: playwright.String(s.config.UserAgent),
+        }
+
+        s.context, err = s.browser.NewContext(contextOptions)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("could not create browser context: %w", err)
+        }</span>
+
+        // Set default timeout
+        <span class="cov8" title="1">s.context.SetDefaultTimeout(s.config.Timeout)
+
+        // Create page
+        s.page, err = s.context.NewPage()
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("could not create page: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Printf("Scraper initialized with download path: %s", absPath)
+        return nil</span>
+}
+
+// Login performs login to ETC meisai service
+func (s *ETCScraperTestable) Login() error <span class="cov8" title="1">{
+        if s.page == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("scraper not initialized")
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Println("Navigating to https://www.etc-meisai.jp/")
+
+        // Navigate to login page
+        _, err := s.page.Goto("https://www.etc-meisai.jp/", playwright.PageGotoOptions{
+                WaitUntil: playwright.WaitUntilStateNetworkidle,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to navigate to login page: %w", err)
+        }</span>
+
+        // Skip screenshot for debugging
+
+        // Wait for login form
+        <span class="cov8" title="1">s.logger.Println("Waiting for login form...")
+
+        // Try multiple selectors for user ID field
+        userIDSelectors := []string{
+                "input[name='userId']",
+                "#userId",
+                "input[type='text'][placeholder*='ID']",
+                "input[name='username']",
+        }
+
+        userIDField := s.findElement(userIDSelectors)
+        if userIDField == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("login form user ID field not found")
+        }</span>
+
+        // Fill user ID
+        <span class="cov8" title="1">s.logger.Println("Filling login credentials...")
+        if err := userIDField.Fill(s.config.UserID); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to fill user ID: %w", err)
+        }</span>
+
+        // Try multiple selectors for password field
+        <span class="cov8" title="1">passwordSelectors := []string{
+                "input[name='password']",
+                "#password",
+                "input[type='password']",
+                "input[name='passwd']",
+        }
+
+        passwordField := s.findElement(passwordSelectors)
+        if passwordField == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("password field not found")
+        }</span>
+
+        // Fill password
+        <span class="cov8" title="1">if err := passwordField.Fill(s.config.Password); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to fill password: %w", err)
+        }</span>
+
+        // Skip screenshot
+
+        // Click login button
+        <span class="cov8" title="1">s.logger.Println("Clicking login button...")
+        loginButtonSelectors := []string{
+                "button[type='submit']",
+                "input[type='submit']",
+                ".login-button",
+                "button:has-text('ログイン')",
+                "input[value='ログイン']",
+        }
+
+        loginButton := s.findElement(loginButtonSelectors)
+        if loginButton == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("login button not found")
+        }</span>
+
+        <span class="cov8" title="1">if err := loginButton.Click(); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to click login button: %w", err)
+        }</span>
+
+        // Wait for navigation after login
+        <span class="cov8" title="1">time.Sleep(3 * time.Second)
+        err = s.page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
+                State: playwright.LoadStateNetworkidle,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to wait for login completion: %w", err)
+        }</span>
+
+        // Skip screenshot
+
+        // Check if login was successful
+        <span class="cov8" title="1">logoutLocator := s.page.Locator("a:has-text('ログアウト')")
+        logoutExists, _ := logoutLocator.Count()
+        if logoutExists &gt; 0 </span><span class="cov8" title="1">{
+                s.logger.Println("Login successful!")
+                return nil
+        }</span>
+
+        // Check for error messages
+        <span class="cov8" title="1">errorLocator := s.page.Locator(".error-message, .alert-danger, .error").First()
+        errorMsg, _ := errorLocator.TextContent()
+        if errorMsg != "" </span><span class="cov8" title="1">{
+                return fmt.Errorf("login failed: %s", errorMsg)
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Println("Login completed")
+        return nil</span>
+}
+
+// DownloadMeisai downloads ETC meisai data for specified date range
+func (s *ETCScraperTestable) DownloadMeisai(fromDate, toDate string) (string, error) <span class="cov8" title="1">{
+        if s.page == nil </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("scraper not initialized")
+        }</span>
+
+        <span class="cov8" title="1">s.logger.Printf("Downloading meisai from %s to %s", fromDate, toDate)
+
+        // Navigate to search/download page
+        searchURLs := []string{
+                "https://www.etc-meisai.jp/search",
+                "https://www.etc-meisai.jp/meisai",
+                "https://www.etc-meisai.jp/download",
+        }
+
+        navigated := false
+        for _, url := range searchURLs </span><span class="cov8" title="1">{
+                if _, err := s.page.Goto(url, playwright.PageGotoOptions{
+                        WaitUntil: playwright.WaitUntilStateNetworkidle,
+                }); err == nil </span><span class="cov8" title="1">{
+                        s.logger.Printf("Navigated to %s", url)
+                        navigated = true
+                        break</span>
+                }
+        }
+
+        <span class="cov8" title="1">if !navigated </span><span class="cov8" title="1">{
+                s.logger.Println("Could not navigate to search page, trying to find search form on current page")
+        }</span>
+
+        // Skip screenshot
+
+        // Fill date range
+        <span class="cov8" title="1">fromDateSelectors := []string{
+                "input[name='fromDate']",
+                "input[name='startDate']",
+                "#fromDate",
+                "input[placeholder*='開始']",
+                "input[placeholder*='から']",
+        }
+
+        fromDateField := s.findElement(fromDateSelectors)
+        if fromDateField != nil </span><span class="cov8" title="1">{
+                fromDateField.Fill(fromDate)
+                s.logger.Printf("Filled from date: %s", fromDate)
+        }</span>
+
+        <span class="cov8" title="1">toDateSelectors := []string{
+                "input[name='toDate']",
+                "input[name='endDate']",
+                "#toDate",
+                "input[placeholder*='終了']",
+                "input[placeholder*='まで']",
+        }
+
+        toDateField := s.findElement(toDateSelectors)
+        if toDateField != nil </span><span class="cov8" title="1">{
+                toDateField.Fill(toDate)
+                s.logger.Printf("Filled to date: %s", toDate)
+        }</span>
+
+        // Skip screenshot
+
+        // Click search button
+        <span class="cov8" title="1">searchButtonSelectors := []string{
+                "button:has-text('検索')",
+                "button:has-text('照会')",
+                "input[value='検索']",
+                "input[value='照会']",
+                "button[type='submit']",
+                ".search-button",
+        }
+
+        searchButton := s.findElement(searchButtonSelectors)
+        if searchButton != nil </span><span class="cov8" title="1">{
+                searchButton.Click()
+                s.logger.Println("Clicked search button")
+                time.Sleep(3 * time.Second)
+        }</span>
+
+        // Skip screenshot
+
+        // Setup download handler
+        <span class="cov8" title="1">downloadComplete := make(chan string, 1)
+        s.page.On("download", func(download playwright.Download) </span><span class="cov8" title="1">{
+                suggestedFilename := download.SuggestedFilename()
+                downloadPath := filepath.Join(s.config.DownloadPath, suggestedFilename)
+
+                s.logger.Printf("Downloading file: %s", suggestedFilename)
+                if err := download.SaveAs(downloadPath); err != nil </span><span class="cov0" title="0">{
+                        s.logger.Printf("Failed to save download: %v", err)
+                }</span> else<span class="cov8" title="1"> {
+                        downloadComplete &lt;- downloadPath
+                }</span>
+        })
+
+        // Click CSV download button
+        <span class="cov8" title="1">downloadButtonSelectors := []string{
+                "button:has-text('CSV')",
+                "button:has-text('ダウンロード')",
+                "a:has-text('CSV')",
+                "a:has-text('ダウンロード')",
+                "input[value*='CSV']",
+                ".download-csv",
+        }
+
+        downloadButton := s.findElement(downloadButtonSelectors)
+        if downloadButton != nil </span><span class="cov8" title="1">{
+                downloadButton.Click()
+                s.logger.Println("Clicked download button")
+
+                // Wait for download with timeout
+                select </span>{
+                case path := &lt;-downloadComplete:<span class="cov8" title="1">
+                        s.logger.Printf("Download completed: %s", path)
+                        return path, nil</span>
+                case &lt;-time.After(100 * time.Millisecond):<span class="cov8" title="1">
+                        return "", fmt.Errorf("download timeout")</span>
+                }
+        }
+
+        <span class="cov8" title="1">return "", fmt.Errorf("could not find download button")</span>
+}
+
+// findElement tries multiple selectors and returns the first match
+func (s *ETCScraperTestable) findElement(selectors []string) LocatorInterface <span class="cov8" title="1">{
+        for _, selector := range selectors </span><span class="cov8" title="1">{
+                locator := s.page.Locator(selector)
+                count, err := locator.Count()
+                if err == nil &amp;&amp; count &gt; 0 </span><span class="cov8" title="1">{
+                        s.logger.Printf("Found element with selector: %s", selector)
+                        return locator.First()
+                }</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// Removed takeScreenshot method - no longer needed
+
+// Close cleans up resources
+func (s *ETCScraperTestable) Close() error <span class="cov8" title="1">{
+        if s.page != nil </span><span class="cov8" title="1">{
+                s.page.Close()
+        }</span>
+        <span class="cov8" title="1">if s.context != nil </span><span class="cov8" title="1">{
+                s.context.Close()
+        }</span>
+        <span class="cov8" title="1">if s.browser != nil </span><span class="cov8" title="1">{
+                s.browser.Close()
+        }</span>
+        <span class="cov8" title="1">if s.pw != nil </span><span class="cov8" title="1">{
+                s.pw.Stop()
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}</pre>
+		
+		<pre class="file" id="file7" style="display: none">package scraper
+
+import "github.com/playwright-community/playwright-go"
+
+// RealPlaywrightAdapter adapts real playwright to our interface
+type RealPlaywrightAdapter struct {
+        pw *playwright.Playwright
+}
+
+func (r *RealPlaywrightAdapter) Stop() error <span class="cov0" title="0">{
+        return r.pw.Stop()
+}</span>
+
+func (r *RealPlaywrightAdapter) GetChromium() BrowserTypeInterface <span class="cov0" title="0">{
+        return &amp;RealBrowserTypeAdapter{bt: r.pw.Chromium}
+}</span>
+
+// RealBrowserTypeAdapter adapts real BrowserType
+type RealBrowserTypeAdapter struct {
+        bt playwright.BrowserType
+}
+
+func (r *RealBrowserTypeAdapter) Launch(options ...playwright.BrowserTypeLaunchOptions) (BrowserInterface, error) <span class="cov0" title="0">{
+        var opt playwright.BrowserTypeLaunchOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">browser, err := r.bt.Launch(opt)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return &amp;RealBrowserAdapter{browser: browser}, nil</span>
+}
+
+// RealBrowserAdapter adapts real Browser
+type RealBrowserAdapter struct {
+        browser playwright.Browser
+}
+
+func (r *RealBrowserAdapter) NewContext(options ...playwright.BrowserNewContextOptions) (BrowserContextInterface, error) <span class="cov0" title="0">{
+        var opt playwright.BrowserNewContextOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">ctx, err := r.browser.NewContext(opt)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return &amp;RealBrowserContextAdapter{ctx: ctx}, nil</span>
+}
+
+func (r *RealBrowserAdapter) Close() error <span class="cov0" title="0">{
+        return r.browser.Close()
+}</span>
+
+// RealBrowserContextAdapter adapts real BrowserContext
+type RealBrowserContextAdapter struct {
+        ctx playwright.BrowserContext
+}
+
+func (r *RealBrowserContextAdapter) NewPage() (PageInterface, error) <span class="cov0" title="0">{
+        page, err := r.ctx.NewPage()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return &amp;RealPageAdapter{page: page}, nil</span>
+}
+
+func (r *RealBrowserContextAdapter) SetDefaultTimeout(timeout float64) <span class="cov0" title="0">{
+        r.ctx.SetDefaultTimeout(timeout)
+}</span>
+
+func (r *RealBrowserContextAdapter) Close() error <span class="cov0" title="0">{
+        return r.ctx.Close()
+}</span>
+
+// RealPageAdapter adapts real Page
+type RealPageAdapter struct {
+        page playwright.Page
+}
+
+func (r *RealPageAdapter) Goto(url string, options ...playwright.PageGotoOptions) (playwright.Response, error) <span class="cov0" title="0">{
+        var opt playwright.PageGotoOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">return r.page.Goto(url, opt)</span>
+}
+
+func (r *RealPageAdapter) Locator(selector string) LocatorInterface <span class="cov0" title="0">{
+        return &amp;RealLocatorAdapter{locator: r.page.Locator(selector)}
+}</span>
+
+func (r *RealPageAdapter) WaitForLoadState(options ...playwright.PageWaitForLoadStateOptions) error <span class="cov0" title="0">{
+        var opt playwright.PageWaitForLoadStateOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">return r.page.WaitForLoadState(opt)</span>
+}
+
+func (r *RealPageAdapter) Screenshot(options ...playwright.PageScreenshotOptions) ([]byte, error) <span class="cov0" title="0">{
+        var opt playwright.PageScreenshotOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">return r.page.Screenshot(opt)</span>
+}
+
+func (r *RealPageAdapter) Close() error <span class="cov0" title="0">{
+        return r.page.Close()
+}</span>
+
+func (r *RealPageAdapter) On(event string, handler interface{}) <span class="cov0" title="0">{
+        r.page.On(event, handler)
+}</span>
+
+// RealLocatorAdapter adapts real Locator
+type RealLocatorAdapter struct {
+        locator playwright.Locator
+}
+
+func (r *RealLocatorAdapter) Count() (int, error) <span class="cov0" title="0">{
+        return r.locator.Count()
+}</span>
+
+func (r *RealLocatorAdapter) First() LocatorInterface <span class="cov0" title="0">{
+        return &amp;RealLocatorAdapter{locator: r.locator.First()}
+}</span>
+
+func (r *RealLocatorAdapter) Fill(value string) error <span class="cov0" title="0">{
+        return r.locator.Fill(value)
+}</span>
+
+func (r *RealLocatorAdapter) Click(options ...playwright.LocatorClickOptions) error <span class="cov0" title="0">{
+        var opt playwright.LocatorClickOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">return r.locator.Click(opt)</span>
+}
+
+func (r *RealLocatorAdapter) TextContent(options ...playwright.LocatorTextContentOptions) (string, error) <span class="cov0" title="0">{
+        var opt playwright.LocatorTextContentOptions
+        if len(options) &gt; 0 </span><span class="cov0" title="0">{
+                opt = options[0]
+        }</span>
+        <span class="cov0" title="0">return r.locator.TextContent(opt)</span>
+}</pre>
+		
+		<pre class="file" id="file8" style="display: none">package services
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "os"
+        "strings"
+        "sync"
+        "time"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+)
+
+// DownloadService はダウンロード処理を管理
+type DownloadService struct {
+        db             *sql.DB
+        logger         *log.Logger
+        jobs           map[string]*DownloadJob
+        jobMutex       sync.RWMutex
+        scraperFactory ScraperFactory
+}
+
+// DownloadJob はダウンロードジョブの状態
+type DownloadJob struct {
+        ID           string
+        Status       string
+        Progress     int
+        TotalRecords int
+        ErrorMessage string
+        StartedAt    time.Time
+        CompletedAt  *time.Time
+}
+
+// DownloadServiceInterface はダウンロードサービスのインターフェース
+type DownloadServiceInterface interface {
+        GetAllAccountIDs() []string
+        ProcessAsync(jobID string, accounts []string, fromDate, toDate string)
+        GetJobStatus(jobID string) (*DownloadJob, bool)
+}
+
+// NewDownloadService creates a new download service
+func NewDownloadService(db *sql.DB, logger *log.Logger) *DownloadService <span class="cov8" title="1">{
+        return NewDownloadServiceWithFactory(db, logger, NewDefaultScraperFactory())
+}</span>
+
+// NewDownloadServiceWithFactory creates a new download service with a custom scraper factory
+func NewDownloadServiceWithFactory(db *sql.DB, logger *log.Logger, factory ScraperFactory) *DownloadService <span class="cov8" title="1">{
+        return &amp;DownloadService{
+                db:             db,
+                logger:         logger,
+                jobs:           make(map[string]*DownloadJob),
+                scraperFactory: factory,
+        }
+}</span>
+
+// GetAllAccountIDs は設定されているすべてのアカウントIDを取得
+func (s *DownloadService) GetAllAccountIDs() []string <span class="cov8" title="1">{
+        var accountIDs []string
+
+        // 法人アカウント
+        corporateAccounts := os.Getenv("ETC_CORPORATE_ACCOUNTS")
+        if corporateAccounts != "" </span><span class="cov8" title="1">{
+                for _, accountStr := range strings.Split(corporateAccounts, ",") </span><span class="cov8" title="1">{
+                        parts := strings.Split(accountStr, ":")
+                        if len(parts) &gt;= 1 </span><span class="cov8" title="1">{
+                                accountIDs = append(accountIDs, parts[0])
+                        }</span>
+                }
+        }
+
+        // 個人アカウント
+        <span class="cov8" title="1">personalAccounts := os.Getenv("ETC_PERSONAL_ACCOUNTS")
+        if personalAccounts != "" </span><span class="cov8" title="1">{
+                for _, accountStr := range strings.Split(personalAccounts, ",") </span><span class="cov8" title="1">{
+                        parts := strings.Split(accountStr, ":")
+                        if len(parts) &gt;= 1 </span><span class="cov8" title="1">{
+                                accountIDs = append(accountIDs, parts[0])
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return accountIDs</span>
+}
+
+// ProcessAsync は非同期でダウンロードを実行
+func (s *DownloadService) ProcessAsync(jobID string, accounts []string, fromDate, toDate string) <span class="cov8" title="1">{
+        s.jobMutex.Lock()
+        job := &amp;DownloadJob{
+                ID:        jobID,
+                Status:    "processing",
+                Progress:  0,
+                StartedAt: time.Now(),
+        }
+        s.jobs[jobID] = job
+        s.jobMutex.Unlock()
+
+        // ダウンロード処理をシミュレート
+        go func() </span><span class="cov8" title="1">{
+                defer func() </span><span class="cov8" title="1">{
+                        if r := recover(); r != nil </span><span class="cov8" title="1">{
+                                if s.logger != nil </span><span class="cov8" title="1">{
+                                        s.logger.Printf("Panic in download job %s: %v", jobID, r)
+                                }</span>
+                                <span class="cov8" title="1">s.updateJobStatus(jobID, "failed", 0, fmt.Sprintf("Internal error: %v", r))</span>
+                        }
+                }()
+
+                <span class="cov8" title="1">if s.logger != nil </span><span class="cov8" title="1">{
+                        s.logger.Printf("Starting download job %s for %d accounts from %s to %s",
+                                jobID, len(accounts), fromDate, toDate)
+                }</span>
+
+                // 各アカウントを処理
+                <span class="cov8" title="1">totalAccounts := len(accounts)
+                for i, account := range accounts </span><span class="cov8" title="1">{
+                        // 進捗更新
+                        progress := int(float64(i+1) / float64(totalAccounts) * 100)
+                        s.updateJobProgress(jobID, progress)
+
+                        // 実際のダウンロード処理
+                        if err := s.downloadAccountData(account, fromDate, toDate); err != nil </span><span class="cov8" title="1">{
+                                if s.logger != nil </span><span class="cov8" title="1">{
+                                        s.logger.Printf("Error downloading data for account %s: %v", account, err)
+                                }</span>
+                                // エラーがあってもほかのアカウントの処理は続ける
+                        }
+
+                        // レート制限のため少し待機
+                        <span class="cov8" title="1">time.Sleep(time.Second)</span>
+                }
+
+                // 完了
+                <span class="cov8" title="1">now := time.Now()
+                s.jobMutex.Lock()
+                if job, exists := s.jobs[jobID]; exists </span><span class="cov8" title="1">{
+                        job.Status = "completed"
+                        job.Progress = 100
+                        job.CompletedAt = &amp;now
+                }</span>
+                <span class="cov8" title="1">s.jobMutex.Unlock()
+
+                if s.logger != nil </span><span class="cov8" title="1">{
+                        s.logger.Printf("Completed download job %s", jobID)
+                }</span>
+        }()
+}
+
+// downloadAccountData は単一アカウントのデータをダウンロード
+func (s *DownloadService) downloadAccountData(accountID, fromDate, toDate string) error <span class="cov8" title="1">{
+        // アカウント情報の解析（accountID:password形式）
+        parts := strings.Split(accountID, ":")
+        if len(parts) &lt; 2 </span><span class="cov8" title="1">{
+                return fmt.Errorf("invalid account format: %s (expected accountID:password)", accountID)
+        }</span>
+
+        <span class="cov8" title="1">userID := parts[0]
+        password := parts[1]
+
+        // スクレイパーの設定
+        config := &amp;scraper.ScraperConfig{
+                UserID:       userID,
+                Password:     password,
+                DownloadPath: fmt.Sprintf("./downloads/%s_%s", userID, time.Now().Format("20060102_150405")),
+                Headless:     true,
+                Timeout:      30000,
+                RetryCount:   3,
+        }
+
+        // スクレイパー作成
+        etcScraper, err := s.scraperFactory.CreateScraper(config, s.logger)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to create scraper: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer etcScraper.Close()
+
+        // Playwright初期化
+        if err := etcScraper.Initialize(); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to initialize scraper: %w", err)
+        }</span>
+
+        // ログイン
+        <span class="cov8" title="1">if err := etcScraper.Login(); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("login failed for account %s: %w", userID, err)
+        }</span>
+
+        // データダウンロード
+        <span class="cov8" title="1">csvPath, err := etcScraper.DownloadMeisai(fromDate, toDate)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("download failed for account %s: %w", userID, err)
+        }</span>
+
+        <span class="cov8" title="1">if s.logger != nil </span><span class="cov8" title="1">{
+                s.logger.Printf("Successfully downloaded data for account %s: %s", userID, csvPath)
+        }</span>
+
+        // TODO: CSVファイルをパースしてDBに保存
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// updateJobProgress はジョブの進捗を更新
+func (s *DownloadService) updateJobProgress(jobID string, progress int) <span class="cov8" title="1">{
+        s.jobMutex.Lock()
+        defer s.jobMutex.Unlock()
+
+        if job, exists := s.jobs[jobID]; exists </span><span class="cov8" title="1">{
+                job.Progress = progress
+        }</span>
+}
+
+// updateJobStatus はジョブのステータスを更新
+func (s *DownloadService) updateJobStatus(jobID string, status string, progress int, errorMsg string) <span class="cov8" title="1">{
+        s.jobMutex.Lock()
+        defer s.jobMutex.Unlock()
+
+        if job, exists := s.jobs[jobID]; exists </span><span class="cov8" title="1">{
+                job.Status = status
+                job.Progress = progress
+                if errorMsg != "" </span><span class="cov8" title="1">{
+                        job.ErrorMessage = errorMsg
+                }</span>
+                <span class="cov8" title="1">if status == "completed" || status == "failed" </span><span class="cov8" title="1">{
+                        now := time.Now()
+                        job.CompletedAt = &amp;now
+                }</span>
+        }
+}
+
+// GetJobStatus はジョブのステータスを取得
+func (s *DownloadService) GetJobStatus(jobID string) (*DownloadJob, bool) <span class="cov8" title="1">{
+        s.jobMutex.RLock()
+        defer s.jobMutex.RUnlock()
+
+        job, exists := s.jobs[jobID]
+        if !exists </span><span class="cov8" title="1">{
+                return nil, false
+        }</span>
+
+        // コピーを返す
+        <span class="cov8" title="1">jobCopy := *job
+        return &amp;jobCopy, true</span>
+}</pre>
+		
+		<pre class="file" id="file9" style="display: none">package services
+
+import (
+        "context"
+        "database/sql"
+        "log"
+        "time"
+
+        "github.com/google/uuid"
+        pb "github.com/yhonda-ohishi/etc_meisai/src/pb"
+        "google.golang.org/protobuf/types/known/timestamppb"
+)
+
+// DownloadServiceGRPC はgRPC対応のダウンロードサービス
+type DownloadServiceGRPC struct {
+        pb.UnimplementedDownloadServiceServer
+        downloadService DownloadServiceInterface
+}
+
+// NewDownloadServiceGRPC creates a new gRPC download service
+func NewDownloadServiceGRPC(db *sql.DB, logger *log.Logger) *DownloadServiceGRPC <span class="cov8" title="1">{
+        return &amp;DownloadServiceGRPC{
+                downloadService: NewDownloadService(db, logger),
+        }
+}</span>
+
+// NewDownloadServiceGRPCWithMock creates a new gRPC download service with a custom download service
+func NewDownloadServiceGRPCWithMock(downloadService DownloadServiceInterface) *DownloadServiceGRPC <span class="cov8" title="1">{
+        return &amp;DownloadServiceGRPC{
+                downloadService: downloadService,
+        }
+}</span>
+
+// DownloadSync は同期ダウンロードを実行
+func (s *DownloadServiceGRPC) DownloadSync(ctx context.Context, req *pb.DownloadRequest) (*pb.DownloadResponse, error) <span class="cov8" title="1">{
+        // パラメータのデフォルト値設定
+        fromDate, toDate := s.setDefaultDates(req.FromDate, req.ToDate)
+
+        // TODO: 実際のダウンロード処理を実装
+        // ここで fromDate と toDate を使用してダウンロード処理を行う
+        _ = fromDate
+        _ = toDate
+
+        response := &amp;pb.DownloadResponse{
+                Success:     true,
+                RecordCount: 0,
+                CsvPath:     "",
+                Records:     []*pb.ETCMeisaiRecord{},
+        }
+
+        return response, nil
+}</span>
+
+// DownloadAsync は非同期でダウンロードを開始
+func (s *DownloadServiceGRPC) DownloadAsync(ctx context.Context, req *pb.DownloadRequest) (*pb.DownloadJobResponse, error) <span class="cov8" title="1">{
+        // パラメータのデフォルト値設定
+        fromDate, toDate := s.setDefaultDates(req.FromDate, req.ToDate)
+
+        accounts := req.Accounts
+        if len(accounts) == 0 </span><span class="cov8" title="1">{
+                // デフォルトで全アカウントを使用
+                accounts = s.downloadService.GetAllAccountIDs()
+                if len(accounts) == 0 </span><span class="cov8" title="1">{
+                        return &amp;pb.DownloadJobResponse{
+                                JobId:   "",
+                                Status:  "failed",
+                                Message: "No accounts configured",
+                        }, nil
+                }</span>
+        }
+
+        // ジョブIDを生成
+        <span class="cov8" title="1">jobID := uuid.New().String()
+
+        // 非同期でダウンロード開始
+        s.downloadService.ProcessAsync(jobID, accounts, fromDate, toDate)
+
+        return &amp;pb.DownloadJobResponse{
+                JobId:   jobID,
+                Status:  "pending",
+                Message: "Download job started",
+        }, nil</span>
+}
+
+// GetJobStatus はジョブのステータスを取得
+func (s *DownloadServiceGRPC) GetJobStatus(ctx context.Context, req *pb.GetJobStatusRequest) (*pb.JobStatus, error) <span class="cov8" title="1">{
+        job, exists := s.downloadService.GetJobStatus(req.JobId)
+        if !exists </span><span class="cov8" title="1">{
+                return nil, nil
+        }</span>
+
+        <span class="cov8" title="1">status := &amp;pb.JobStatus{
+                JobId:        job.ID,
+                Status:       job.Status,
+                Progress:     int32(job.Progress),
+                TotalRecords: int32(job.TotalRecords),
+                ErrorMessage: job.ErrorMessage,
+                StartedAt:    timestamppb.New(job.StartedAt),
+        }
+
+        if job.CompletedAt != nil </span><span class="cov8" title="1">{
+                status.CompletedAt = timestamppb.New(*job.CompletedAt)
+        }</span>
+
+        <span class="cov8" title="1">return status, nil</span>
+}
+
+// GetAllAccountIDs は設定されている全アカウントIDを取得
+func (s *DownloadServiceGRPC) GetAllAccountIDs(ctx context.Context, req *pb.GetAllAccountIDsRequest) (*pb.GetAllAccountIDsResponse, error) <span class="cov8" title="1">{
+        accountIDs := s.downloadService.GetAllAccountIDs()
+        return &amp;pb.GetAllAccountIDsResponse{
+                AccountIds: accountIDs,
+        }, nil
+}</span>
+
+// setDefaultDates はデフォルトの日付を設定
+func (s *DownloadServiceGRPC) setDefaultDates(fromDate, toDate string) (string, string) <span class="cov8" title="1">{
+        now := time.Now()
+        if toDate == "" </span><span class="cov8" title="1">{
+                toDate = now.Format("2006-01-02")
+        }</span>
+        <span class="cov8" title="1">if fromDate == "" </span><span class="cov8" title="1">{
+                lastMonth := now.AddDate(0, -1, 0)
+                fromDate = lastMonth.Format("2006-01-02")
+        }</span>
+        <span class="cov8" title="1">return fromDate, toDate</span>
+}</pre>
+		
+		<pre class="file" id="file10" style="display: none">package services
+
+import (
+        "log"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+)
+
+// ScraperFactory creates scraper instances
+type ScraperFactory interface {
+        CreateScraper(config *scraper.ScraperConfig, logger *log.Logger) (scraper.ScraperInterface, error)
+}
+
+// DefaultScraperFactory creates real ETCScraper instances
+type DefaultScraperFactory struct{}
+
+// CreateScraper creates a new ETCScraper instance
+func (f *DefaultScraperFactory) CreateScraper(config *scraper.ScraperConfig, logger *log.Logger) (scraper.ScraperInterface, error) <span class="cov8" title="1">{
+        return scraper.NewETCScraper(config, logger)
+}</span>
+
+// NewDefaultScraperFactory creates a new default scraper factory
+func NewDefaultScraperFactory() ScraperFactory <span class="cov8" title="1">{
+        return &amp;DefaultScraperFactory{}
+}</pre>
+		
+		<pre class="file" id="file11" style="display: none">package main
+
+import (
+        "fmt"
+        "log"
+        "os"
+        "time"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+)
+
+func main() <span class="cov0" title="0">{
+        // ロガー設定
+        logger := log.New(os.Stdout, "[TEST-DOWNLOAD] ", log.LstdFlags|log.Lshortfile)
+
+        // 環境変数からアカウント情報を取得
+        userID := os.Getenv("ETC_USER_ID")
+        password := os.Getenv("ETC_PASSWORD")
+
+        if userID == "" || password == "" </span><span class="cov0" title="0">{
+                logger.Fatal("Please set ETC_USER_ID and ETC_PASSWORD environment variables")
+        }</span>
+
+        // スクレイパー設定
+        <span class="cov0" title="0">config := &amp;scraper.ScraperConfig{
+                UserID:       userID,
+                Password:     password,
+                DownloadPath: "./downloads/test_" + time.Now().Format("20060102_150405"),
+                Headless:     false, // デバッグ用にブラウザを表示
+                Timeout:      30000,
+                RetryCount:   3,
+        }
+
+        // スクレイパー作成
+        etcScraper, err := scraper.NewETCScraper(config, logger)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.Fatalf("Failed to create scraper: %v", err)
+        }</span>
+        <span class="cov0" title="0">defer etcScraper.Close()
+
+        // Playwright初期化
+        logger.Println("Initializing Playwright...")
+        if err := etcScraper.Initialize(); err != nil </span><span class="cov0" title="0">{
+                logger.Fatalf("Failed to initialize scraper: %v", err)
+        }</span>
+
+        // ログイン
+        <span class="cov0" title="0">logger.Println("Logging in to https://www.etc-meisai.jp/...")
+        if err := etcScraper.Login(); err != nil </span><span class="cov0" title="0">{
+                logger.Fatalf("Login failed: %v", err)
+        }</span>
+
+        // 日付範囲設定（先月のデータをダウンロード）
+        <span class="cov0" title="0">now := time.Now()
+        lastMonth := now.AddDate(0, -1, 0)
+        fromDate := lastMonth.Format("2006/01/01")
+        toDate := lastMonth.Format("2006/01/31")
+
+        // データダウンロード
+        logger.Printf("Downloading meisai from %s to %s...", fromDate, toDate)
+        csvPath, err := etcScraper.DownloadMeisai(fromDate, toDate)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.Fatalf("Download failed: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">logger.Printf("Successfully downloaded: %s", csvPath)
+        fmt.Println("\nTest completed successfully!")
+        fmt.Println("Downloaded file:", csvPath)
+        fmt.Println("\nThis test demonstrates that the scraper can:")
+        fmt.Println("1. Navigate to https://www.etc-meisai.jp/")
+        fmt.Println("2. Login with credentials")
+        fmt.Println("3. Download ETC meisai data for specified date range")</span>
+}</pre>
+		
+		<pre class="file" id="file12" style="display: none">package mocks
+
+import (
+        "github.com/playwright-community/playwright-go"
+        "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+)
+
+// MockPlaywrightFactory implements scraper.PlaywrightFactory
+type MockPlaywrightFactory struct {
+        RunFunc     func() (scraper.PlaywrightInterface, error)
+        InstallFunc func() error
+        RunError    error
+        InstallError error
+}
+
+func (m *MockPlaywrightFactory) Run() (scraper.PlaywrightInterface, error) <span class="cov8" title="1">{
+        if m.RunFunc != nil </span><span class="cov8" title="1">{
+                return m.RunFunc()
+        }</span>
+        <span class="cov8" title="1">if m.RunError != nil </span><span class="cov8" title="1">{
+                return nil, m.RunError
+        }</span>
+        <span class="cov0" title="0">return &amp;MockPlaywright{}, nil</span>
+}
+
+func (m *MockPlaywrightFactory) Install() error <span class="cov8" title="1">{
+        if m.InstallFunc != nil </span><span class="cov0" title="0">{
+                return m.InstallFunc()
+        }</span>
+        <span class="cov8" title="1">return m.InstallError</span>
+}
+
+// MockPlaywright implements scraper.PlaywrightInterface
+type MockPlaywright struct {
+        StopFunc func() error
+        StopError error
+        Chromium *MockBrowserType
+}
+
+func (m *MockPlaywright) Stop() error <span class="cov8" title="1">{
+        if m.StopFunc != nil </span><span class="cov0" title="0">{
+                return m.StopFunc()
+        }</span>
+        <span class="cov8" title="1">return m.StopError</span>
+}
+
+func (m *MockPlaywright) GetChromium() scraper.BrowserTypeInterface <span class="cov8" title="1">{
+        if m.Chromium != nil </span><span class="cov8" title="1">{
+                return m.Chromium
+        }</span>
+        <span class="cov0" title="0">return &amp;MockBrowserType{}</span>
+}
+
+// MockBrowserType implements scraper.BrowserTypeInterface
+type MockBrowserType struct {
+        LaunchFunc func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error)
+        LaunchError error
+}
+
+func (m *MockBrowserType) Launch(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) <span class="cov8" title="1">{
+        if m.LaunchFunc != nil </span><span class="cov8" title="1">{
+                return m.LaunchFunc(options...)
+        }</span>
+        <span class="cov8" title="1">if m.LaunchError != nil </span><span class="cov8" title="1">{
+                return nil, m.LaunchError
+        }</span>
+        <span class="cov0" title="0">return &amp;MockBrowser{}, nil</span>
+}
+
+// MockBrowser implements scraper.BrowserInterface
+type MockBrowser struct {
+        NewContextFunc func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error)
+        CloseFunc func() error
+        NewContextError error
+        CloseError error
+}
+
+func (m *MockBrowser) NewContext(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) <span class="cov8" title="1">{
+        if m.NewContextFunc != nil </span><span class="cov8" title="1">{
+                return m.NewContextFunc(options...)
+        }</span>
+        <span class="cov8" title="1">if m.NewContextError != nil </span><span class="cov8" title="1">{
+                return nil, m.NewContextError
+        }</span>
+        <span class="cov0" title="0">return &amp;MockBrowserContext{}, nil</span>
+}
+
+func (m *MockBrowser) Close() error <span class="cov8" title="1">{
+        if m.CloseFunc != nil </span><span class="cov0" title="0">{
+                return m.CloseFunc()
+        }</span>
+        <span class="cov8" title="1">return m.CloseError</span>
+}
+
+// MockBrowserContext implements scraper.BrowserContextInterface
+type MockBrowserContext struct {
+        NewPageFunc func() (scraper.PageInterface, error)
+        SetDefaultTimeoutFunc func(timeout float64)
+        CloseFunc func() error
+        NewPageError error
+        CloseError error
+        TimeoutSet float64
+}
+
+func (m *MockBrowserContext) NewPage() (scraper.PageInterface, error) <span class="cov8" title="1">{
+        if m.NewPageFunc != nil </span><span class="cov8" title="1">{
+                return m.NewPageFunc()
+        }</span>
+        <span class="cov8" title="1">if m.NewPageError != nil </span><span class="cov8" title="1">{
+                return nil, m.NewPageError
+        }</span>
+        <span class="cov0" title="0">return &amp;MockPage{}, nil</span>
+}
+
+func (m *MockBrowserContext) SetDefaultTimeout(timeout float64) <span class="cov8" title="1">{
+        m.TimeoutSet = timeout
+        if m.SetDefaultTimeoutFunc != nil </span><span class="cov0" title="0">{
+                m.SetDefaultTimeoutFunc(timeout)
+        }</span>
+}
+
+func (m *MockBrowserContext) Close() error <span class="cov8" title="1">{
+        if m.CloseFunc != nil </span><span class="cov0" title="0">{
+                return m.CloseFunc()
+        }</span>
+        <span class="cov8" title="1">return m.CloseError</span>
+}
+
+// MockPage implements scraper.PageInterface
+type MockPage struct {
+        GotoFunc func(url string, options ...playwright.PageGotoOptions) (playwright.Response, error)
+        LocatorFunc func(selector string) scraper.LocatorInterface
+        WaitForLoadStateFunc func(options ...playwright.PageWaitForLoadStateOptions) error
+        ScreenshotFunc func(options ...playwright.PageScreenshotOptions) ([]byte, error)
+        CloseFunc func() error
+        OnFunc func(event string, handler interface{})
+
+        GotoError error
+        WaitError error
+        ScreenshotError error
+        CloseError error
+        Locators map[string]*MockLocator
+        DownloadHandler interface{}
+}
+
+func NewMockPage() *MockPage <span class="cov8" title="1">{
+        return &amp;MockPage{
+                Locators: make(map[string]*MockLocator),
+        }
+}</span>
+
+func (m *MockPage) Goto(url string, options ...playwright.PageGotoOptions) (playwright.Response, error) <span class="cov8" title="1">{
+        if m.GotoFunc != nil </span><span class="cov8" title="1">{
+                return m.GotoFunc(url, options...)
+        }</span>
+        <span class="cov8" title="1">if m.GotoError != nil </span><span class="cov8" title="1">{
+                return nil, m.GotoError
+        }</span>
+        <span class="cov8" title="1">return nil, nil</span>
+}
+
+func (m *MockPage) Locator(selector string) scraper.LocatorInterface <span class="cov8" title="1">{
+        if m.LocatorFunc != nil </span><span class="cov0" title="0">{
+                return m.LocatorFunc(selector)
+        }</span>
+        <span class="cov8" title="1">if locator, exists := m.Locators[selector]; exists </span><span class="cov8" title="1">{
+                return locator
+        }</span>
+        // Return empty locator by default
+        <span class="cov8" title="1">return &amp;MockLocator{CountValue: 0}</span>
+}
+
+func (m *MockPage) WaitForLoadState(options ...playwright.PageWaitForLoadStateOptions) error <span class="cov8" title="1">{
+        if m.WaitForLoadStateFunc != nil </span><span class="cov0" title="0">{
+                return m.WaitForLoadStateFunc(options...)
+        }</span>
+        <span class="cov8" title="1">return m.WaitError</span>
+}
+
+func (m *MockPage) Screenshot(options ...playwright.PageScreenshotOptions) ([]byte, error) <span class="cov0" title="0">{
+        if m.ScreenshotFunc != nil </span><span class="cov0" title="0">{
+                return m.ScreenshotFunc(options...)
+        }</span>
+        <span class="cov0" title="0">if m.ScreenshotError != nil </span><span class="cov0" title="0">{
+                return nil, m.ScreenshotError
+        }</span>
+        <span class="cov0" title="0">return []byte("mock screenshot"), nil</span>
+}
+
+func (m *MockPage) Close() error <span class="cov8" title="1">{
+        if m.CloseFunc != nil </span><span class="cov0" title="0">{
+                return m.CloseFunc()
+        }</span>
+        <span class="cov8" title="1">return m.CloseError</span>
+}
+
+func (m *MockPage) On(event string, handler interface{}) <span class="cov8" title="1">{
+        if m.OnFunc != nil </span><span class="cov8" title="1">{
+                m.OnFunc(event, handler)
+        }</span>
+        <span class="cov8" title="1">if event == "download" </span><span class="cov8" title="1">{
+                m.DownloadHandler = handler
+        }</span>
+}
+
+// MockLocator implements scraper.LocatorInterface
+type MockLocator struct {
+        CountFunc func() (int, error)
+        FirstFunc func() scraper.LocatorInterface
+        FillFunc func(value string) error
+        ClickFunc func(options ...playwright.LocatorClickOptions) error
+        TextContentFunc func(options ...playwright.LocatorTextContentOptions) (string, error)
+
+        CountValue int
+        CountError error
+        FillError error
+        ClickError error
+        TextValue string
+        TextError error
+}
+
+func (m *MockLocator) Count() (int, error) <span class="cov8" title="1">{
+        if m.CountFunc != nil </span><span class="cov0" title="0">{
+                return m.CountFunc()
+        }</span>
+        <span class="cov8" title="1">if m.CountError != nil </span><span class="cov0" title="0">{
+                return 0, m.CountError
+        }</span>
+        <span class="cov8" title="1">return m.CountValue, nil</span>
+}
+
+func (m *MockLocator) First() scraper.LocatorInterface <span class="cov8" title="1">{
+        if m.FirstFunc != nil </span><span class="cov0" title="0">{
+                return m.FirstFunc()
+        }</span>
+        <span class="cov8" title="1">return m</span>
+}
+
+func (m *MockLocator) Fill(value string) error <span class="cov8" title="1">{
+        if m.FillFunc != nil </span><span class="cov0" title="0">{
+                return m.FillFunc(value)
+        }</span>
+        <span class="cov8" title="1">return m.FillError</span>
+}
+
+func (m *MockLocator) Click(options ...playwright.LocatorClickOptions) error <span class="cov8" title="1">{
+        if m.ClickFunc != nil </span><span class="cov0" title="0">{
+                return m.ClickFunc(options...)
+        }</span>
+        <span class="cov8" title="1">return m.ClickError</span>
+}
+
+func (m *MockLocator) TextContent(options ...playwright.LocatorTextContentOptions) (string, error) <span class="cov8" title="1">{
+        if m.TextContentFunc != nil </span><span class="cov0" title="0">{
+                return m.TextContentFunc(options...)
+        }</span>
+        <span class="cov8" title="1">if m.TextError != nil </span><span class="cov0" title="0">{
+                return "", m.TextError
+        }</span>
+        <span class="cov8" title="1">return m.TextValue, nil</span>
+}
+
+// MockDownload simulates a playwright.Download
+type MockDownload struct {
+        SuggestedName string
+        SaveError error
+}
+
+func (m *MockDownload) SuggestedFilename() string <span class="cov0" title="0">{
+        return m.SuggestedName
+}</span>
+
+func (m *MockDownload) SaveAs(path string) error <span class="cov0" title="0">{
+        return m.SaveError
+}</pre>
+		
+		<pre class="file" id="file13" style="display: none">package mocks
+
+import (
+        "fmt"
+        "log"
+
+        "github.com/yhonda-ohishi/etc_meisai/src/scraper"
+)
+
+// MockETCScraper is a mock implementation of ScraperInterface
+type MockETCScraper struct {
+        InitializeCalled   bool
+        InitializeError    error
+        LoginCalled        bool
+        LoginError         error
+        DownloadCalled     bool
+        DownloadError      error
+        DownloadResult     string
+        CloseCalled        bool
+        CloseError         error
+        FromDate           string
+        ToDate             string
+}
+
+// NewMockETCScraper creates a new mock scraper
+func NewMockETCScraper() *MockETCScraper <span class="cov8" title="1">{
+        return &amp;MockETCScraper{
+                DownloadResult: "/mock/downloads/test.csv",
+        }
+}</span>
+
+// Initialize mocks the Initialize method
+func (m *MockETCScraper) Initialize() error <span class="cov8" title="1">{
+        m.InitializeCalled = true
+        return m.InitializeError
+}</span>
+
+// Login mocks the Login method
+func (m *MockETCScraper) Login() error <span class="cov8" title="1">{
+        m.LoginCalled = true
+        return m.LoginError
+}</span>
+
+// DownloadMeisai mocks the DownloadMeisai method
+func (m *MockETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) <span class="cov8" title="1">{
+        m.DownloadCalled = true
+        m.FromDate = fromDate
+        m.ToDate = toDate
+
+        if m.DownloadError != nil </span><span class="cov8" title="1">{
+                return "", m.DownloadError
+        }</span>
+
+        <span class="cov8" title="1">return m.DownloadResult, nil</span>
+}
+
+// Close mocks the Close method
+func (m *MockETCScraper) Close() error <span class="cov8" title="1">{
+        m.CloseCalled = true
+        return m.CloseError
+}</span>
+
+// Verify interface compliance
+var _ scraper.ScraperInterface = (*MockETCScraper)(nil)
+
+// MockScraperFactory creates mock scrapers for testing
+type MockScraperFactory struct {
+        CreateFunc func(config *scraper.ScraperConfig, logger *log.Logger) (scraper.ScraperInterface, error)
+        CreateErr  error
+        MockScraper *MockETCScraper
+}
+
+// NewMockScraperFactory creates a new mock scraper factory
+func NewMockScraperFactory() *MockScraperFactory <span class="cov0" title="0">{
+        mockScraper := NewMockETCScraper()
+        return &amp;MockScraperFactory{
+                MockScraper: mockScraper,
+                CreateFunc: func(config *scraper.ScraperConfig, logger *log.Logger) (scraper.ScraperInterface, error) </span><span class="cov0" title="0">{
+                        return mockScraper, nil
+                }</span>,
+        }
+}
+
+// CreateScraper creates a mock scraper
+func (f *MockScraperFactory) CreateScraper(config *scraper.ScraperConfig, logger *log.Logger) (scraper.ScraperInterface, error) <span class="cov0" title="0">{
+        if f.CreateErr != nil </span><span class="cov0" title="0">{
+                return nil, f.CreateErr
+        }</span>
+
+        <span class="cov0" title="0">if f.CreateFunc != nil </span><span class="cov0" title="0">{
+                return f.CreateFunc(config, logger)
+        }</span>
+
+        <span class="cov0" title="0">return f.MockScraper, nil</span>
+}
+
+// ConfigurableETCScraper allows configuring mock behavior per test
+type ConfigurableETCScraper struct {
+        InitializeFunc func() error
+        LoginFunc      func() error
+        DownloadFunc   func(fromDate, toDate string) (string, error)
+        CloseFunc      func() error
+}
+
+// NewConfigurableETCScraper creates a new configurable mock
+func NewConfigurableETCScraper() *ConfigurableETCScraper <span class="cov8" title="1">{
+        return &amp;ConfigurableETCScraper{
+                InitializeFunc: func() error </span><span class="cov8" title="1">{ return nil }</span>,
+                LoginFunc:      func() error <span class="cov8" title="1">{ return nil }</span>,
+                DownloadFunc:   func(fromDate, toDate string) (string, error) <span class="cov0" title="0">{
+                        return fmt.Sprintf("/downloads/mock_%s_%s.csv", fromDate, toDate), nil
+                }</span>,
+                CloseFunc:      func() error <span class="cov8" title="1">{ return nil }</span>,
+        }
+}
+
+// Initialize calls the configured function
+func (c *ConfigurableETCScraper) Initialize() error <span class="cov8" title="1">{
+        if c.InitializeFunc != nil </span><span class="cov8" title="1">{
+                return c.InitializeFunc()
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// Login calls the configured function
+func (c *ConfigurableETCScraper) Login() error <span class="cov8" title="1">{
+        if c.LoginFunc != nil </span><span class="cov8" title="1">{
+                return c.LoginFunc()
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// DownloadMeisai calls the configured function
+func (c *ConfigurableETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) <span class="cov8" title="1">{
+        if c.DownloadFunc != nil </span><span class="cov8" title="1">{
+                return c.DownloadFunc(fromDate, toDate)
+        }</span>
+        <span class="cov0" title="0">return "", nil</span>
+}
+
+// Close calls the configured function
+func (c *ConfigurableETCScraper) Close() error <span class="cov8" title="1">{
+        if c.CloseFunc != nil </span><span class="cov8" title="1">{
+                return c.CloseFunc()
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// Verify interface compliance
+var _ scraper.ScraperInterface = (*ConfigurableETCScraper)(nil)</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
