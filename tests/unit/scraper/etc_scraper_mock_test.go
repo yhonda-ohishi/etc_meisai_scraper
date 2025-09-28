@@ -181,10 +181,44 @@ func TestETCScraper_Initialize(t *testing.T) {
 			errorContains: "could not launch browser",
 		},
 		{
-			name: "create context error",
+			name: "successful initialization with SlowMo",
+			setupMock: func() *mocks.MockPlaywrightFactory {
+				mockContext := &mocks.MockBrowserContext{
+					NewPageFunc: func() (scraper.PageInterface, error) {
+						return mocks.NewMockPage(), nil
+					},
+				}
+
+				mockBrowser := &mocks.MockBrowser{
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+						return mockContext, nil
+					},
+				}
+				mockChromium := &mocks.MockBrowserType{
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+						// Verify SlowMo is passed
+						if options.SlowMo != nil {
+							t.Logf("SlowMo option passed: %f", *options.SlowMo)
+						}
+						return mockBrowser, nil
+					},
+				}
+				mockPw := &mocks.MockPlaywright{
+					Chromium: mockChromium,
+				}
+				return &mocks.MockPlaywrightFactory{
+					RunFunc: func() (scraper.PlaywrightInterface, error) {
+						return mockPw, nil
+					},
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "browser context creation error",
 			setupMock: func() *mocks.MockPlaywrightFactory {
 				mockBrowser := &mocks.MockBrowser{
-					NewContextError: errors.New("context failed"),
+					NewContextError: errors.New("context creation failed"),
 				}
 				mockChromium := &mocks.MockBrowserType{
 					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
@@ -204,7 +238,7 @@ func TestETCScraper_Initialize(t *testing.T) {
 			errorContains: "could not create browser context",
 		},
 		{
-			name: "create page error",
+			name: "page creation error",
 			setupMock: func() *mocks.MockPlaywrightFactory {
 				mockContext := &mocks.MockBrowserContext{
 					NewPageError: errors.New("page creation failed"),
@@ -231,40 +265,6 @@ func TestETCScraper_Initialize(t *testing.T) {
 			expectError:   true,
 			errorContains: "could not create page",
 		},
-		{
-			name: "with SlowMo option",
-			setupMock: func() *mocks.MockPlaywrightFactory {
-				mockPage := mocks.NewMockPage()
-				mockContext := &mocks.MockBrowserContext{
-					NewPageFunc: func() (scraper.PageInterface, error) {
-						return mockPage, nil
-					},
-				}
-				mockBrowser := &mocks.MockBrowser{
-					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
-						return mockContext, nil
-					},
-				}
-				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
-						// Verify SlowMo is passed
-						if options.SlowMo != nil {
-							t.Logf("SlowMo option passed: %f", *options.SlowMo)
-						}
-						return mockBrowser, nil
-					},
-				}
-				mockPw := &mocks.MockPlaywright{
-					Chromium: mockChromium,
-				}
-				return &mocks.MockPlaywrightFactory{
-					RunFunc: func() (scraper.PlaywrightInterface, error) {
-						return mockPw, nil
-					},
-				}
-			},
-			expectError: false,
-		},
 	}
 
 	for _, tt := range tests {
@@ -276,7 +276,7 @@ func TestETCScraper_Initialize(t *testing.T) {
 				DownloadPath: "./test_downloads",
 				TestMode:     true,
 			}
-			if tt.name == "with SlowMo option" {
+			if tt.name == "successful initialization with SlowMo" {
 				config.SlowMo = 100
 			}
 			defer os.RemoveAll(config.DownloadPath)
@@ -986,13 +986,13 @@ func (m *MockPlaywrightDownload) Page() scraper.PageInterface {
 // TestETCScraper_DownloadMeisaiToBuffer tests the DownloadMeisaiToBuffer function
 func TestETCScraper_DownloadMeisaiToBuffer(t *testing.T) {
 	tests := []struct {
-		name           string
-		setupMock      func() *mocks.MockPlaywrightFactory
-		fromDate       string
-		toDate         string
-		expectedData   string
-		expectError    bool
-		errorContains  string
+		name          string
+		setupMock     func() *mocks.MockPlaywrightFactory
+		fromDate      string
+		toDate        string
+		expectedData  string
+		expectError   bool
+		errorContains string
 	}{
 		{
 			name: "successful download and buffer",
@@ -1019,10 +1019,10 @@ func TestETCScraper_DownloadMeisaiToBuffer(t *testing.T) {
 
 				// Setup locators for successful flow
 				mockPage.Locators = map[string]*mocks.MockLocator{
-					"input[name='fromDate']":    {CountValue: 1},
-					"input[name='toDate']":      {CountValue: 1},
-					"button:has-text('検索')":      {CountValue: 1},
-					"button:has-text('CSV')":    {CountValue: 1},
+					"input[name='fromDate']": {CountValue: 1},
+					"input[name='toDate']":   {CountValue: 1},
+					"button:has-text('検索')":  {CountValue: 1},
+					"button:has-text('CSV')": {CountValue: 1},
 				}
 
 				mockContext := &mocks.MockBrowserContext{
@@ -1090,6 +1090,33 @@ func TestETCScraper_DownloadMeisaiToBuffer(t *testing.T) {
 			toDate:        "2024-01-31",
 			expectError:   true,
 			errorContains: "failed to download CSV",
+		},
+		{
+			name: "read file error after successful download",
+			setupMock: func() *mocks.MockPlaywrightFactory {
+				mockPage := mocks.NewMockPage()
+				mockPage.Locators = map[string]*mocks.MockLocator{
+					"button:has-text('CSV')": {CountValue: 1},
+				}
+				mockPage.OnFunc = func(event string, handler interface{}) {
+					if event == "download" {
+						go func() {
+							if downloadHandler, ok := handler.(func(scraper.Download)); ok {
+								mockDownload := &mocks.MockDownload{
+									SuggestedName: "nonexistent.csv",
+									SaveError:     nil,
+								}
+								downloadHandler(mockDownload)
+							}
+						}()
+					}
+				}
+				return createMockFactory(mockPage)
+			},
+			fromDate:      "2024-01-01",
+			toDate:        "2024-01-31",
+			expectError:   true,
+			errorContains: "failed to read CSV file",
 		},
 	}
 
@@ -1164,4 +1191,102 @@ func (m *MockPlaywrightDownload) URL() string {
 
 func (m *MockPlaywrightDownload) String() string {
 	return "MockPlaywrightDownload{" + m.suggestedName + "}"
+}
+
+// TestETCScraper_waitForNavigation tests the waitForNavigation function via DownloadMeisai
+func TestETCScraper_waitForNavigation(t *testing.T) {
+	t.Run("non-TestMode path", func(t *testing.T) {
+		config := &scraper.ScraperConfig{
+			UserID:   "test",
+			Password: "test",
+			TestMode: false, // Non-TestMode to trigger sleep
+		}
+		logger := log.New(os.Stdout, "[TEST] ", log.LstdFlags)
+
+		mockPage := mocks.NewMockPage()
+		mockPage.Locators = map[string]*mocks.MockLocator{
+			"button:has-text('検索')": {CountValue: 1},
+		}
+		factory := createMockFactory(mockPage)
+
+		scraperInstance, err := scraper.NewETCScraperWithFactory(config, logger, factory)
+		if err != nil {
+			t.Fatalf("Failed to create scraper: %v", err)
+		}
+
+		err = scraperInstance.Initialize()
+		if err != nil {
+			t.Fatalf("Failed to initialize: %v", err)
+		}
+
+		// DownloadMeisai calls waitForNavigation after clicking search
+		start := time.Now()
+		scraperInstance.DownloadMeisai("2024-01-01", "2024-01-31")
+		elapsed := time.Since(start)
+
+		// Should have taken some time due to sleep in waitForNavigation
+		if elapsed < 2*time.Second {
+			t.Errorf("Expected at least 2 seconds delay for non-TestMode, got %v", elapsed)
+		}
+	})
+}
+
+// TestReadAndDeleteFile tests the ReadAndDeleteFile function directly
+func TestReadAndDeleteFile(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupFile     func() string
+		expectError   bool
+		errorContains string
+		expectedData  string
+	}{
+		{
+			name: "successful read and delete",
+			setupFile: func() string {
+				tmpFile := filepath.Join("./test_downloads", "test_read_delete.csv")
+				os.MkdirAll("./test_downloads", 0755)
+				os.WriteFile(tmpFile, []byte("test data content"), 0644)
+				return tmpFile
+			},
+			expectError:  false,
+			expectedData: "test data content",
+		},
+		{
+			name: "file does not exist",
+			setupFile: func() string {
+				return "./test_downloads/nonexistent.csv"
+			},
+			expectError:   true,
+			errorContains: "failed to read file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer os.RemoveAll("./test_downloads")
+
+			filePath := tt.setupFile()
+
+			data, err := scraper.ReadAndDeleteFile(filePath)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain %q, got %q", tt.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if string(data) != tt.expectedData {
+					t.Errorf("Expected data %q, got %q", tt.expectedData, string(data))
+				}
+				// Verify file was deleted
+				if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+					t.Error("Expected file to be deleted")
+				}
+			}
+		})
+	}
 }
