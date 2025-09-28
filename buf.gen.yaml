@@ -1,0 +1,34 @@
+version: v1
+plugins:
+  # Go code generation
+  - plugin: go
+    out: src/pb
+    opt:
+      - paths=source_relative
+
+  # gRPC Go code generation
+  - plugin: go-grpc
+    out: src/pb
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+
+  # grpc-gateway generation
+  - plugin: grpc-gateway
+    out: src/pb
+    opt:
+      - paths=source_relative
+      - generate_unbound_methods=true
+      - allow_repeated_fields_in_body=true
+      - grpc_api_configuration=src/proto/download_api.yaml
+
+  # OpenAPI v2 generation for Swagger
+  - plugin: openapiv2
+    out: swagger
+    opt:
+      - allow_repeated_fields_in_body=true
+      - generate_unbound_methods=true
+      - allow_merge=true
+      - merge_file_name=etc_meisai
+      - json_names_for_fields=false
+      - grpc_api_configuration=src/proto/download_api.yaml

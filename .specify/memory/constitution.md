@@ -1,75 +1,123 @@
+<!--
+Sync Impact Report:
+Version: 1.0.0 → 1.1.0 (Added Code Quality Validation principle for immediate go vet error correction)
+Modified Principles:
+- Added Principle VIII: Code Quality Validation
+
+Templates Requiring Updates:
+✅ Constitution updated with new principle
+⚠ CLAUDE.md - May need update to include go vet instructions
+⚠ plan-template.md - May need update for quality validation tasks
+⚠ tasks-template.md - May need update for validation checkpoints
+
+Follow-up TODOs:
+- Update CLAUDE.md with specific go vet handling instructions
+- Consider adding pre-commit hooks for go vet validation
+-->
+
 # ETC明細システム Constitution
 
 ## Core Principles
 
-### I. ドキュメント言語
-すべての仕様書、計画書、設計書は日本語で記述する
-- 機能仕様書（spec.md）：日本語必須
-- 実装計画書（plan.md）：日本語必須
-- リサーチドキュメント：日本語推奨
-- データモデル定義：日本語必須
-- タスクリスト：日本語必須
+### I. Test File Separation (NON-NEGOTIABLE)
+Test files MUST be placed in the `tests/` directory structure, NEVER in the `src/` directory.
+Tests are organized as `tests/unit/`, `tests/integration/`, and `tests/contract/`.
+This ensures clean separation between production code and test code, prevents accidental
+inclusion of test dependencies in production builds, and maintains clear project structure.
 
-### II. セキュリティ原則（譲れない）
-**ハードコードされた認証情報の禁止**
-- パスワード、APIキー、秘密鍵をソースコードに直接記載することは厳禁
-- すべての認証情報は環境変数または設定ファイルから読み込む
-- テストコードであってもハードコードは禁止
-- デフォルト値として実際の認証情報を使用しない
+### II. Test-First Development
+TDD (Test-Driven Development) approach is mandatory for all new features.
+Tests must be written first, fail initially, then implementation follows.
+Red-Green-Refactor cycle must be strictly enforced.
+This ensures comprehensive test coverage and drives better design decisions.
 
-### III. Test-First（譲れない）
-TDD必須: テスト作成 → ユーザー承認 → テスト失敗確認 → 実装
-- Red-Green-Refactorサイクルの厳格な適用
-- テストなしの実装は禁止
+### III. Coverage Requirements
+Project MUST maintain 100% test coverage target as per project requirements.
+Coverage is measured at statement level using Go's built-in coverage tools.
+Any code that cannot be tested must be explicitly documented with justification.
+Coverage reports must be generated for all CI/CD pipelines.
 
-### IV. 統合テスト
-統合テストが必要な重点領域:
-- 新規ライブラリの契約テスト
-- 契約変更
-- サービス間通信
-- 共有スキーマ
+### IV. Clean Architecture
+Clear separation of concerns MUST be maintained across all layers:
+- `src/models/` - Data models and entities only
+- `src/services/` - Business logic layer
+- `src/repositories/` - Data access layer
+- `src/grpc/` - gRPC server and handlers
+- `src/adapters/` - External system adapters
+No cross-layer dependencies allowed except through defined interfaces.
 
-### V. 可観測性
-- テキストI/Oによるデバッグ性の確保
-- 構造化ログ記録必須
-- エラーメッセージは明確で実行可能に
+### V. Observable Systems
+All services MUST implement comprehensive logging and monitoring.
+Structured logging is required for all operations.
+Performance metrics must be tracked for critical operations.
+Timeout protection (2-minute max) for all long-running operations.
 
-## セキュリティ要件
+### VI. Dependency Injection
+All services MUST use constructor injection pattern.
+Dependencies are passed as interfaces, not concrete types.
+No global state or singleton patterns allowed.
+This enables proper mocking and testing.
 
-### 認証情報管理
-1. **環境変数の使用**
-   - 本番環境: 必ず環境変数から読み込む
-   - 開発環境: `.env`ファイルを使用（.gitignoreに追加必須）
-   - テスト環境: モックまたはテスト用の環境変数
+### VII. Simplicity First
+Start with the simplest solution that works.
+YAGNI (You Aren't Gonna Need It) principles apply.
+Complexity must be explicitly justified and documented.
+Prefer Go standard library over external dependencies when possible.
 
-2. **禁止事項**
-   - `password := "kikuraku"` のようなハードコード
-   - `defaultPassword = "actual_password"` のようなデフォルト値
-   - URLに認証情報を含める（`http://user:pass@host`）
+### VIII. Code Quality Validation
+All code modifications MUST pass `go vet` without any errors or warnings.
+When hooks report `go vet` errors, they MUST be corrected immediately before proceeding.
+After every edit operation, `go vet` validation MUST be performed to ensure code quality.
+This prevents accumulation of technical debt and maintains consistent code standards.
+Common `go vet` issues include unreachable code, malformed build tags, incorrect printf formats,
+and suspicious constructs that must be fixed immediately upon detection.
 
-3. **推奨事項**
-   - getEnv関数でデフォルト値は空文字または"CHANGE_ME"を使用
-   - 認証情報が未設定の場合は明確なエラーメッセージ
-   - サンプルファイル（.env.example）での説明
+## Development Standards
 
-## 開発ワークフロー
+### Code Organization
+- Production code in `src/` directory only
+- Test code in `tests/` directory only
+- Mock files in `src/mocks/` for generated mocks
+- Documentation in `docs/` directory
+- Scripts and tools in `scripts/` directory
 
-### コードレビュー要件
-- すべてのPRでハードコードされた認証情報のチェック必須
-- セキュリティ原則違反は即座に修正が必要
-- テストコードも同じ基準で審査
+### Testing Requirements
+- Unit tests for all business logic
+- Integration tests for service interactions
+- Contract tests for all API endpoints
+- Table-driven tests preferred for comprehensive coverage
+- Parallel test execution where possible
 
-### デプロイ前チェック
-1. ハードコードされた認証情報の検索
-2. 環境変数の設定確認
-3. `.env`ファイルがコミットされていないことの確認
+### Quality Gates
+- All tests must pass before merge
+- Coverage must meet or exceed 100% target
+- No build warnings allowed
+- Code must pass linting checks
+- `go vet` must report zero issues
+- Documentation must be updated for API changes
+
+### Validation Workflow
+1. Make code changes
+2. Run `go vet` immediately after edits
+3. Fix any reported issues before continuing
+4. Run tests to verify functionality
+5. Check coverage metrics
+6. Commit only clean, validated code
 
 ## Governance
 
-憲法はすべての他の慣行に優先する
-- 修正には文書化、承認、移行計画が必要
-- すべてのPR/レビューは準拠を検証しなければならない
-- 複雑さは正当化されなければならない
-- セキュリティ違反は例外なく修正が必要
+The Constitution supersedes all other project practices and guidelines.
+Any amendments require:
+1. Documentation of proposed change with rationale
+2. Team review and approval
+3. Migration plan for existing code if needed
+4. Update to all affected documentation
 
-**Version**: 3.0.0 | **Ratified**: 2025-09-19 | **Last Amended**: 2025-09-19
+All pull requests must verify constitutional compliance.
+Violations must be fixed before merge is allowed.
+Complexity additions require explicit justification in PR description.
+`go vet` errors block merge until resolved.
+
+Runtime development guidance is maintained in CLAUDE.md for agent-specific instructions.
+
+**Version**: 1.1.0 | **Ratified**: 2025-09-26 | **Last Amended**: 2025-09-27

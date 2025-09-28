@@ -1,0 +1,170 @@
+# Mock Generation Contract
+openapi: 3.0.0
+info:
+  title: Mock Generation API
+  version: 1.0.0
+  description: Contract for generating and managing mock objects
+
+paths:
+  /mocks/generate:
+    post:
+      summary: Generate mock for interface
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                package:
+                  type: string
+                  description: Package containing interface
+                interface:
+                  type: string
+                  description: Interface name to mock
+                outputPath:
+                  type: string
+                  description: Where to save mock file
+                methods:
+                  type: array
+                  items:
+                    type: string
+                  description: Specific methods to mock (empty = all)
+      responses:
+        '201':
+          description: Mock generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedMock'
+        '400':
+          description: Invalid interface or package
+
+  /mocks/list:
+    get:
+      summary: List all generated mocks
+      parameters:
+        - name: package
+          in: query
+          schema:
+            type: string
+          description: Filter by package
+      responses:
+        '200':
+          description: List of mocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MockInfo'
+
+  /mocks/validate:
+    post:
+      summary: Validate mock implementations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mockFile:
+                  type: string
+                  description: Path to mock file
+                interface:
+                  type: string
+                  description: Interface being mocked
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+
+components:
+  schemas:
+    GeneratedMock:
+      type: object
+      properties:
+        file:
+          type: string
+          description: Generated file path
+        package:
+          type: string
+        mockName:
+          type: string
+        interface:
+          type: string
+        methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/MockMethod'
+        linesOfCode:
+          type: integer
+
+    MockMethod:
+      type: object
+      properties:
+        name:
+          type: string
+        signature:
+          type: string
+        parameters:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+        returns:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+
+    MockInfo:
+      type: object
+      properties:
+        file:
+          type: string
+        package:
+          type: string
+        mockName:
+          type: string
+        interface:
+          type: string
+        methodCount:
+          type: integer
+        lastModified:
+          type: string
+          format: date-time
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        coverage:
+          type: object
+          properties:
+            totalMethods:
+              type: integer
+            mockedMethods:
+              type: integer
+            percentage:
+              type: number
+              format: float

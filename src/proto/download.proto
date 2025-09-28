@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package etc_meisai.download.v1;
+
+option go_package = "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb";
+
+import "google/protobuf/timestamp.proto";
+
+// ダウンロードサービス
+service DownloadService {
+  // 同期ダウンロード
+  rpc DownloadSync(DownloadRequest) returns (DownloadResponse);
+
+  // 非同期ダウンロード開始
+  rpc DownloadAsync(DownloadRequest) returns (DownloadJobResponse);
+
+  // ジョブステータス取得
+  rpc GetJobStatus(GetJobStatusRequest) returns (JobStatus);
+
+  // 全アカウントID取得
+  rpc GetAllAccountIDs(GetAllAccountIDsRequest) returns (GetAllAccountIDsResponse);
+}
+
+// ダウンロードリクエスト
+message DownloadRequest {
+  repeated string accounts = 1;
+  string from_date = 2;
+  string to_date = 3;
+  string mode = 4;
+}
+
+// ダウンロードレスポンス
+message DownloadResponse {
+  bool success = 1;
+  int32 record_count = 2;
+  string csv_path = 3;
+  repeated ETCMeisaiRecord records = 4;
+  string error = 5;
+}
+
+// ダウンロードジョブレスポンス
+message DownloadJobResponse {
+  string job_id = 1;
+  string status = 2;
+  string message = 3;
+}
+
+// ジョブステータス取得リクエスト
+message GetJobStatusRequest {
+  string job_id = 1;
+}
+
+// ジョブステータス
+message JobStatus {
+  string job_id = 1;
+  string status = 2;
+  int32 progress = 3;
+  int32 total_records = 4;
+  string error_message = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+}
+
+// アカウントID取得リクエスト
+message GetAllAccountIDsRequest {}
+
+// アカウントID取得レスポンス
+message GetAllAccountIDsResponse {
+  repeated string account_ids = 1;
+}
+
+// ETC明細レコード
+message ETCMeisaiRecord {
+  int64 id = 1;
+  string account_id = 2;
+  google.protobuf.Timestamp usage_date = 3;
+  string entry_ic = 4;
+  string exit_ic = 5;
+  string vehicle_number = 6;
+  string etc_card_number = 7;
+  int32 amount = 8;
+  string csv_file_name = 9;
+  google.protobuf.Timestamp downloaded_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}

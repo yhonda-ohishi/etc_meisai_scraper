@@ -1,0 +1,232 @@
+# Tasks: Full gRPC Architecture Migration
+
+**Input**: Design documents from `/specs/006-refactor-src-to/`
+**Prerequisites**: plan.md (required), research.md, data-model.md, contracts/
+
+## Execution Flow (main)
+```
+1. Load plan.md from feature directory
+   → If not found: ERROR "No implementation plan found"
+   → Extract: tech stack, libraries, structure
+2. Load optional design documents:
+   → data-model.md: Extract entities → model tasks
+   → contracts/: Each file → contract test task
+   → research.md: Extract decisions → setup tasks
+3. Generate tasks by category:
+   → Setup: project init, dependencies, linting
+   → Tests: contract tests, integration tests
+   → Core: models, services, CLI commands
+   → Integration: DB, middleware, logging
+   → Polish: unit tests, performance, docs
+4. Apply task rules:
+   → Different files = mark [P] for parallel
+   → Same file = sequential (no [P])
+   → Tests before implementation (TDD)
+5. Number tasks sequentially (T001, T002...)
+6. Generate dependency graph
+7. Create parallel execution examples
+8. Validate task completeness:
+   → All contracts have tests?
+   → All entities have models?
+   → All endpoints implemented?
+9. Return: SUCCESS (tasks ready for execution)
+```
+
+## Format: `[ID] [P?] Description`
+- **[P]**: Can run in parallel (different files, no dependencies)
+- Include exact file paths in descriptions
+
+## Path Conventions
+- **Single project**: `src/`, `tests/` at repository root
+- Paths shown below assume single project structure per plan.md
+
+## Phase 3.1: Setup & Protocol Buffer Infrastructure
+
+- [ ] T001 Install buf tooling and Protocol Buffer dependencies (go install github.com/bufbuild/buf/cmd/buf@latest)
+- [ ] T002 [P] Install protoc-gen-go plugins for code generation (protoc-gen-go, protoc-gen-go-grpc, protoc-gen-grpc-gateway, protoc-gen-openapiv2)
+- [ ] T003 [P] Install mockgen for mock generation from gRPC interfaces (go install github.com/golang/mock/mockgen@latest)
+- [ ] T004 Create src/proto/buf.yaml with linting and breaking change detection configuration
+- [ ] T005 Create src/proto/buf.gen.yaml with code generation plugins configuration
+- [ ] T006 [P] Create .gitignore entries for generated code (src/pb/*, tests/mocks/mock_*.go)
+
+## Phase 3.2: Protocol Buffer Definitions
+
+- [ ] T007 Create src/proto/repository.proto with ETCMappingRepository service definition (15 methods)
+- [ ] T008 Add ETCMeisaiRecordRepository service to src/proto/repository.proto (12 methods)
+- [ ] T009 Add ImportRepository service to src/proto/repository.proto (6 methods)
+- [ ] T010 Add StatisticsRepository service to src/proto/repository.proto (6 methods)
+- [ ] T011 [P] Create src/proto/models.proto with ETCMappingEntity message definition
+- [ ] T012 [P] Add ETCMeisaiRecordEntity message to src/proto/models.proto
+- [ ] T013 [P] Add ImportSessionEntity and ImportErrorEntity messages to src/proto/models.proto
+- [ ] T014 [P] Create src/proto/services.proto with ETCMappingService definition
+- [ ] T015 [P] Add ETCMeisaiService to src/proto/services.proto
+- [ ] T016 Add all enum definitions (MappingStatusEnum, ImportStatusEnum, SortOrderEnum) to src/proto/common.proto
+- [ ] T017 Generate initial Go code from proto files (cd src/proto && buf generate)
+
+## Phase 3.3: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.4
+
+### Contract Tests
+- [ ] T018 [P] Create tests/contract/etc_mapping_repository_test.go for ETCMappingRepository contract
+- [ ] T019 [P] Create tests/contract/etc_meisai_record_repository_test.go for ETCMeisaiRecordRepository contract
+- [ ] T020 [P] Create tests/contract/import_repository_test.go for ImportRepository contract
+- [ ] T021 [P] Create tests/contract/statistics_repository_test.go for StatisticsRepository contract
+- [ ] T022 [P] Create tests/contract/etc_mapping_service_test.go for ETCMappingService contract
+- [ ] T023 [P] Create tests/contract/etc_meisai_service_test.go for ETCMeisaiService contract
+
+### Integration Test Scenarios (from quickstart.md)
+- [ ] T024 [P] Create tests/integration/scenario1_update_structure_test.go - test proto field addition workflow
+- [ ] T025 [P] Create tests/integration/scenario2_add_service_method_test.go - test new method addition
+- [ ] T026 [P] Create tests/integration/scenario3_mock_generation_test.go - test mock generation from proto
+- [ ] T027 [P] Create tests/integration/scenario4_migration_verification_test.go - verify no manual interfaces remain
+- [ ] T028 [P] Create tests/integration/scenario5_performance_validation_test.go - benchmark response times
+
+### Mock Generation Setup
+- [ ] T029 Create tests/mocks/generate.go with go:generate directives for all repository clients
+- [ ] T030 Generate initial mocks (cd tests && go generate ./...)
+
+## Phase 3.4: Core Implementation
+
+### Database Adapters
+- [ ] T031 Create src/adapters/proto_db_adapter.go with ProtoDBAdapter base struct
+- [ ] T032 Add ETCMappingToDB and DBToETCMapping conversion methods to proto_db_adapter.go
+- [ ] T033 Add ETCMeisaiRecordToDB and DBToETCMeisaiRecord conversion methods
+- [ ] T034 Add ImportSessionToDB and DBToImportSession conversion methods
+- [ ] T035 Add timestamp and enum conversion utilities to proto_db_adapter.go
+
+### Repository Implementations
+- [ ] T036 Create src/repositories/grpc/etc_mapping_repository_server.go implementing ETCMappingRepository service
+- [ ] T037 Implement all 15 ETCMappingRepository methods (Create, GetByID, Update, Delete, List, etc.)
+- [ ] T038 Create src/repositories/grpc/etc_meisai_record_repository_server.go implementing ETCMeisaiRecordRepository
+- [ ] T039 Implement all 12 ETCMeisaiRecordRepository methods
+- [ ] T040 Create src/repositories/grpc/import_repository_server.go implementing ImportRepository
+- [ ] T041 Implement all 6 ImportRepository methods
+- [ ] T042 Create src/repositories/grpc/statistics_repository_server.go implementing StatisticsRepository
+- [ ] T043 Implement all 6 StatisticsRepository methods
+
+### Repository Client Wrappers
+- [ ] T044 Create src/repositories/etc_mapping_repository_client.go with gRPC client wrapper
+- [ ] T045 Create src/repositories/etc_meisai_record_repository_client.go with gRPC client wrapper
+- [ ] T046 Create src/repositories/import_repository_client.go with gRPC client wrapper
+- [ ] T047 Create src/repositories/statistics_repository_client.go with gRPC client wrapper
+
+### Service Layer Migration
+- [ ] T048 Create src/services/grpc/etc_mapping_service_server.go implementing ETCMappingService
+- [ ] T049 Migrate existing etc_mapping_service.go business logic to use proto messages
+- [ ] T050 Create src/services/grpc/etc_meisai_service_server.go implementing ETCMeisaiService
+- [ ] T051 Migrate existing etc_meisai_service.go business logic to use proto messages
+
+## Phase 3.5: Integration & Migration
+
+### gRPC Server Setup
+- [ ] T052 Update src/grpc/server.go to register all new repository services
+- [ ] T053 Update src/grpc/server.go to register all new service layer services
+- [ ] T054 Configure grpc-gateway for HTTP/REST compatibility
+
+### Remove Legacy Code
+- [ ] T055 Remove all manual interface definitions from src/repositories/interfaces.go
+- [ ] T056 Remove all GORM model files from src/models/ (etc_mapping.go, etc_meisai_record.go, etc.)
+- [ ] T057 Update all import statements to use generated pb package instead of models package
+- [ ] T058 Remove deprecated mock files that were manually created
+
+### Migration Validation
+- [ ] T059 Run all contract tests to ensure API compatibility (go test ./tests/contract/...)
+- [ ] T060 Run all integration tests to validate scenarios (go test ./tests/integration/...)
+- [ ] T061 Verify no test files remain in src/ directory (find src -name "*_test.go")
+- [ ] T062 Verify all mocks are generated from proto definitions (ls tests/mocks/)
+
+## Phase 3.6: Polish
+
+### Documentation & Configuration
+- [ ] T063 [P] Update CLAUDE.md with new gRPC architecture details
+- [ ] T064 [P] Create migration guide documenting the changes for other developers
+- [ ] T065 [P] Update CI/CD pipeline to include buf lint and buf breaking checks
+- [ ] T066 [P] Add Makefile targets for proto generation (make proto, make mocks)
+
+### Performance & Testing
+- [ ] T067 [P] Create benchmark tests comparing old vs new implementation (tests/performance/)
+- [ ] T068 [P] Achieve 100% test coverage for all new adapter code
+- [ ] T069 [P] Achieve 100% test coverage for all repository implementations
+- [ ] T070 [P] Load test the new gRPC services to validate performance goals
+
+### Final Validation
+- [ ] T071 Validate build time is under 60 seconds including code generation
+- [ ] T072 Validate response times are within ±10% of original implementation
+- [ ] T073 Run buf breaking against main branch to document any breaking changes
+- [ ] T074 Create rollback documentation in case issues are discovered
+
+## Parallel Execution Examples
+
+You can run these task groups in parallel to speed up execution:
+
+**Group 1: Setup Tools (T001-T003)**
+```bash
+# Run in separate terminals or with Task agent
+Task 1: "Install buf tooling"
+Task 2: "Install protoc plugins"
+Task 3: "Install mockgen"
+```
+
+**Group 2: Proto Messages (T011-T013)**
+```bash
+# These are independent message definitions
+Task 1: "Define ETCMappingEntity in models.proto"
+Task 2: "Define ETCMeisaiRecordEntity in models.proto"
+Task 3: "Define Import entities in models.proto"
+```
+
+**Group 3: Contract Tests (T018-T023)**
+```bash
+# All contract test files are independent
+Task 1: "Create ETCMappingRepository contract tests"
+Task 2: "Create ETCMeisaiRecordRepository contract tests"
+Task 3: "Create ImportRepository contract tests"
+Task 4: "Create StatisticsRepository contract tests"
+Task 5: "Create ETCMappingService contract tests"
+Task 6: "Create ETCMeisaiService contract tests"
+```
+
+**Group 4: Integration Tests (T024-T028)**
+```bash
+# All scenario tests are independent
+Task 1: "Create update structure scenario test"
+Task 2: "Create add service method scenario test"
+Task 3: "Create mock generation scenario test"
+Task 4: "Create migration verification test"
+Task 5: "Create performance validation test"
+```
+
+**Group 5: Documentation (T063-T066)**
+```bash
+# All documentation tasks are independent
+Task 1: "Update CLAUDE.md"
+Task 2: "Create migration guide"
+Task 3: "Update CI/CD pipeline"
+Task 4: "Add Makefile targets"
+```
+
+## Task Dependencies
+
+```
+Phase 3.1 (Setup) → Phase 3.2 (Proto Definitions) → T017 (Generate Code)
+                                                         ↓
+                              Phase 3.3 (Tests) ← ← ← ← ┘
+                                      ↓
+                              Phase 3.4 (Implementation)
+                                      ↓
+                              Phase 3.5 (Integration)
+                                      ↓
+                              Phase 3.6 (Polish)
+```
+
+## Success Criteria
+- [ ] All 74 tasks completed
+- [ ] All tests passing with 100% coverage
+- [ ] No manual interfaces or GORM models remain
+- [ ] Build time < 60 seconds
+- [ ] Response time within ±10% of original
+- [ ] All proto files lint-clean (buf lint passes)
+- [ ] No breaking changes without justification
+
+---
+*Generated from feature 006-refactor-src-to design documents*
+*Total estimated effort: 5-8 days for single developer, 2-3 days with parallel execution*

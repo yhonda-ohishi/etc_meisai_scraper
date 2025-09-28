@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "// Goファイルを書き込んだ後に自動フォーマット": "",
+    "after-write": "if [[ '{{file_path}}' == *.go ]]; then go fmt {{file_path}}; fi",
+
+    "// テストファイルを編集した後に自動テスト実行": "",
+    "after-edit": "if [[ '{{file_path}}' == *_test.go ]]; then go test {{file_path}}; fi",
+
+    "// 重要なファイルを編集する前にバックアップ": "",
+    "before-edit": "if [[ '{{file_path}}' == *.proto ]]; then cp {{file_path}} {{file_path}}.bak; fi",
+
+    "// go buildコマンドの後にバイナリサイズを表示": "",
+    "after-bash": "if [[ '{{command}}' == *'go build'* ]]; then ls -lh etc_meisai*; fi",
+
+    "// ユーザーがテストを要求した時に自動でカバレッジも実行": "",
+    "user-prompt-submit": "if [[ '{{prompt}}' == *'test'* ]]; then echo 'テストカバレッジも確認します'; fi"
+  }
+}

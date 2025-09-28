@@ -8,14 +8,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yhonda-ohishi/etc_meisai_scraper/src/scraper"
 )
 
 // DownloadService はダウンロード処理を管理
 type DownloadService struct {
-	db       *sql.DB
-	logger   *log.Logger
-	jobs     map[string]*DownloadJob
-	jobMutex sync.RWMutex
+	db             *sql.DB
+	logger         *log.Logger
+	jobs           map[string]*DownloadJob
+	jobMutex       sync.RWMutex
+	scraperFactory ScraperFactory
 }
 
 // DownloadJob はダウンロードジョブの状態
@@ -29,12 +32,25 @@ type DownloadJob struct {
 	CompletedAt  *time.Time
 }
 
+// DownloadServiceInterface はダウンロードサービスのインターフェース
+type DownloadServiceInterface interface {
+	GetAllAccountIDs() []string
+	ProcessAsync(jobID string, accounts []string, fromDate, toDate string)
+	GetJobStatus(jobID string) (*DownloadJob, bool)
+}
+
 // NewDownloadService creates a new download service
 func NewDownloadService(db *sql.DB, logger *log.Logger) *DownloadService {
+	return NewDownloadServiceWithFactory(db, logger, NewDefaultScraperFactory())
+}
+
+// NewDownloadServiceWithFactory creates a new download service with a custom scraper factory
+func NewDownloadServiceWithFactory(db *sql.DB, logger *log.Logger, factory ScraperFactory) *DownloadService {
 	return &DownloadService{
-		db:     db,
-		logger: logger,
-		jobs:   make(map[string]*DownloadJob),
+		db:             db,
+		logger:         logger,
+		jobs:           make(map[string]*DownloadJob),
+		scraperFactory: factory,
 	}
 }
 
@@ -132,13 +148,53 @@ func (s *DownloadService) ProcessAsync(jobID string, accounts []string, fromDate
 
 // downloadAccountData は単一アカウントのデータをダウンロード
 func (s *DownloadService) downloadAccountData(accountID, fromDate, toDate string) error {
-	// TODO: 実際のスクレイピング処理を実装
-	if s.logger != nil {
-		s.logger.Printf("Downloading data for account %s from %s to %s", accountID, fromDate, toDate)
+	// アカウント情報の解析（accountID:password形式）
+	parts := strings.Split(accountID, ":")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid account format: %s (expected accountID:password)", accountID)
 	}
 
-	// シミュレーション用の待機
-	time.Sleep(2 * time.Second)
+	userID := parts[0]
+	password := parts[1]
+
+	// スクレイパーの設定
+	config := &scraper.ScraperConfig{
+		UserID:       userID,
+		Password:     password,
+		DownloadPath: fmt.Sprintf("./downloads/%s_%s", userID, time.Now().Format("20060102_150405")),
+		Headless:     true,
+		Timeout:      30000,
+		RetryCount:   3,
+	}
+
+	// スクレイパー作成
+	etcScraper, err := s.scraperFactory.CreateScraper(config, s.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create scraper: %w", err)
+	}
+	defer etcScraper.Close()
+
+	// Playwright初期化
+	if err := etcScraper.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize scraper: %w", err)
+	}
+
+	// ログイン
+	if err := etcScraper.Login(); err != nil {
+		return fmt.Errorf("login failed for account %s: %w", userID, err)
+	}
+
+	// データダウンロード
+	csvPath, err := etcScraper.DownloadMeisai(fromDate, toDate)
+	if err != nil {
+		return fmt.Errorf("download failed for account %s: %w", userID, err)
+	}
+
+	if s.logger != nil {
+		s.logger.Printf("Successfully downloaded data for account %s: %s", userID, csvPath)
+	}
+
+	// TODO: CSVファイルをパースしてDBに保存
 
 	return nil
 }

@@ -1,0 +1,552 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "download.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "DownloadService"
+    },
+    {
+      "name": "DownloadBufferService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/etc_meisai.download.v2.DownloadBufferService/DownloadAsBuffer": {
+      "post": {
+        "summary": "CSVデータをバイナリで直接返す",
+        "operationId": "DownloadBufferService_DownloadAsBuffer",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v2BufferResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v2BufferDownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadBufferService"
+        ]
+      }
+    },
+    "/etc_meisai.download.v2.DownloadBufferService/DownloadAsProto": {
+      "post": {
+        "summary": "Protocol Buffersメッセージとして返す",
+        "operationId": "DownloadBufferService_DownloadAsProto",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v2ProtoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v2BufferDownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadBufferService"
+        ]
+      }
+    },
+    "/etc_meisai.download.v2.DownloadBufferService/DownloadStream": {
+      "post": {
+        "summary": "ストリーミングでチャンク送信",
+        "operationId": "DownloadBufferService_DownloadStream",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/v2ChunkResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of v2ChunkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v2BufferDownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadBufferService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/accounts": {
+      "get": {
+        "summary": "全アカウントID取得",
+        "operationId": "DownloadService_GetAllAccountIDs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetAllAccountIDsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/download/async": {
+      "post": {
+        "summary": "非同期ダウンロード開始",
+        "operationId": "DownloadService_DownloadAsync",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DownloadJobResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1DownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/download/jobs/{job_id}": {
+      "get": {
+        "summary": "ジョブステータス取得",
+        "operationId": "DownloadService_GetJobStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1JobStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    },
+    "/etc_meisai_scraper/v1/download/sync": {
+      "post": {
+        "summary": "同期ダウンロード",
+        "operationId": "DownloadService_DownloadSync",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DownloadResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1DownloadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "DownloadService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1DownloadJobResponse": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "ダウンロードジョブレスポンス"
+    },
+    "v1DownloadRequest": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "from_date": {
+          "type": "string"
+        },
+        "to_date": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        }
+      },
+      "title": "ダウンロードリクエスト"
+    },
+    "v1DownloadResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "record_count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "csv_path": {
+          "type": "string"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1ETCMeisaiRecord"
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "title": "ダウンロードレスポンス"
+    },
+    "v1ETCMeisaiRecord": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "account_id": {
+          "type": "string"
+        },
+        "usage_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "entry_ic": {
+          "type": "string"
+        },
+        "exit_ic": {
+          "type": "string"
+        },
+        "vehicle_number": {
+          "type": "string"
+        },
+        "etc_card_number": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "csv_file_name": {
+          "type": "string"
+        },
+        "downloaded_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "ETC明細レコード"
+    },
+    "v1GetAllAccountIDsResponse": {
+      "type": "object",
+      "properties": {
+        "account_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "title": "アカウントID取得レスポンス"
+    },
+    "v1JobStatus": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "total_records": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "error_message": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "ジョブステータス"
+    },
+    "v2BufferDownloadRequest": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "from_date": {
+          "type": "string"
+        },
+        "to_date": {
+          "type": "string"
+        }
+      },
+      "title": "リクエスト"
+    },
+    "v2BufferResponse": {
+      "type": "object",
+      "properties": {
+        "csv_data": {
+          "type": "string",
+          "format": "byte",
+          "title": "CSVファイルの内容をそのまま"
+        },
+        "record_count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "content_type": {
+          "type": "string",
+          "title": "\"text/csv\""
+        },
+        "size_bytes": {
+          "type": "string",
+          "format": "int64"
+        }
+      },
+      "title": "バッファレスポンス（CSVをそのままバイナリで）"
+    },
+    "v2ChunkResponse": {
+      "type": "object",
+      "properties": {
+        "chunk": {
+          "type": "string",
+          "format": "byte",
+          "title": "データの一部（例: 1MB chunks）"
+        },
+        "is_last": {
+          "type": "boolean"
+        },
+        "sequence_number": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "ストリーミング用チャンク"
+    },
+    "v2ETCRecord": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "entrance_ic": {
+          "type": "string"
+        },
+        "exit_ic": {
+          "type": "string"
+        },
+        "fare": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "vehicle_number": {
+          "type": "string"
+        },
+        "card_number": {
+          "type": "string"
+        }
+      }
+    },
+    "v2ProtoResponse": {
+      "type": "object",
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v2ETCRecord"
+          }
+        },
+        "metadata": {
+          "$ref": "#/definitions/v2RecordMetadata"
+        }
+      },
+      "title": "Protocol Buffersネイティブ形式"
+    },
+    "v2RecordMetadata": {
+      "type": "object",
+      "properties": {
+        "total_count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "downloaded_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "account_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
