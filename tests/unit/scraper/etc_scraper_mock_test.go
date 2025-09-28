@@ -2,13 +2,14 @@ package scraper_test
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/playwright-community/playwright-go"
 	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
 	"github.com/yhonda-ohishi/etc_meisai/tests/mocks"
 )
@@ -34,6 +35,7 @@ func TestNewETCScraper(t *testing.T) {
 				Password:     "pass",
 				DownloadPath: "./custom",
 				Headless:     true,
+				TestMode:     true,
 				Timeout:      60000,
 				RetryCount:   5,
 				UserAgent:    "CustomAgent",
@@ -120,12 +122,12 @@ func TestETCScraper_Initialize(t *testing.T) {
 					},
 				}
 				mockBrowser := &mocks.MockBrowser{
-					NewContextFunc: func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 						return mockContext, nil
 					},
 				}
 				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 						return mockBrowser, nil
 					},
 				}
@@ -185,7 +187,7 @@ func TestETCScraper_Initialize(t *testing.T) {
 					NewContextError: errors.New("context failed"),
 				}
 				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 						return mockBrowser, nil
 					},
 				}
@@ -208,12 +210,12 @@ func TestETCScraper_Initialize(t *testing.T) {
 					NewPageError: errors.New("page creation failed"),
 				}
 				mockBrowser := &mocks.MockBrowser{
-					NewContextFunc: func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 						return mockContext, nil
 					},
 				}
 				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 						return mockBrowser, nil
 					},
 				}
@@ -239,15 +241,15 @@ func TestETCScraper_Initialize(t *testing.T) {
 					},
 				}
 				mockBrowser := &mocks.MockBrowser{
-					NewContextFunc: func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 						return mockContext, nil
 					},
 				}
 				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 						// Verify SlowMo is passed
-						if len(options) > 0 && options[0].SlowMo != nil {
-							t.Logf("SlowMo option passed: %f", *options[0].SlowMo)
+						if options.SlowMo != nil {
+							t.Logf("SlowMo option passed: %f", *options.SlowMo)
 						}
 						return mockBrowser, nil
 					},
@@ -272,6 +274,7 @@ func TestETCScraper_Initialize(t *testing.T) {
 				UserID:       "test",
 				Password:     "pass",
 				DownloadPath: "./test_downloads",
+				TestMode:     true,
 			}
 			if tt.name == "with SlowMo option" {
 				config.SlowMo = 100
@@ -502,6 +505,7 @@ func TestETCScraper_Login(t *testing.T) {
 				UserID:       "test",
 				Password:     "pass",
 				DownloadPath: "./test_downloads",
+				TestMode:     true,
 			}
 			defer os.RemoveAll(config.DownloadPath)
 
@@ -552,7 +556,7 @@ func TestETCScraper_DownloadMeisai(t *testing.T) {
 
 				// Setup successful navigation
 				navigateCount := 0
-				mockPage.GotoFunc = func(url string, options ...playwright.PageGotoOptions) (playwright.Response, error) {
+				mockPage.GotoFunc = func(url string, options scraper.PageGotoOptions) (scraper.Response, error) {
 					navigateCount++
 					if navigateCount == 1 && url == "https://www.etc-meisai.jp/search" {
 						return nil, nil
@@ -571,7 +575,7 @@ func TestETCScraper_DownloadMeisai(t *testing.T) {
 					if event == "download" {
 						// Simulate download
 						go func() {
-							if downloadHandler, ok := handler.(func(playwright.Download)); ok {
+							if downloadHandler, ok := handler.(func(scraper.Download)); ok {
 								mockDownload := &MockPlaywrightDownload{
 									suggestedName: "meisai.csv",
 								}
@@ -614,7 +618,7 @@ func TestETCScraper_DownloadMeisai(t *testing.T) {
 				mockPage.OnFunc = func(event string, handler interface{}) {
 					if event == "download" {
 						go func() {
-							if downloadHandler, ok := handler.(func(playwright.Download)); ok {
+							if downloadHandler, ok := handler.(func(scraper.Download)); ok {
 								mockDownload := &MockPlaywrightDownload{
 									suggestedName: "meisai.csv",
 								}
@@ -702,6 +706,7 @@ func TestETCScraper_DownloadMeisai(t *testing.T) {
 				UserID:       "test",
 				Password:     "pass",
 				DownloadPath: "./test_downloads",
+				TestMode:     true,
 				Timeout:      1000, // Short timeout for test
 			}
 			defer os.RemoveAll(config.DownloadPath)
@@ -774,6 +779,7 @@ func TestETCScraper_handleDownload(t *testing.T) {
 				UserID:       "test",
 				Password:     "pass",
 				DownloadPath: "./test_downloads",
+				TestMode:     true,
 			}
 			logger := log.New(os.Stdout, "[TEST] ", log.LstdFlags)
 
@@ -822,12 +828,12 @@ func TestETCScraper_Close(t *testing.T) {
 					},
 				}
 				mockBrowser := &mocks.MockBrowser{
-					NewContextFunc: func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 						return mockContext, nil
 					},
 				}
 				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 						return mockBrowser, nil
 					},
 				}
@@ -855,13 +861,13 @@ func TestETCScraper_Close(t *testing.T) {
 					CloseError: errors.New("context close failed"),
 				}
 				mockBrowser := &mocks.MockBrowser{
-					NewContextFunc: func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 						return mockContext, nil
 					},
 					CloseError: errors.New("browser close failed"),
 				}
 				mockChromium := &mocks.MockBrowserType{
-					LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 						return mockBrowser, nil
 					},
 				}
@@ -892,6 +898,7 @@ func TestETCScraper_Close(t *testing.T) {
 				UserID:       "test",
 				Password:     "pass",
 				DownloadPath: "./test_downloads",
+				TestMode:     true,
 			}
 			defer os.RemoveAll(config.DownloadPath)
 
@@ -935,12 +942,12 @@ func createMockFactory(mockPage *mocks.MockPage) *mocks.MockPlaywrightFactory {
 		},
 	}
 	mockBrowser := &mocks.MockBrowser{
-		NewContextFunc: func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+		NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 			return mockContext, nil
 		},
 	}
 	mockChromium := &mocks.MockBrowserType{
-		LaunchFunc: func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+		LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 			return mockBrowser, nil
 		},
 	}
@@ -954,7 +961,7 @@ func createMockFactory(mockPage *mocks.MockPage) *mocks.MockPlaywrightFactory {
 	}
 }
 
-// MockPlaywrightDownload implements playwright.Download interface
+// MockPlaywrightDownload implements scraper.Download interface
 type MockPlaywrightDownload struct {
 	suggestedName string
 	saveError     error
@@ -972,8 +979,171 @@ func (m *MockPlaywrightDownload) Failure() error {
 	return nil
 }
 
-func (m *MockPlaywrightDownload) Page() playwright.Page {
+func (m *MockPlaywrightDownload) Page() scraper.PageInterface {
 	return nil
+}
+
+// TestETCScraper_DownloadMeisaiToBuffer tests the DownloadMeisaiToBuffer function
+func TestETCScraper_DownloadMeisaiToBuffer(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func() *mocks.MockPlaywrightFactory
+		fromDate       string
+		toDate         string
+		expectedData   string
+		expectError    bool
+		errorContains  string
+	}{
+		{
+			name: "successful download and buffer",
+			setupMock: func() *mocks.MockPlaywrightFactory {
+				mockPage := mocks.NewMockPage()
+				mockPage.GotoFunc = func(url string, options scraper.PageGotoOptions) (scraper.Response, error) {
+					return nil, nil
+				}
+
+				// Setup download handler to simulate file creation
+				mockPage.OnFunc = func(event string, handler interface{}) {
+					if event == "download" {
+						go func() {
+							if downloadHandler, ok := handler.(func(scraper.Download)); ok {
+								mockDownload := &mocks.MockDownload{
+									SuggestedName: "test.csv",
+									SaveError:     nil,
+								}
+								downloadHandler(mockDownload)
+							}
+						}()
+					}
+				}
+
+				// Setup locators for successful flow
+				mockPage.Locators = map[string]*mocks.MockLocator{
+					"input[name='fromDate']":    {CountValue: 1},
+					"input[name='toDate']":      {CountValue: 1},
+					"button:has-text('検索')":      {CountValue: 1},
+					"button:has-text('CSV')":    {CountValue: 1},
+				}
+
+				mockContext := &mocks.MockBrowserContext{
+					NewPageFunc: func() (scraper.PageInterface, error) {
+						return mockPage, nil
+					},
+				}
+				mockBrowser := &mocks.MockBrowser{
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+						return mockContext, nil
+					},
+				}
+				mockChromium := &mocks.MockBrowserType{
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+						return mockBrowser, nil
+					},
+				}
+				mockPw := &mocks.MockPlaywright{
+					Chromium: mockChromium,
+				}
+				return &mocks.MockPlaywrightFactory{
+					RunFunc: func() (scraper.PlaywrightInterface, error) {
+						return mockPw, nil
+					},
+				}
+			},
+			fromDate:     "2024-01-01",
+			toDate:       "2024-01-31",
+			expectedData: "test csv data",
+			expectError:  false,
+		},
+		{
+			name: "download error",
+			setupMock: func() *mocks.MockPlaywrightFactory {
+				mockPage := mocks.NewMockPage()
+				mockPage.GotoFunc = func(url string, options scraper.PageGotoOptions) (scraper.Response, error) {
+					return nil, fmt.Errorf("navigation failed")
+				}
+
+				mockContext := &mocks.MockBrowserContext{
+					NewPageFunc: func() (scraper.PageInterface, error) {
+						return mockPage, nil
+					},
+				}
+				mockBrowser := &mocks.MockBrowser{
+					NewContextFunc: func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+						return mockContext, nil
+					},
+				}
+				mockChromium := &mocks.MockBrowserType{
+					LaunchFunc: func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+						return mockBrowser, nil
+					},
+				}
+				mockPw := &mocks.MockPlaywright{
+					Chromium: mockChromium,
+				}
+				return &mocks.MockPlaywrightFactory{
+					RunFunc: func() (scraper.PlaywrightInterface, error) {
+						return mockPw, nil
+					},
+				}
+			},
+			fromDate:      "2024-01-01",
+			toDate:        "2024-01-31",
+			expectError:   true,
+			errorContains: "failed to download CSV",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary file for successful test
+			if tt.expectedData != "" {
+				tmpFile := filepath.Join("./test_downloads", "test.csv")
+				os.MkdirAll("./test_downloads", 0755)
+				err := os.WriteFile(tmpFile, []byte(tt.expectedData), 0644)
+				if err != nil {
+					t.Fatalf("Failed to create test file: %v", err)
+				}
+				defer os.Remove(tmpFile)
+			}
+
+			config := &scraper.ScraperConfig{
+				UserID:       "test",
+				Password:     "test",
+				DownloadPath: "./test_downloads",
+				Headless:     true,
+				TestMode:     true,
+			}
+
+			factory := tt.setupMock()
+			logger := log.New(os.Stdout, "[TEST] ", log.LstdFlags)
+			scraperInstance, err := scraper.NewETCScraperWithFactory(config, logger, factory)
+			if err != nil {
+				t.Fatalf("Failed to create scraper: %v", err)
+			}
+
+			err = scraperInstance.Initialize()
+			if err != nil {
+				t.Fatalf("Failed to initialize scraper: %v", err)
+			}
+
+			data, err := scraperInstance.DownloadMeisaiToBuffer(tt.fromDate, tt.toDate)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain %q, got %q", tt.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if tt.expectedData != "" && string(data) != tt.expectedData {
+					t.Errorf("Expected data %q, got %q", tt.expectedData, string(data))
+				}
+			}
+		})
+	}
 }
 
 func (m *MockPlaywrightDownload) Path() (string, error) {

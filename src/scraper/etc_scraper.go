@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/playwright-community/playwright-go"
 )
 
 // ETCScraper handles web scraping for ETC meisai service
@@ -31,6 +29,7 @@ type ScraperConfig struct {
 	RetryCount   int
 	UserAgent    string
 	SlowMo       float64
+	TestMode     bool // Skip time.Sleep in tests
 }
 
 // NewETCScraper creates a new ETC scraper instance (for production use)
@@ -91,12 +90,12 @@ func (s *ETCScraper) Initialize() error {
 	}
 
 	// Launch browser
-	launchOptions := playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(s.config.Headless),
+	launchOptions := BrowserTypeLaunchOptions{
+		Headless: Bool(s.config.Headless),
 	}
 
 	if s.config.SlowMo > 0 {
-		launchOptions.SlowMo = playwright.Float(s.config.SlowMo)
+		launchOptions.SlowMo = Float(s.config.SlowMo)
 	}
 
 	chromium := s.pw.GetChromium()
@@ -106,14 +105,13 @@ func (s *ETCScraper) Initialize() error {
 	}
 
 	// Create browser context with download settings
-	absPath, _ := filepath.Abs(s.config.DownloadPath)
-	contextOptions := playwright.BrowserNewContextOptions{
-		AcceptDownloads: playwright.Bool(true),
-		Viewport: &playwright.Size{
+	contextOptions := BrowserNewContextOptions{
+		AcceptDownloads: Bool(true),
+		Viewport: &Size{
 			Width:  1920,
 			Height: 1080,
 		},
-		UserAgent: playwright.String(s.config.UserAgent),
+		UserAgent: String(s.config.UserAgent),
 	}
 
 	s.context, err = s.browser.NewContext(contextOptions)
@@ -130,7 +128,7 @@ func (s *ETCScraper) Initialize() error {
 		return fmt.Errorf("could not create page: %w", err)
 	}
 
-	s.logger.Printf("Scraper initialized with download path: %s", absPath)
+	s.logger.Printf("Scraper initialized with download path: %s", s.config.DownloadPath)
 	return nil
 }
 
@@ -143,8 +141,8 @@ func (s *ETCScraper) Login() error {
 	s.logger.Println("Navigating to https://www.etc-meisai.jp/")
 
 	// Navigate to login page
-	_, err := s.page.Goto("https://www.etc-meisai.jp/", playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateNetworkidle,
+	_, err := s.page.Goto("https://www.etc-meisai.jp/", PageGotoOptions{
+		WaitUntil: WaitUntilStateNetworkidle,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to navigate to login page: %w", err)
@@ -209,14 +207,14 @@ func (s *ETCScraper) Login() error {
 		return fmt.Errorf("login button not found")
 	}
 
-	if err := loginButton.Click(); err != nil {
+	if err := loginButton.Click(LocatorClickOptions{}); err != nil {
 		return fmt.Errorf("failed to click login button: %w", err)
 	}
 
 	// Wait for navigation after login
-	time.Sleep(3 * time.Second)
-	err = s.page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
-		State: playwright.LoadStateNetworkidle,
+	s.waitForNavigation()
+	err = s.page.WaitForLoadState(PageWaitForLoadStateOptions{
+		State: LoadStateNetworkidle,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to wait for login completion: %w", err)
@@ -234,7 +232,7 @@ func (s *ETCScraper) Login() error {
 
 	// Check for error messages
 	errorLocator := s.page.Locator(".error-message, .alert-danger, .error").First()
-	errorMsg, _ := errorLocator.TextContent()
+	errorMsg, _ := errorLocator.TextContent(LocatorTextContentOptions{})
 	if errorMsg != "" {
 		return fmt.Errorf("login failed: %s", errorMsg)
 	}
@@ -260,8 +258,8 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	navigated := false
 	for _, url := range searchURLs {
-		if _, err := s.page.Goto(url, playwright.PageGotoOptions{
-			WaitUntil: playwright.WaitUntilStateNetworkidle,
+		if _, err := s.page.Goto(url, PageGotoOptions{
+			WaitUntil: WaitUntilStateNetworkidle,
 		}); err == nil {
 			s.logger.Printf("Navigated to %s", url)
 			navigated = true
@@ -318,16 +316,16 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	searchButton := s.findElement(searchButtonSelectors)
 	if searchButton != nil {
-		searchButton.Click()
+		searchButton.Click(LocatorClickOptions{})
 		s.logger.Println("Clicked search button")
-		time.Sleep(3 * time.Second)
+		s.waitForNavigation()
 	}
 
 	// Skip screenshot
 
 	// Setup download handler
 	downloadComplete := make(chan string, 1)
-	s.page.On("download", func(download playwright.Download) {
+	s.page.On("download", func(download Download) {
 		s.HandleDownload(download, downloadComplete)
 	})
 
@@ -343,7 +341,7 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	downloadButton := s.findElement(downloadButtonSelectors)
 	if downloadButton != nil {
-		downloadButton.Click()
+		downloadButton.Click(LocatorClickOptions{})
 		s.logger.Println("Clicked download button")
 
 		// Wait for download with timeout
@@ -360,7 +358,7 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 }
 
 // HandleDownload processes download events (exported for testing)
-func (s *ETCScraper) HandleDownload(download playwright.Download, downloadComplete chan<- string) {
+func (s *ETCScraper) HandleDownload(download Download, downloadComplete chan<- string) {
 	suggestedFilename := download.SuggestedFilename()
 	downloadPath := filepath.Join(s.config.DownloadPath, suggestedFilename)
 
@@ -402,4 +400,43 @@ func (s *ETCScraper) Close() error {
 		s.pw.Stop()
 	}
 	return nil
+}
+// ReadAndDeleteFile reads a file and deletes it (extracted for testing)
+func ReadAndDeleteFile(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	if err := os.Remove(path); err != nil {
+		// Ignore deletion errors
+	}
+
+	return data, nil
+}
+
+// DownloadMeisaiToBuffer downloads ETC meisai data and returns it as a byte buffer
+func (s *ETCScraper) DownloadMeisaiToBuffer(fromDate, toDate string) ([]byte, error) {
+	// Download CSV file
+	csvPath, err := s.DownloadMeisai(fromDate, toDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download CSV: %w", err)
+	}
+
+	// Read and delete file
+	data, err := ReadAndDeleteFile(csvPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CSV file: %w", err)
+	}
+
+	return data, nil
+}
+
+// waitForNavigation waits for page navigation (extracted for testing)
+func (s *ETCScraper) waitForNavigation() {
+	if !s.config.TestMode {
+		time.Sleep(3 * time.Second)
+	} else {
+		s.logger.Printf("TestMode: Skipping 3 second sleep")
+	}
 }

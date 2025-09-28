@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	"github.com/playwright-community/playwright-go"
 	"github.com/yhonda-ohishi/etc_meisai/src/scraper"
 )
 
@@ -53,13 +52,13 @@ func (m *MockPlaywright) GetChromium() scraper.BrowserTypeInterface {
 
 // MockBrowserType implements scraper.BrowserTypeInterface
 type MockBrowserType struct {
-	LaunchFunc func(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error)
+	LaunchFunc func(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error)
 	LaunchError error
 }
 
-func (m *MockBrowserType) Launch(options ...playwright.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
+func (m *MockBrowserType) Launch(options scraper.BrowserTypeLaunchOptions) (scraper.BrowserInterface, error) {
 	if m.LaunchFunc != nil {
-		return m.LaunchFunc(options...)
+		return m.LaunchFunc(options)
 	}
 	if m.LaunchError != nil {
 		return nil, m.LaunchError
@@ -69,15 +68,15 @@ func (m *MockBrowserType) Launch(options ...playwright.BrowserTypeLaunchOptions)
 
 // MockBrowser implements scraper.BrowserInterface
 type MockBrowser struct {
-	NewContextFunc func(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error)
+	NewContextFunc func(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error)
 	CloseFunc func() error
 	NewContextError error
 	CloseError error
 }
 
-func (m *MockBrowser) NewContext(options ...playwright.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
+func (m *MockBrowser) NewContext(options scraper.BrowserNewContextOptions) (scraper.BrowserContextInterface, error) {
 	if m.NewContextFunc != nil {
-		return m.NewContextFunc(options...)
+		return m.NewContextFunc(options)
 	}
 	if m.NewContextError != nil {
 		return nil, m.NewContextError
@@ -128,10 +127,10 @@ func (m *MockBrowserContext) Close() error {
 
 // MockPage implements scraper.PageInterface
 type MockPage struct {
-	GotoFunc func(url string, options ...playwright.PageGotoOptions) (playwright.Response, error)
+	GotoFunc func(url string, options scraper.PageGotoOptions) (scraper.Response, error)
 	LocatorFunc func(selector string) scraper.LocatorInterface
-	WaitForLoadStateFunc func(options ...playwright.PageWaitForLoadStateOptions) error
-	ScreenshotFunc func(options ...playwright.PageScreenshotOptions) ([]byte, error)
+	WaitForLoadStateFunc func(options scraper.PageWaitForLoadStateOptions) error
+	ScreenshotFunc func(options scraper.PageScreenshotOptions) ([]byte, error)
 	CloseFunc func() error
 	OnFunc func(event string, handler interface{})
 
@@ -149,9 +148,9 @@ func NewMockPage() *MockPage {
 	}
 }
 
-func (m *MockPage) Goto(url string, options ...playwright.PageGotoOptions) (playwright.Response, error) {
+func (m *MockPage) Goto(url string, options scraper.PageGotoOptions) (scraper.Response, error) {
 	if m.GotoFunc != nil {
-		return m.GotoFunc(url, options...)
+		return m.GotoFunc(url, options)
 	}
 	if m.GotoError != nil {
 		return nil, m.GotoError
@@ -170,16 +169,16 @@ func (m *MockPage) Locator(selector string) scraper.LocatorInterface {
 	return &MockLocator{CountValue: 0}
 }
 
-func (m *MockPage) WaitForLoadState(options ...playwright.PageWaitForLoadStateOptions) error {
+func (m *MockPage) WaitForLoadState(options scraper.PageWaitForLoadStateOptions) error {
 	if m.WaitForLoadStateFunc != nil {
-		return m.WaitForLoadStateFunc(options...)
+		return m.WaitForLoadStateFunc(options)
 	}
 	return m.WaitError
 }
 
-func (m *MockPage) Screenshot(options ...playwright.PageScreenshotOptions) ([]byte, error) {
+func (m *MockPage) Screenshot(options scraper.PageScreenshotOptions) ([]byte, error) {
 	if m.ScreenshotFunc != nil {
-		return m.ScreenshotFunc(options...)
+		return m.ScreenshotFunc(options)
 	}
 	if m.ScreenshotError != nil {
 		return nil, m.ScreenshotError
@@ -208,8 +207,8 @@ type MockLocator struct {
 	CountFunc func() (int, error)
 	FirstFunc func() scraper.LocatorInterface
 	FillFunc func(value string) error
-	ClickFunc func(options ...playwright.LocatorClickOptions) error
-	TextContentFunc func(options ...playwright.LocatorTextContentOptions) (string, error)
+	ClickFunc func(options scraper.LocatorClickOptions) error
+	TextContentFunc func(options scraper.LocatorTextContentOptions) (string, error)
 
 	CountValue int
 	CountError error
@@ -243,16 +242,16 @@ func (m *MockLocator) Fill(value string) error {
 	return m.FillError
 }
 
-func (m *MockLocator) Click(options ...playwright.LocatorClickOptions) error {
+func (m *MockLocator) Click(options scraper.LocatorClickOptions) error {
 	if m.ClickFunc != nil {
-		return m.ClickFunc(options...)
+		return m.ClickFunc(options)
 	}
 	return m.ClickError
 }
 
-func (m *MockLocator) TextContent(options ...playwright.LocatorTextContentOptions) (string, error) {
+func (m *MockLocator) TextContent(options scraper.LocatorTextContentOptions) (string, error) {
 	if m.TextContentFunc != nil {
-		return m.TextContentFunc(options...)
+		return m.TextContentFunc(options)
 	}
 	if m.TextError != nil {
 		return "", m.TextError
@@ -260,7 +259,7 @@ func (m *MockLocator) TextContent(options ...playwright.LocatorTextContentOption
 	return m.TextValue, nil
 }
 
-// MockDownload simulates a playwright.Download
+// MockDownload simulates a scraper.Download
 type MockDownload struct {
 	SuggestedName string
 	SaveError error
@@ -272,4 +271,21 @@ func (m *MockDownload) SuggestedFilename() string {
 
 func (m *MockDownload) SaveAs(path string) error {
 	return m.SaveError
+}
+
+// SetDownloadHandler sets up mock download handler for testing
+func (m *MockPage) SetDownloadHandler(filePath string) {
+	m.OnFunc = func(event string, handler interface{}) {
+		if event == "download" {
+			go func() {
+				if downloadHandler, ok := handler.(func(scraper.Download)); ok {
+					mockDownload := &MockDownload{
+						SuggestedName: "test.csv",
+						SaveError:     nil,
+					}
+					downloadHandler(mockDownload)
+				}
+			}()
+		}
+	}
 }
