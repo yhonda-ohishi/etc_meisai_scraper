@@ -8,11 +8,12 @@ import (
 
 	pb "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	// gRPCサーバーに接続
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,7 +24,7 @@ func main() {
 
 	// 方法1: CSVデータを直接バイナリで取得
 	fmt.Println("=== Method 1: Direct Buffer ===")
-	bufferResp, err := client.DownloadAsBuffer(ctx, &pb.DownloadRequest{
+	bufferResp, err := client.DownloadAsBuffer(ctx, &pb.BufferDownloadRequest{
 		Accounts: []string{"account1"},
 		FromDate: "2024-01-01",
 		ToDate:   "2024-01-31",
@@ -40,7 +41,7 @@ func main() {
 
 	// 方法2: ストリーミングで受信
 	fmt.Println("\n=== Method 2: Streaming ===")
-	stream, err := client.DownloadStream(ctx, &pb.DownloadRequest{
+	stream, err := client.DownloadStream(ctx, &pb.BufferDownloadRequest{
 		Accounts: []string{"account1"},
 		FromDate: "2024-01-01",
 		ToDate:   "2024-01-31",
@@ -65,7 +66,7 @@ func main() {
 
 	// 方法3: 構造化データとして取得
 	fmt.Println("\n=== Method 3: Structured Proto ===")
-	protoResp, err := client.DownloadAsProto(ctx, &pb.DownloadRequest{
+	protoResp, err := client.DownloadAsProto(ctx, &pb.BufferDownloadRequest{
 		Accounts: []string{"account1"},
 		FromDate: "2024-01-01",
 		ToDate:   "2024-01-31",

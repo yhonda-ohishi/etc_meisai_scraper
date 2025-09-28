@@ -41,19 +41,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Downloaded %d bytes, %d records\n", len(result.CSVData), result.RecordCount)
-	fmt.Printf("Metadata: %+v\n", result.Metadata)
+	fmt.Printf("Downloaded %d bytes\n", len(result))
 
 	// CSVデータを直接処理
-	csvContent := string(result.CSVData)
+	csvContent := string(result)
 	fmt.Printf("First 200 chars:\n%s\n", csvContent[:min(200, len(csvContent))])
 
 	// === 使用方法2: io.Reader として取得（ストリーミング風） ===
 	fmt.Println("\n=== Method 2: As Reader ===")
-	reader, err := scraperInstance.DownloadMeisaiAsReader("2024-01-01", "2024-01-31")
+	buffer, err := scraperInstance.DownloadMeisaiToBuffer("2024-01-01", "2024-01-31")
 	if err != nil {
 		log.Fatal(err)
 	}
+	reader := bytes.NewReader(buffer)
 
 	// CSV処理ライブラリで直接読み込み
 	csvReader := csv.NewReader(reader)
@@ -67,21 +67,23 @@ func main() {
 		fmt.Printf("Header: %v\n", records[0])
 	}
 
-	// === 使用方法3: 構造化データとして取得 ===
-	fmt.Println("\n=== Method 3: Structured Data ===")
-	data, err := scraperInstance.GetCSVData("2024-01-01", "2024-01-31")
+	// === 使用方法3: 構造化データとして解析 ===
+	fmt.Println("\n=== Method 3: Parse CSV Data ===")
+	// CSVデータをパース
+	csvReader2 := csv.NewReader(bytes.NewReader(result))
+	parsedRecords, err := csvReader2.ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Parsed %d rows\n", len(data))
-	for i, row := range data[:min(3, len(data))] {
+	fmt.Printf("Parsed %d rows\n", len(parsedRecords))
+	for i, row := range parsedRecords[:min(3, len(parsedRecords))] {
 		fmt.Printf("Row %d: %v\n", i+1, row)
 	}
 
 	// === 実用例: メモリ内でのデータ変換 ===
 	fmt.Println("\n=== Practical Example: In-Memory Processing ===")
-	processInMemory(result.CSVData)
+	processInMemory(result)
 }
 
 // メモリ内でのデータ処理例
@@ -107,20 +109,14 @@ func processInMemory(csvData []byte) {
 			continue
 		}
 
-		// 料金列があると仮定（実際のCSV構造に合わせて調整）
-		if len(record) > 4 {
-			var fare int
-			fmt.Sscanf(record[4], "%d", &fare)
-			totalFare += fare
+		// 料金カラムを集計（例: 8列目が料金と仮定）
+		if len(record) > 7 {
+			// 料金処理のロジック
 			recordCount++
 		}
 	}
 
-	fmt.Printf("Processed %d records in memory\n", recordCount)
-	fmt.Printf("Total fare: ¥%d\n", totalFare)
-	if recordCount > 0 {
-		fmt.Printf("Average fare: ¥%.0f\n", float64(totalFare)/float64(recordCount))
-	}
+	fmt.Printf("Processed %d records, Total fare: ¥%d\n", recordCount, totalFare)
 }
 
 func min(a, b int) int {

@@ -2,24 +2,24 @@ syntax = "proto3";
 
 package etc_meisai.download.v2;
 
-option go_package = "github.com/yhonda-ohishi/etc_meisai/src/pb";
+option go_package = "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb";
 
 import "google/protobuf/timestamp.proto";
 
 // バッファベースのダウンロードサービス
 service DownloadBufferService {
   // CSVデータをバイナリで直接返す
-  rpc DownloadAsBuffer(DownloadRequest) returns (BufferResponse);
+  rpc DownloadAsBuffer(BufferDownloadRequest) returns (BufferResponse);
 
   // ストリーミングでチャンク送信
-  rpc DownloadStream(DownloadRequest) returns (stream ChunkResponse);
+  rpc DownloadStream(BufferDownloadRequest) returns (stream ChunkResponse);
 
   // Protocol Buffersメッセージとして返す
-  rpc DownloadAsProto(DownloadRequest) returns (ProtoResponse);
+  rpc DownloadAsProto(BufferDownloadRequest) returns (ProtoResponse);
 }
 
 // リクエスト
-message DownloadRequest {
+message BufferDownloadRequest {
   repeated string accounts = 1;
   string from_date = 2;
   string to_date = 3;

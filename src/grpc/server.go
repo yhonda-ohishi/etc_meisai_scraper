@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"net"
 	"os"
 
 	pb "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb"
@@ -18,10 +17,11 @@ type Server struct {
 	grpcServer      *grpc.Server
 	downloadService *services.DownloadServiceGRPC
 	logger          *log.Logger
+	netListener     NetListener
 }
 
-// NewServer creates a new gRPC server
-func NewServer(db *sql.DB, logger *log.Logger) *Server {
+// NewServerWithListener creates a new gRPC server with custom NetListener
+func NewServerWithListener(db *sql.DB, logger *log.Logger, listener NetListener) *Server {
 	if logger == nil {
 		logger = log.New(os.Stdout, "[GRPC-SERVER] ", log.LstdFlags|log.Lshortfile)
 	}
@@ -39,7 +39,13 @@ func NewServer(db *sql.DB, logger *log.Logger) *Server {
 		grpcServer:      grpcServer,
 		downloadService: downloadService,
 		logger:          logger,
+		netListener:     listener,
 	}
+}
+
+// NewServer creates a new gRPC server
+func NewServer(db *sql.DB, logger *log.Logger) *Server {
+	return NewServerWithListener(db, logger, &DefaultNetListener{})
 }
 
 // Start はgRPCサーバーを起動
@@ -48,7 +54,10 @@ func (s *Server) Start(port string) error {
 		port = "50051"
 	}
 
-	lis, err := net.Listen("tcp", ":"+port)
+	if s.netListener == nil {
+		s.netListener = &DefaultNetListener{}
+	}
+	lis, err := s.netListener.Listen("tcp", ":"+port)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}

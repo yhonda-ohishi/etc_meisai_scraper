@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package etc_meisai.download.v1;
 
-option go_package = "github.com/yhonda-ohishi/etc_meisai/src/pb";
+option go_package = "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb";
 
 import "google/protobuf/timestamp.proto";
 
