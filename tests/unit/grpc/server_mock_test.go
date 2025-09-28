@@ -46,17 +46,6 @@ type mockAddr struct{}
 func (m *mockAddr) Network() string { return "tcp" }
 func (m *mockAddr) String() string  { return "127.0.0.1:50051" }
 
-type mockConn struct{}
-
-func (m *mockConn) Read(b []byte) (n int, err error)   { return 0, nil }
-func (m *mockConn) Write(b []byte) (n int, err error)  { return len(b), nil }
-func (m *mockConn) Close() error                       { return nil }
-func (m *mockConn) LocalAddr() net.Addr                { return &mockAddr{} }
-func (m *mockConn) RemoteAddr() net.Addr               { return &mockAddr{} }
-func (m *mockConn) SetDeadline(t time.Time) error      { return nil }
-func (m *mockConn) SetReadDeadline(t time.Time) error  { return nil }
-func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
-
 func TestNewServer_Mock(t *testing.T) {
 	tests := []struct {
 		name   string

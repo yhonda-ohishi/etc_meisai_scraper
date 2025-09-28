@@ -106,7 +106,7 @@ func TestDownloadService_ProcessAsync_Panic_Recovery(t *testing.T) {
 	service.ProcessAsync(jobID, accounts, fromDate, toDate)
 
 	// Check that job was created
-	job, exists := service.GetJobStatus(jobID)
+	_, exists := service.GetJobStatus(jobID)
 	if !exists {
 		t.Fatal("Job should exist")
 	}
@@ -114,7 +114,7 @@ func TestDownloadService_ProcessAsync_Panic_Recovery(t *testing.T) {
 	// Job should complete even with empty accounts
 	time.Sleep(100 * time.Millisecond)
 
-	job, _ = service.GetJobStatus(jobID)
+	job, _ := service.GetJobStatus(jobID)
 	if job.Status == "" {
 		t.Error("Job should have a status")
 	}

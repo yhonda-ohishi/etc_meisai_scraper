@@ -48,7 +48,8 @@
       "Bash(xargs:*)",
       "Bash(ls:*)",
       "Bash(go generate:*)",
-      "Read(//c/**)"
+      "Read(//c/**)",
+      "Bash(staticcheck:*)"
     ],
     "deny": [],
     "ask": []
