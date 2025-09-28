@@ -47,7 +47,8 @@
       "WebFetch(domain:github.com)",
       "Bash(xargs:*)",
       "Bash(ls:*)",
-      "Bash(go generate:*)"
+      "Bash(go generate:*)",
+      "Read(//c/**)"
     ],
     "deny": [],
     "ask": []

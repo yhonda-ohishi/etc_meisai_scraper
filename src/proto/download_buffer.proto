@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package etc_meisai.download.v2;
+
+option go_package = "github.com/yhonda-ohishi/etc_meisai/src/pb";
+
+import "google/protobuf/timestamp.proto";
+
+// バッファベースのダウンロードサービス
+service DownloadBufferService {
+  // CSVデータをバイナリで直接返す
+  rpc DownloadAsBuffer(DownloadRequest) returns (BufferResponse);
+
+  // ストリーミングでチャンク送信
+  rpc DownloadStream(DownloadRequest) returns (stream ChunkResponse);
+
+  // Protocol Buffersメッセージとして返す
+  rpc DownloadAsProto(DownloadRequest) returns (ProtoResponse);
+}
+
+// リクエスト
+message DownloadRequest {
+  repeated string accounts = 1;
+  string from_date = 2;
+  string to_date = 3;
+}
+
+// バッファレスポンス（CSVをそのままバイナリで）
+message BufferResponse {
+  bytes csv_data = 1;  // CSVファイルの内容をそのまま
+  int32 record_count = 2;
+  string content_type = 3;  // "text/csv"
+  int64 size_bytes = 4;
+}
+
+// ストリーミング用チャンク
+message ChunkResponse {
+  bytes chunk = 1;  // データの一部（例: 1MB chunks）
+  bool is_last = 2;
+  int32 sequence_number = 3;
+}
+
+// Protocol Buffersネイティブ形式
+message ProtoResponse {
+  repeated ETCRecord records = 1;
+  RecordMetadata metadata = 2;
+}
+
+message ETCRecord {
+  string date = 1;
+  string time = 2;
+  string entrance_ic = 3;
+  string exit_ic = 4;
+  int32 fare = 5;
+  string vehicle_number = 6;
+  string card_number = 7;
+}
+
+message RecordMetadata {
+  int32 total_count = 1;
+  google.protobuf.Timestamp downloaded_at = 2;
+  string account_id = 3;
+}
