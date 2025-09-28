@@ -131,14 +131,13 @@ type PlaywrightFactory interface {
 type DefaultPlaywrightFactory struct{}
 
 func (f *DefaultPlaywrightFactory) Install() error {
-	// For production, this would call playwright.Install()
-	// For now, return nil for testing
+	// Playwright install is handled separately by the user
+	// or CI/CD pipeline, so we just return nil here
 	return nil
 }
 
 func (f *DefaultPlaywrightFactory) Run() (PlaywrightInterface, error) {
-	// TODO: Implement actual playwright adapter
-	// For now, return nil as this is only used in production
-	// and tests use mock implementations
-	return nil, nil
+	// For production use, we need a real playwright implementation
+	// This requires creating an adapter
+	return NewRealPlaywright()
 }
