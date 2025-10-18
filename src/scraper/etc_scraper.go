@@ -98,6 +98,13 @@ func (s *ETCScraper) Initialize() error {
 		launchOptions.SlowMo = Float(s.config.SlowMo)
 	}
 
+	// Log Headless mode setting
+	if s.config.Headless {
+		s.logger.Println("🔒 Launching browser in Headless mode (browser not visible)")
+	} else {
+		s.logger.Println("👁️  Launching browser in VISIBLE mode (browser will appear)")
+	}
+
 	chromium := s.pw.GetChromium()
 	s.browser, err = chromium.Launch(launchOptions)
 	if err != nil {

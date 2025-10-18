@@ -248,6 +248,7 @@ func (s *DownloadService) GetJobStatus(jobID string) (*DownloadJob, bool) {
 func GetHeadlessMode() bool {
 	headlessEnv := os.Getenv("ETC_HEADLESS")
 	if headlessEnv == "" {
+		log.Println("[Headless] ETC_HEADLESS not set, using default: true (Headless mode)")
 		return true // デフォルトはHeadlessモード
 	}
 
@@ -255,7 +256,14 @@ func GetHeadlessMode() bool {
 	headless, err := strconv.ParseBool(headlessEnv)
 	if err != nil {
 		// パースエラーの場合もデフォルトのHeadlessモード
+		log.Printf("[Headless] Invalid ETC_HEADLESS value %q, using default: true (Headless mode)", headlessEnv)
 		return true
+	}
+
+	if headless {
+		log.Printf("[Headless] ETC_HEADLESS=%s -> Headless mode (browser not visible)", headlessEnv)
+	} else {
+		log.Printf("[Headless] ETC_HEADLESS=%s -> VISIBLE mode (browser will appear)", headlessEnv)
 	}
 
 	return headless
