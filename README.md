@@ -66,9 +66,60 @@ func main() {
 }
 ```
 
-### サービスとして実行
+### スタンドアロンサーバーとして実行
 
-このモジュールは主に他のサービスから呼び出されるライブラリとして設計されています。
+このモジュールは別プロセスとして実行し、他のサービス（例: desktop-server）からgRPCで接続できます。
+
+#### gRPCサーバーとして起動（推奨）
+
+```bash
+# デフォルト設定で起動（ポート: 50052）
+./etc_meisai_scraper.exe
+
+# カスタムポートで起動
+./etc_meisai_scraper.exe --grpc-port 50052
+```
+
+#### レガシーHTTPサーバーとして起動
+
+```bash
+./etc_meisai_scraper.exe --grpc=false --http-port 8080
+```
+
+#### ヘルプの表示
+
+```bash
+./etc_meisai_scraper.exe --help
+```
+
+### desktop-server との統合
+
+desktop-serverとの統合では、etc_meisai_scraperを**別プロセス**として実行することを推奨します：
+
+```
+┌─────────────────────────────────────┐
+│ desktop-server.exe                  │
+│ - db_service統合（同一プロセス）    │
+│ - gRPC-Webプロキシ                  │
+│ - フロントエンド提供                │
+└─────────────────────────────────────┘
+         │
+         │ gRPC Client
+         ↓
+┌─────────────────────────────────────┐
+│ etc_meisai_scraper.exe (別プロセス) │
+│ - DownloadService提供               │
+│ - Playwrightでスクレイピング        │
+└─────────────────────────────────────┘
+```
+
+**メリット:**
+- ✅ desktop-serverのバイナリサイズが小さいまま
+- ✅ 環境依存性の分離（Playwright依存）
+- ✅ スクレイピング処理がデスクトップアプリに影響しない
+- ✅ 必要な時だけ起動可能（オンデマンド起動）
+
+詳細な統合方法は [desktop-serverリポジトリ](https://github.com/yhonda-ohishi/desktop-server) を参照してください。
 
 ## 🌐 API エンドポイント
 

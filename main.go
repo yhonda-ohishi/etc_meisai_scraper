@@ -17,25 +17,57 @@ import (
 func main() {
 	// コマンドラインフラグ
 	var (
-		useGRPC    = flag.Bool("grpc", false, "Use gRPC server instead of HTTP")
-		grpcPort   = flag.String("grpc-port", "50051", "gRPC server port")
-		httpPort   = flag.String("http-port", "8080", "HTTP server port")
+		useGRPC    = flag.Bool("grpc", true, "Use gRPC server (default: true)")
+		grpcPort   = flag.String("grpc-port", "50052", "gRPC server port for etc_meisai_scraper")
+		httpPort   = flag.String("http-port", "8080", "HTTP server port (legacy mode)")
+		showHelp   = flag.Bool("help", false, "Show help message")
 	)
 	flag.Parse()
 
-	// ロガー設定
-	logger := log.New(os.Stdout, "[ETC-MEISAI] ", log.LstdFlags|log.Lshortfile)
+	if *showHelp {
+		printHelp()
+		return
+	}
 
-	// DB接続（TODO: 実装）
+	// ロガー設定
+	logger := log.New(os.Stdout, "[ETC-MEISAI] ", log.LstdFlags)
+
+	// DB接続は不要（スクレイピング専用サービス）
 	var db *sql.DB
 
 	if *useGRPC {
-		// gRPCサーバーモード
+		// gRPCサーバーモード（推奨）
+		logger.Println("Starting in gRPC server mode (recommended for desktop-server integration)")
 		runGRPCServer(db, logger, *grpcPort)
 	} else {
-		// HTTPサーバーモード
+		// HTTPサーバーモード（レガシー）
+		logger.Println("Starting in HTTP server mode (legacy)")
 		runHTTPServer(db, logger, *httpPort)
 	}
+}
+
+func printHelp() {
+	log.Println("ETC Meisai Scraper - Standalone gRPC Server")
+	log.Println()
+	log.Println("Usage:")
+	log.Println("  etc_meisai_scraper.exe [options]")
+	log.Println()
+	log.Println("Options:")
+	flag.PrintDefaults()
+	log.Println()
+	log.Println("Examples:")
+	log.Println("  # Start as gRPC server (default)")
+	log.Println("  etc_meisai_scraper.exe")
+	log.Println()
+	log.Println("  # Start with custom port")
+	log.Println("  etc_meisai_scraper.exe --grpc-port 50052")
+	log.Println()
+	log.Println("  # Start as HTTP server (legacy)")
+	log.Println("  etc_meisai_scraper.exe --grpc=false --http-port 8080")
+	log.Println()
+	log.Println("Integration with desktop-server:")
+	log.Println("  This service is designed to run as a separate process and be called")
+	log.Println("  by desktop-server via gRPC. See README.md for integration details.")
 }
 
 func runGRPCServer(db *sql.DB, logger *log.Logger, port string) {
