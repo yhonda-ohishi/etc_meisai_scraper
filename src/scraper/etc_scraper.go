@@ -21,15 +21,16 @@ type ETCScraper struct {
 
 // ScraperConfig holds configuration for the scraper
 type ScraperConfig struct {
-	UserID       string
-	Password     string
-	DownloadPath string
-	Headless     bool
-	Timeout      float64
-	RetryCount   int
-	UserAgent    string
-	SlowMo       float64
-	TestMode     bool // Skip time.Sleep in tests
+	UserID        string
+	Password      string
+	DownloadPath  string
+	SessionFolder string // Current session folder for this execution
+	Headless      bool
+	Timeout       float64
+	RetryCount    int
+	UserAgent     string
+	SlowMo        float64
+	TestMode      bool // Skip time.Sleep in tests
 }
 
 // NewETCScraper creates a new ETC scraper instance (for production use)
@@ -250,6 +251,30 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	s.logger.Printf("Downloading meisai from %s to %s", fromDate, toDate)
 
+	// Use existing session folder or create a new one
+	var sessionFolder string
+	if s.config.SessionFolder != "" {
+		// Use existing session folder (for multiple downloads in same session)
+		sessionFolder = s.config.SessionFolder
+		s.logger.Printf("Using existing session folder: %s", sessionFolder)
+	} else {
+		// Create new timestamped subfolder for this download session
+		timestamp := time.Now().Format("20060102_150405")
+		sessionFolder = filepath.Join(s.config.DownloadPath, timestamp)
+		if err := os.MkdirAll(sessionFolder, 0755); err != nil {
+			return "", fmt.Errorf("failed to create session folder: %w", err)
+		}
+		s.logger.Printf("Created new session folder: %s", sessionFolder)
+		s.config.SessionFolder = sessionFolder
+	}
+
+	// Update download path to use session folder
+	originalDownloadPath := s.config.DownloadPath
+	s.config.DownloadPath = sessionFolder
+	defer func() {
+		s.config.DownloadPath = originalDownloadPath
+	}()
+
 	// Navigate to search page (検索条件の指定)
 	s.logger.Println("Navigating to search page...")
 	searchPageLink := s.page.Locator("a:has-text('検索条件の指定')").First()
@@ -279,6 +304,15 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 		return "", fmt.Errorf("failed to wait for search results: %w", err)
 	}
 
+	// Check if there are any results
+	s.logger.Println("Checking for search results...")
+	resultCount, _ := s.page.Locator("input[name='hakkoMeisai']").Count()
+	s.logger.Printf("Found %d result items", resultCount)
+
+	if resultCount == 0 {
+		s.logger.Println("⚠️ No search results found. CSV link may not be available.")
+	}
+
 	// Setup download handler
 	downloadComplete := make(chan string, 1)
 	s.logger.Println("Setting up download handler...")
@@ -289,8 +323,31 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	// Click CSV download link
 	s.logger.Println("Clicking CSV download link...")
-	// Use onclick attribute to find the CSV link more reliably
-	csvLink := s.page.Locator("a[onclick*='1032500000']").First()
+
+	// Try multiple selectors for CSV link
+	// Note: onclick funccode varies by account type (1032500000 or other)
+	csvSelectors := []string{
+		"a:has-text('明細ＣＳＶ')",    // Text match (most reliable, ignores spacing)
+		"a[onclick*='goOutput'][onclick*='hakkoMeisai']", // goOutput function call
+		"a[onclick*='1032500000']",  // 明細CSV funccode (pattern 1)
+	}
+
+	var csvLink LocatorInterface
+	var csvLinkCount int
+
+	for _, selector := range csvSelectors {
+		count, _ := s.page.Locator(selector).Count()
+		s.logger.Printf("Trying selector '%s': found %d links", selector, count)
+		if count > 0 {
+			csvLink = s.page.Locator(selector).First()
+			csvLinkCount = count
+			break
+		}
+	}
+
+	if csvLinkCount == 0 {
+		return "", fmt.Errorf("CSV download link not found with any selector - possibly no search results or different page structure")
+	}
 
 	s.logger.Println("CSV link located, attempting click...")
 	if err := csvLink.Click(LocatorClickOptions{}); err != nil {
@@ -313,7 +370,10 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 // HandleDownload processes download events (exported for testing)
 func (s *ETCScraper) HandleDownload(download Download, downloadComplete chan<- string) {
 	suggestedFilename := download.SuggestedFilename()
-	downloadPath := filepath.Join(s.config.DownloadPath, suggestedFilename)
+
+	// Add account name prefix to filename
+	filenameWithAccount := s.config.UserID + "_" + suggestedFilename
+	downloadPath := filepath.Join(s.config.DownloadPath, filenameWithAccount)
 
 	s.logger.Printf("Downloading file: %s", suggestedFilename)
 	s.logger.Printf("Saving to: %s", downloadPath)

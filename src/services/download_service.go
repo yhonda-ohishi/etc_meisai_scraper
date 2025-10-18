@@ -112,6 +112,9 @@ func (s *DownloadService) ProcessAsync(jobID string, accounts []string, fromDate
 				jobID, len(accounts), fromDate, toDate)
 		}
 
+		// Create a shared session folder for all accounts in this job
+		sessionFolder := fmt.Sprintf("./downloads/%s", time.Now().Format("20060102_150405"))
+
 		// 各アカウントを処理
 		totalAccounts := len(accounts)
 		for i, account := range accounts {
@@ -119,8 +122,8 @@ func (s *DownloadService) ProcessAsync(jobID string, accounts []string, fromDate
 			progress := int(float64(i+1) / float64(totalAccounts) * 100)
 			s.updateJobProgress(jobID, progress)
 
-			// 実際のダウンロード処理
-			if err := s.downloadAccountData(account, fromDate, toDate); err != nil {
+			// 実際のダウンロード処理（セッションフォルダを渡す）
+			if err := s.downloadAccountData(account, fromDate, toDate, sessionFolder); err != nil {
 				if s.logger != nil {
 					s.logger.Printf("Error downloading data for account %s: %v", account, err)
 				}
@@ -148,7 +151,7 @@ func (s *DownloadService) ProcessAsync(jobID string, accounts []string, fromDate
 }
 
 // downloadAccountData は単一アカウントのデータをダウンロード
-func (s *DownloadService) downloadAccountData(accountID, fromDate, toDate string) error {
+func (s *DownloadService) downloadAccountData(accountID, fromDate, toDate, sessionFolder string) error {
 	// アカウント情報の解析（accountID:password形式）
 	parts := strings.Split(accountID, ":")
 	if len(parts) < 2 {
@@ -160,12 +163,13 @@ func (s *DownloadService) downloadAccountData(accountID, fromDate, toDate string
 
 	// スクレイパーの設定
 	config := &scraper.ScraperConfig{
-		UserID:       userID,
-		Password:     password,
-		DownloadPath: fmt.Sprintf("./downloads/%s_%s", userID, time.Now().Format("20060102_150405")),
-		Headless:     getHeadlessMode(),
-		Timeout:      30000,
-		RetryCount:   3,
+		UserID:        userID,
+		Password:      password,
+		DownloadPath:  "./downloads",
+		SessionFolder: sessionFolder, // Use shared session folder
+		Headless:      getHeadlessMode(),
+		Timeout:       30000,
+		RetryCount:    3,
 	}
 
 	// スクレイパー作成
