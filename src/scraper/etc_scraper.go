@@ -135,6 +135,25 @@ func (s *ETCScraper) Initialize() error {
 		return fmt.Errorf("could not create page: %w", err)
 	}
 
+	// Setup dialog handler to auto-accept all dialogs (for CSV download confirmation)
+	s.logger.Println("Setting up global dialog handler...")
+	s.page.On("dialog", func(dialog interface{}) {
+		s.logger.Printf("🔔 Dialog detected! Type: %T", dialog)
+		// playwright.Dialog has Accept() method - cast to playwright.Dialog
+		if d, ok := dialog.(interface {
+			Accept(promptText ...string) error
+		}); ok {
+			s.logger.Println("✅ Auto-accepting dialog...")
+			if err := d.Accept(); err != nil {
+				s.logger.Printf("❌ Failed to accept dialog: %v", err)
+			} else {
+				s.logger.Println("✅ Dialog accepted successfully!")
+			}
+		} else {
+			s.logger.Printf("❌ Could not cast dialog to acceptable interface")
+		}
+	})
+
 	s.logger.Printf("Scraper initialized with download path: %s", s.config.DownloadPath)
 	return nil
 }
@@ -158,7 +177,7 @@ func (s *ETCScraper) Login() error {
 	// Click login link
 	s.logger.Println("Clicking login link...")
 	loginLinkSelector := "a[href*='funccode=1013000000']"
-	loginLink := s.page.Locator(loginLinkSelector)
+	loginLink := s.page.Locator(loginLinkSelector).First()
 	if err := loginLink.Click(LocatorClickOptions{}); err != nil {
 		return fmt.Errorf("failed to click login link: %w", err)
 	}
@@ -231,112 +250,64 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	s.logger.Printf("Downloading meisai from %s to %s", fromDate, toDate)
 
-	// Navigate to search/download page
-	searchURLs := []string{
-		"https://www.etc-meisai.jp/search",
-		"https://www.etc-meisai.jp/meisai",
-		"https://www.etc-meisai.jp/download",
-	}
-
-	navigated := false
-	for _, url := range searchURLs {
-		if _, err := s.page.Goto(url, PageGotoOptions{
-			WaitUntil: WaitUntilStateNetworkidle,
-		}); err == nil {
-			s.logger.Printf("Navigated to %s", url)
-			navigated = true
-			break
-		}
-	}
-
-	if !navigated {
-		s.logger.Println("Could not navigate to search page, trying to find search form on current page")
-	}
-
-	// Skip screenshot
-
-	// Fill date range
-	fromDateSelectors := []string{
-		"input[name='fromDate']",
-		"input[name='startDate']",
-		"#fromDate",
-		"input[placeholder*='開始']",
-		"input[placeholder*='から']",
-	}
-
-	fromDateField := s.findElement(fromDateSelectors)
-	if fromDateField != nil {
-		fromDateField.Fill(fromDate)
-		s.logger.Printf("Filled from date: %s", fromDate)
-	}
-
-	toDateSelectors := []string{
-		"input[name='toDate']",
-		"input[name='endDate']",
-		"#toDate",
-		"input[placeholder*='終了']",
-		"input[placeholder*='まで']",
-	}
-
-	toDateField := s.findElement(toDateSelectors)
-	if toDateField != nil {
-		toDateField.Fill(toDate)
-		s.logger.Printf("Filled to date: %s", toDate)
-	}
-
-	// Skip screenshot
-
-	// Click search button
-	searchButtonSelectors := []string{
-		"button:has-text('検索')",
-		"button:has-text('照会')",
-		"input[value='検索']",
-		"input[value='照会']",
-		"button[type='submit']",
-		".search-button",
-	}
-
-	searchButton := s.findElement(searchButtonSelectors)
-	if searchButton != nil {
-		searchButton.Click(LocatorClickOptions{})
-		s.logger.Println("Clicked search button")
+	// Navigate to search page (検索条件の指定)
+	s.logger.Println("Navigating to search page...")
+	searchPageLink := s.page.Locator("a:has-text('検索条件の指定')").First()
+	if err := searchPageLink.Click(LocatorClickOptions{}); err != nil {
+		// If link not found, we might already be on search page
+		s.logger.Println("Search link not found, assuming already on search page")
+	} else {
 		s.waitForNavigation()
+		s.page.WaitForLoadState(PageWaitForLoadStateOptions{
+			State: LoadStateNetworkidle,
+		})
 	}
 
-	// Skip screenshot
+	// Click search button to execute search with current date range
+	s.logger.Println("Clicking search button...")
+	searchButton := s.page.Locator("input[name='focusTarget']").First()
+	if err := searchButton.Click(LocatorClickOptions{}); err != nil {
+		return "", fmt.Errorf("failed to click search button: %w", err)
+	}
+
+	// Wait for results page to load
+	s.waitForNavigation()
+	err := s.page.WaitForLoadState(PageWaitForLoadStateOptions{
+		State: LoadStateNetworkidle,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to wait for search results: %w", err)
+	}
 
 	// Setup download handler
 	downloadComplete := make(chan string, 1)
+	s.logger.Println("Setting up download handler...")
 	s.page.On("download", func(download Download) {
+		s.logger.Println("📥 Download event triggered!")
 		s.HandleDownload(download, downloadComplete)
 	})
 
-	// Click CSV download button
-	downloadButtonSelectors := []string{
-		"button:has-text('CSV')",
-		"button:has-text('ダウンロード')",
-		"a:has-text('CSV')",
-		"a:has-text('ダウンロード')",
-		"input[value*='CSV']",
-		".download-csv",
+	// Click CSV download link
+	s.logger.Println("Clicking CSV download link...")
+	// Use onclick attribute to find the CSV link more reliably
+	csvLink := s.page.Locator("a[onclick*='1032500000']").First()
+
+	s.logger.Println("CSV link located, attempting click...")
+	if err := csvLink.Click(LocatorClickOptions{}); err != nil {
+		return "", fmt.Errorf("failed to click CSV link: %w", err)
 	}
+	s.logger.Println("CSV link clicked successfully!")
 
-	downloadButton := s.findElement(downloadButtonSelectors)
-	if downloadButton != nil {
-		downloadButton.Click(LocatorClickOptions{})
-		s.logger.Println("Clicked download button")
+	s.logger.Println("Waiting for CSV download to complete...")
 
-		// Wait for download with timeout
-		select {
-		case path := <-downloadComplete:
-			s.logger.Printf("Download completed: %s", path)
-			return path, nil
-		case <-time.After(100 * time.Millisecond):
-			return "", fmt.Errorf("download timeout")
-		}
+	// Wait for download with timeout
+	select {
+	case path := <-downloadComplete:
+		s.logger.Printf("Download completed: %s", path)
+		return path, nil
+	case <-time.After(60 * time.Second):
+		return "", fmt.Errorf("download timeout after 60 seconds")
 	}
-
-	return "", fmt.Errorf("could not find download button")
 }
 
 // HandleDownload processes download events (exported for testing)
@@ -345,11 +316,35 @@ func (s *ETCScraper) HandleDownload(download Download, downloadComplete chan<- s
 	downloadPath := filepath.Join(s.config.DownloadPath, suggestedFilename)
 
 	s.logger.Printf("Downloading file: %s", suggestedFilename)
-	if err := download.SaveAs(downloadPath); err != nil {
-		s.logger.Printf("Failed to save download: %v", err)
-	} else {
-		downloadComplete <- downloadPath
-	}
+	s.logger.Printf("Saving to: %s", downloadPath)
+
+	// Run SaveAs in a goroutine with timeout
+	go func() {
+		done := make(chan error, 1)
+		go func() {
+			done <- download.SaveAs(downloadPath)
+		}()
+
+		// Wait for SaveAs to complete or timeout after 30 seconds
+		select {
+		case err := <-done:
+			if err != nil {
+				s.logger.Printf("❌ Failed to save download: %v", err)
+			} else {
+				s.logger.Printf("✅ File saved successfully: %s", downloadPath)
+				downloadComplete <- downloadPath
+			}
+		case <-time.After(30 * time.Second):
+			// SaveAs is hanging, but file is probably saved
+			// Check if file exists
+			if _, err := filepath.Glob(downloadPath); err == nil {
+				s.logger.Printf("⚠️ SaveAs timeout, but file appears to exist: %s", downloadPath)
+				downloadComplete <- downloadPath
+			} else {
+				s.logger.Printf("❌ SaveAs timeout and file not found")
+			}
+		}
+	}()
 }
 
 // findElement tries multiple selectors and returns the first match

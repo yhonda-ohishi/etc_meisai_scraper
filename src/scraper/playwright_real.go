@@ -102,6 +102,11 @@ func (r *RealBrowserContext) Close() error {
 	return r.context.Close()
 }
 
+func (r *RealBrowserContext) On(event string, handler interface{}) {
+	// BrowserContext event handling not supported in playwright-go
+	// Downloads are handled at the page level
+}
+
 // RealPage wraps playwright.Page
 type RealPage struct {
 	page playwright.Page
@@ -144,7 +149,18 @@ func (r *RealPage) On(event string, handler interface{}) {
 				fn(&RealDownload{download: d})
 			}
 		})
+	} else if event == "dialog" {
+		r.page.OnDialog(func(d playwright.Dialog) {
+			// Pass the dialog as interface{} to match the handler signature
+			if fn, ok := handler.(func(interface{})); ok {
+				fn(d)
+			}
+		})
 	}
+}
+
+func (r *RealPage) Evaluate(expression string, arg ...interface{}) (interface{}, error) {
+	return r.page.Evaluate(expression, arg...)
 }
 
 // RealLocator wraps playwright.Locator

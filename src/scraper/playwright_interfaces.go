@@ -87,6 +87,7 @@ type BrowserContextInterface interface {
 	NewPage() (PageInterface, error)
 	SetDefaultTimeout(timeout float64)
 	Close() error
+	On(event string, handler interface{})
 }
 
 // PageInterface wraps playwright.Page for mocking
@@ -97,6 +98,7 @@ type PageInterface interface {
 	Screenshot(options PageScreenshotOptions) ([]byte, error)
 	Close() error
 	On(event string, handler interface{})
+	Evaluate(expression string, arg ...interface{}) (interface{}, error)
 }
 
 // LocatorInterface wraps playwright.Locator for mocking
