@@ -147,31 +147,35 @@ func (s *ETCScraper) Login() error {
 
 	s.logger.Println("Navigating to https://www.etc-meisai.jp/")
 
-	// Navigate to login page
+	// Navigate to top page
 	_, err := s.page.Goto("https://www.etc-meisai.jp/", PageGotoOptions{
 		WaitUntil: WaitUntilStateNetworkidle,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to navigate to login page: %w", err)
+		return fmt.Errorf("failed to navigate to top page: %w", err)
 	}
 
-	// Skip screenshot for debugging
+	// Click login link
+	s.logger.Println("Clicking login link...")
+	loginLinkSelector := "a[href*='funccode=1013000000']"
+	loginLink := s.page.Locator(loginLinkSelector)
+	if err := loginLink.Click(LocatorClickOptions{}); err != nil {
+		return fmt.Errorf("failed to click login link: %w", err)
+	}
 
-	// Wait for login form
+	// Wait for login page to load
+	s.waitForNavigation()
+	err = s.page.WaitForLoadState(PageWaitForLoadStateOptions{
+		State: LoadStateNetworkidle,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to load login page: %w", err)
+	}
+
+	// Wait for login form with correct field names
 	s.logger.Println("Waiting for login form...")
-
-	// Try multiple selectors for user ID field
-	userIDSelectors := []string{
-		"input[name='userId']",
-		"#userId",
-		"input[type='text'][placeholder*='ID']",
-		"input[name='username']",
-	}
-
-	userIDField := s.findElement(userIDSelectors)
-	if userIDField == nil {
-		return fmt.Errorf("login form user ID field not found")
-	}
+	userIDField := s.page.Locator("input[name='risLoginId']")
+	passwordField := s.page.Locator("input[name='risPassword']")
 
 	// Fill user ID
 	s.logger.Println("Filling login credentials...")
@@ -179,41 +183,14 @@ func (s *ETCScraper) Login() error {
 		return fmt.Errorf("failed to fill user ID: %w", err)
 	}
 
-	// Try multiple selectors for password field
-	passwordSelectors := []string{
-		"input[name='password']",
-		"#password",
-		"input[type='password']",
-		"input[name='passwd']",
-	}
-
-	passwordField := s.findElement(passwordSelectors)
-	if passwordField == nil {
-		return fmt.Errorf("password field not found")
-	}
-
 	// Fill password
 	if err := passwordField.Fill(s.config.Password); err != nil {
 		return fmt.Errorf("failed to fill password: %w", err)
 	}
 
-	// Skip screenshot
-
 	// Click login button
 	s.logger.Println("Clicking login button...")
-	loginButtonSelectors := []string{
-		"button[type='submit']",
-		"input[type='submit']",
-		".login-button",
-		"button:has-text('ログイン')",
-		"input[value='ログイン']",
-	}
-
-	loginButton := s.findElement(loginButtonSelectors)
-	if loginButton == nil {
-		return fmt.Errorf("login button not found")
-	}
-
+	loginButton := s.page.Locator("input[type='button'][value='ログイン']")
 	if err := loginButton.Click(LocatorClickOptions{}); err != nil {
 		return fmt.Errorf("failed to click login button: %w", err)
 	}
@@ -226,8 +203,6 @@ func (s *ETCScraper) Login() error {
 	if err != nil {
 		return fmt.Errorf("failed to wait for login completion: %w", err)
 	}
-
-	// Skip screenshot
 
 	// Check if login was successful
 	logoutLocator := s.page.Locator("a:has-text('ログアウト')")
