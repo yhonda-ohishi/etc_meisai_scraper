@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -162,7 +163,7 @@ func (s *DownloadService) downloadAccountData(accountID, fromDate, toDate string
 		UserID:       userID,
 		Password:     password,
 		DownloadPath: fmt.Sprintf("./downloads/%s_%s", userID, time.Now().Format("20060102_150405")),
-		Headless:     true,
+		Headless:     getHeadlessMode(),
 		Timeout:      30000,
 		RetryCount:   3,
 	}
@@ -240,4 +241,27 @@ func (s *DownloadService) GetJobStatus(jobID string) (*DownloadJob, bool) {
 	// コピーを返す
 	jobCopy := *job
 	return &jobCopy, true
+}
+
+// GetHeadlessMode は環境変数からHeadlessモードの設定を取得
+// ETC_HEADLESS=false でブラウザを表示、未設定またはtrueでHeadlessモード（デフォルト）
+func GetHeadlessMode() bool {
+	headlessEnv := os.Getenv("ETC_HEADLESS")
+	if headlessEnv == "" {
+		return true // デフォルトはHeadlessモード
+	}
+
+	// "false", "0", "no" の場合は非Headlessモード（ブラウザ表示）
+	headless, err := strconv.ParseBool(headlessEnv)
+	if err != nil {
+		// パースエラーの場合もデフォルトのHeadlessモード
+		return true
+	}
+
+	return headless
+}
+
+// getHeadlessMode は後方互換性のため維持（非推奨）
+func getHeadlessMode() bool {
+	return GetHeadlessMode()
 }

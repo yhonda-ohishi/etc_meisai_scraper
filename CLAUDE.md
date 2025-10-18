@@ -98,11 +98,14 @@ db_service (Fiber):
 - **API契紁E*: [contracts/](specs/001-db-service-integration/contracts/)
 - **開発ガイチE*: [quickstart.md](specs/001-db-service-integration/quickstart.md)
 
-## 環墁E�E��E�数
-- `ETC_CORPORATE_ACCOUNTS`: 法人アカウント（カンマ区刁E�E��E��E�E�E�E
-- `ETC_PERSONAL_ACCOUNTS`: 個人アカウント（カンマ区刁E�E��E��E�E�E�E
-- `DATABASE_URL`: チE�E�Eタベ�Eス接続URL (統合征E
-- `GRPC_SERVER_PORT`: gRPCサーバ�Eポ�EチE(統合征E
+## 環境変数
+- `ETC_CORPORATE_ACCOUNTS`: 法人アカウント（カンマ区切り）
+- `ETC_PERSONAL_ACCOUNTS`: 個人アカウント（カンマ区切り）
+- `ETC_HEADLESS`: Headlessモード（デフォルト: true）
+  - `true` または未設定: Headlessモード（ブラウザ非表示）
+  - `false`: ブラウザ表示モード（デバッグ用）
+- `DATABASE_URL`: データベース接続URL（統合後）
+- `GRPC_SERVER_PORT`: gRPCサーバーポート（統合後）
 
 ## チE�E��E�トコマンチE
 ```bash

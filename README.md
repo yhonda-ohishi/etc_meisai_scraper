@@ -250,10 +250,30 @@ etc_meisai/
 └── show_coverage.sh    # カバレッジレポート生成
 ```
 
+## ⚙️ 環境変数
+
+| 変数名 | 説明 | デフォルト値 |
+|--------|------|--------------|
+| `ETC_CORPORATE_ACCOUNTS` | 法人アカウント（カンマ区切り） | - |
+| `ETC_PERSONAL_ACCOUNTS` | 個人アカウント（カンマ区切り） | - |
+| `ETC_HEADLESS` | Headlessモード | `true` |
+
+### ETC_HEADLESS の使用例
+
+```bash
+# Headlessモード（デフォルト、ブラウザ非表示）
+ETC_HEADLESS=true ./etc_meisai_scraper.exe
+
+# ブラウザ表示モード（デバッグ用）
+ETC_HEADLESS=false ./etc_meisai_scraper.exe
+```
+
+**推奨**: 本番環境では`ETC_HEADLESS=true`（デフォルト）を使用してください。
+
 ## 🔒 セキュリティ
 
 - パスワードは環境変数で管理
-- Headlessモードでの実行推奨
+- Headlessモードでの実行推奨（`ETC_HEADLESS=true`）
 - ログに機密情報は出力されません
 
 ## 🤝 コントリビューション
