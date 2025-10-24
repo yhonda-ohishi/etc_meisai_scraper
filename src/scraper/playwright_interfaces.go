@@ -42,6 +42,12 @@ type LocatorClickOptions struct{}
 // LocatorTextContentOptions represents text content options
 type LocatorTextContentOptions struct{}
 
+// LocatorCheckOptions represents check options
+type LocatorCheckOptions struct{}
+
+// LocatorIsCheckedOptions represents is checked options
+type LocatorIsCheckedOptions struct{}
+
 // WaitUntilState represents wait until states
 type WaitUntilState string
 
@@ -108,6 +114,8 @@ type LocatorInterface interface {
 	Fill(value string) error
 	Click(options LocatorClickOptions) error
 	TextContent(options LocatorTextContentOptions) (string, error)
+	Check(options LocatorCheckOptions) error
+	IsChecked(options LocatorIsCheckedOptions) (bool, error)
 }
 
 // Helper functions for creating option structs

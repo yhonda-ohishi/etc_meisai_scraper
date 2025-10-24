@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package etc_meisai.download.v2;
 
-option go_package = "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb";
-
 import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yhonda-ohishi/etc_meisai_scraper/src/pb";
 
 // バッファベースのダウンロードサービス
 service DownloadBufferService {
@@ -27,15 +27,15 @@ message BufferDownloadRequest {
 
 // バッファレスポンス（CSVをそのままバイナリで）
 message BufferResponse {
-  bytes csv_data = 1;  // CSVファイルの内容をそのまま
+  bytes csv_data = 1; // CSVファイルの内容をそのまま
   int32 record_count = 2;
-  string content_type = 3;  // "text/csv"
+  string content_type = 3; // "text/csv"
   int64 size_bytes = 4;
 }
 
 // ストリーミング用チャンク
 message ChunkResponse {
-  bytes chunk = 1;  // データの一部（例: 1MB chunks）
+  bytes chunk = 1; // データの一部（例: 1MB chunks）
   bool is_last = 2;
   int32 sequence_number = 3;
 }

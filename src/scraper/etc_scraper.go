@@ -288,6 +288,41 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 		})
 	}
 
+	// Select "全て" (All) radio button for 走行区分 (sokoKbn)
+	s.logger.Println("Selecting '全て' (All) option for 走行区分...")
+	allRadioButton := s.page.Locator("input[name='sokoKbn'][value='0']").First()
+
+	// Check if already selected
+	isChecked, err := allRadioButton.IsChecked(LocatorIsCheckedOptions{})
+	if err != nil {
+		s.logger.Printf("⚠️ Could not check radio button state: %v", err)
+	}
+
+	if !isChecked {
+		s.logger.Println("Clicking '全て' radio button...")
+		if err := allRadioButton.Click(LocatorClickOptions{}); err != nil {
+			s.logger.Printf("⚠️ Failed to click '全て' radio button: %v", err)
+		} else {
+			s.logger.Println("✅ '全て' radio button selected successfully!")
+		}
+	} else {
+		s.logger.Println("✅ '全て' radio button already selected")
+	}
+
+	// Click "この条件を記憶する" (Save this condition) button to save the search settings
+	s.logger.Println("Clicking 'この条件を記憶する' button to save search settings...")
+	saveButton := s.page.Locator("input[name='focusTarget_Save']").First()
+	if err := saveButton.Click(LocatorClickOptions{}); err != nil {
+		s.logger.Printf("⚠️ Failed to click 'この条件を記憶する' button: %v", err)
+	} else {
+		s.logger.Println("✅ Search settings saved successfully!")
+		// Wait for save confirmation
+		s.waitForNavigation()
+		s.page.WaitForLoadState(PageWaitForLoadStateOptions{
+			State: LoadStateNetworkidle,
+		})
+	}
+
 	// Click search button to execute search with current date range
 	s.logger.Println("Clicking search button...")
 	searchButton := s.page.Locator("input[name='focusTarget']").First()
@@ -297,10 +332,9 @@ func (s *ETCScraper) DownloadMeisai(fromDate, toDate string) (string, error) {
 
 	// Wait for results page to load
 	s.waitForNavigation()
-	err := s.page.WaitForLoadState(PageWaitForLoadStateOptions{
+	if err := s.page.WaitForLoadState(PageWaitForLoadStateOptions{
 		State: LoadStateNetworkidle,
-	})
-	if err != nil {
+	}); err != nil {
 		return "", fmt.Errorf("failed to wait for search results: %w", err)
 	}
 

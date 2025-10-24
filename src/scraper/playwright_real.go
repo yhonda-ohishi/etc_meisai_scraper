@@ -188,6 +188,14 @@ func (r *RealLocator) TextContent(options LocatorTextContentOptions) (string, er
 	return r.locator.TextContent()
 }
 
+func (r *RealLocator) Check(options LocatorCheckOptions) error {
+	return r.locator.Check()
+}
+
+func (r *RealLocator) IsChecked(options LocatorIsCheckedOptions) (bool, error) {
+	return r.locator.IsChecked()
+}
+
 // RealDownload wraps playwright.Download
 type RealDownload struct {
 	download playwright.Download
